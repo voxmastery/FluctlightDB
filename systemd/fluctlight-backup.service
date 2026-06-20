@@ -1,0 +1,7 @@
+[Unit]
+Description=Fluctlight brain backup
+
+[Service]
+Type=oneshot
+Environment=FLUCTLIGHT_BRAIN_PATH=/home/ambugo/.fluctlight/tenants/default/brain
+ExecStart=/home/ambugo/fluctlightdb/scripts/fluctlight-backup.sh

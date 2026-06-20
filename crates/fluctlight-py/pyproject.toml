@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "fluctlightdb-native"
+version = "0.1.0"
+description = "In-process FluctlightDB for Python agents (library call, like sqlite3)"
+license = "MIT OR Apache-2.0"
+requires-python = ">=3.9"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "fluctlightdb_native"

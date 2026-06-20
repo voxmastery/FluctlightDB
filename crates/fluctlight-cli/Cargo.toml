@@ -1,0 +1,16 @@
+[package]
+name = "fluctlight-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "fluctlight"
+path = "src/main.rs"
+
+[dependencies]
+fluctlightdb = { path = "../fluctlightdb" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+rustyline = "14"

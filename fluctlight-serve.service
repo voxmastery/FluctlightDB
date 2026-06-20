@@ -1,0 +1,19 @@
+[Unit]
+Description=FluctlightDB in-process HTTP API for ServerBrain
+After=network.target
+
+[Service]
+Type=simple
+User=ambugo
+WorkingDirectory=/home/ambugo
+Environment=HOME=/home/ambugo
+Environment=FLUCTLIGHT_STORAGE=v4
+Environment=FLUCTLIGHT_BRAIN_PATH=/home/ambugo/.fluctlight/tenants/default/brain
+Environment=FLUCTLIGHT_RATE_CAPACITY=120
+Environment=FLUCTLIGHT_RATE_REFILL=60
+ExecStart=/home/ambugo/fluctlightdb/target/release/fluctlight serve --addr 127.0.0.1:8792 --path /home/ambugo/.fluctlight/tenants/default/brain
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

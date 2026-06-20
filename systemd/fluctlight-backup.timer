@@ -1,0 +1,10 @@
+[Unit]
+Description=Fluctlight daily brain backup
+Requires=fluctlight-backup.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

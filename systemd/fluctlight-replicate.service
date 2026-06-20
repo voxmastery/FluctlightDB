@@ -1,0 +1,20 @@
+[Unit]
+Description=FluctlightDB WAL replication tail (primary → replica)
+After=network.target fluctlight-serve.service
+Wants=fluctlight-serve.service
+
+[Service]
+Type=simple
+User=ambugo
+WorkingDirectory=/home/ambugo
+Environment=HOME=/home/ambugo
+Environment=FLUCTLIGHT_STORAGE=v4
+Environment=FLUCTLIGHT_PRIMARY_BRAIN=/home/ambugo/.fluctlight/tenants/default/brain
+Environment=FLUCTLIGHT_REPLICA_DIR=/home/ambugo/.fluctlight/replica
+Environment=FLUCTLIGHT_REPLICA_INTERVAL_SEC=2
+ExecStart=/home/ambugo/fluctlightdb/scripts/replicate.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

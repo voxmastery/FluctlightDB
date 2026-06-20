@@ -1,0 +1,15 @@
+/target
+**/*.rs.bk
+*.pyc
+__pycache__/
+.venv/
+embed-server/.venv/
+*.egg-info/
+dist/
+.maturin/
+*.so
+*.dylib
+*.dll
+.DS_Store
+.fluctlight_history
+--path

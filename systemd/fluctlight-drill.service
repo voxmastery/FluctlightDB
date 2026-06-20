@@ -1,0 +1,8 @@
+[Unit]
+Description=Fluctlight weekly verify drill
+
+[Service]
+Type=oneshot
+User=ambugo
+Environment=HOME=/home/ambugo
+ExecStart=/home/ambugo/fluctlightdb/scripts/fluctlight-drill.sh

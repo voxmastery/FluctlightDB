@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FluctlightDB — Brain Visualizer</title>
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --panel: #121a2a;
+      --text: #e8eef7;
+      --muted: #8ba3c7;
+      --ec: #5b9bd5;
+      --dg: #70c1b3;
+      --ca3: #f4a261;
+      --amy: #e76f51;
+      --pfc: #9b5de5;
+      --auto: #06d6a0;
+      --sep: #ffd166;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, #1a2744, var(--bg));
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 2rem 2rem 1rem;
+      border-bottom: 1px solid #243049;
+    }
+    h1 { margin: 0; font-size: 1.8rem; letter-spacing: 0.02em; }
+    .sub { color: var(--muted); margin-top: 0.35rem; }
+    main { padding: 1.5rem 2rem 3rem; display: grid; gap: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem; }
+    .card {
+      background: var(--panel);
+      border: 1px solid #243049;
+      border-radius: 14px;
+      padding: 1.25rem;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+    }
+    .card h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+    svg { width: 100%; height: auto; display: block; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.75rem; font-size: 0.85rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .bar-row { margin: 0.5rem 0; }
+    .bar-label { font-size: 0.8rem; color: var(--muted); display: flex; justify-content: space-between; }
+    .bar {
+      height: 14px; border-radius: 7px; background: #1e2a40; overflow: hidden; margin-top: 4px;
+    }
+    .bar > span { display: block; height: 100%; border-radius: 7px; transition: width 0.6s ease; }
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+    .metric {
+      background: #0d1422; border-radius: 10px; padding: 0.75rem; text-align: center;
+    }
+    .metric .v { font-size: 1.4rem; font-weight: 700; color: var(--auto); }
+    .metric .k { font-size: 0.75rem; color: var(--muted); }
+    .pulse {
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 1; }
+    }
+    code { background: #0d1422; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+    input[type=file] { margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted); }
+    .timeline {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;
+    }
+    .step {
+      padding: 0.35rem 0.65rem; border-radius: 999px; font-size: 0.75rem;
+      border: 1px solid #334;
+      background: #0d1422;
+    }
+    .step.active { border-color: var(--auto); color: var(--auto); box-shadow: 0 0 12px rgba(6,214,160,0.35); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>FluctlightDB — Brain Visualizer</h1>
+    <p class="sub">Helping agents experience, remember, and grow — not a vector database</p>
+  </header>
+  <main>
+    <section class="card">
+      <h2>1. Trisynaptic memory path (Marr model)</h2>
+      <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#8ba3c7"/>
+          </marker>
+        </defs>
+        <rect x="20" y="70" width="100" height="50" rx="8" fill="#1e3a5f" stroke="#5b9bd5"/>
+        <text x="70" y="100" text-anchor="middle" fill="#e8eef7" font-size="13">Episode</text>
+        <line x1="120" y1="95" x2="160" y2="95" stroke="#8ba3c7" marker-end="url(#arrow)"/>
+        <rect x="160" y="55" width="110" height="80" rx="8" fill="#1a3330" stroke="#70c1b3"/>
+        <text x="215" y="88" text-anchor="middle" fill="#70c1b3" font-size="12" font-weight="bold">EC</text>
+        <text x="215" y="108" text-anchor="middle" fill="#8ba3c7" font-size="10">rich tokens</text>
+        <line x1="270" y1="95" x2="310" y2="95" stroke="#8ba3c7" marker-end="url(#arrow)"/>
+        <rect x="310" y="40" width="120" height="110" rx="8" fill="#1a3330" stroke="#70c1b3" stroke-width="2"/>
+        <text x="370" y="78" text-anchor="middle" fill="#70c1b3" font-size="13" font-weight="bold">DG</text>
+        <text x="370" y="98" text-anchor="middle" fill="#ffd166" font-size="10">SEPARATE()</text>
+        <text x="370" y="118" text-anchor="middle" fill="#8ba3c7" font-size="9">sparse granules</text>
+        <text x="370" y="133" text-anchor="middle" fill="#8ba3c7" font-size="9">+ separators</text>
+        <line x1="430" y1="95" x2="470" y2="95" stroke="#8ba3c7" marker-end="url(#arrow)"/>
+        <rect x="470" y="55" width="110" height="80" rx="8" fill="#3d2a1a" stroke="#f4a261"/>
+        <text x="525" y="88" text-anchor="middle" fill="#f4a261" font-size="12" font-weight="bold">CA3</text>
+        <text x="525" y="108" text-anchor="middle" fill="#8ba3c7" font-size="10">COMPLETE()</text>
+        <line x1="580" y1="95" x2="620" y2="95" stroke="#8ba3c7" marker-end="url(#arrow)"/>
+        <rect x="620" y="70" width="80" height="50" rx="8" fill="#2a1a3d" stroke="#9b5de5"/>
+        <text x="660" y="100" text-anchor="middle" fill="#9b5de5" font-size="11">Engram</text>
+        <text x="370" y="185" text-anchor="middle" fill="#8ba3c7" font-size="11">Similar episodes → high overlap → orthogonal separator neurons added</text>
+      </svg>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--ec)"></i>Entorhinal (tokenize)</span>
+        <span><i class="dot" style="background:var(--dg)"></i>Dentate Gyrus (separate)</span>
+        <span><i class="dot" style="background:var(--ca3)"></i>CA3 (complete / wire)</span>
+        <span><i class="dot" style="background:var(--sep)"></i>Separator neurons</span>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>2. Pattern separation — overlap</h2>
+        <div id="sep-bars">Loading demo…</div>
+        <p style="font-size:0.8rem;color:var(--muted);margin-top:0.75rem">
+          Run: <code>fluctlight demo-separate</code> then load <code>~/.fluctlight/brain-viz.json</code>
+        </p>
+        <input type="file" id="viz-file" accept="application/json,.json" />
+      </section>
+
+      <section class="card">
+        <h2>3. Autonomic loop (brainstem)</h2>
+        <svg viewBox="0 0 400 180" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="60" cy="90" r="28" fill="#0d1422" stroke="#06d6a0" class="pulse"/>
+          <text x="60" y="95" text-anchor="middle" fill="#06d6a0" font-size="11">tick()</text>
+          <line x1="88" y1="90" x2="130" y2="90" stroke="#334" marker-end="url(#arrow)"/>
+          <rect x="130" y="65" width="90" height="50" rx="6" fill="#121a2a" stroke="#5b9bd5"/>
+          <text x="175" y="88" text-anchor="middle" fill="#8ba3c7" font-size="10">metrics++</text>
+          <text x="175" y="102" text-anchor="middle" fill="#8ba3c7" font-size="10">stage check</text>
+          <line x1="220" y1="90" x2="260" y2="90" stroke="#334" marker-end="url(#arrow)"/>
+          <polygon points="290,65 340,90 290,115" fill="#1a3330" stroke="#70c1b3"/>
+          <text x="308" y="88" text-anchor="middle" fill="#70c1b3" font-size="9">sleep?</text>
+          <text x="308" y="102" text-anchor="middle" fill="#8ba3c7" font-size="8">pressure</text>
+          <line x1="340" y1="90" x2="370" y2="90" stroke="#334" marker-end="url(#arrow)"/>
+          <rect x="300" y="130" width="100" height="36" rx="6" fill="#3d2a1a" stroke="#f4a261"/>
+          <text x="350" y="152" text-anchor="middle" fill="#f4a261" font-size="10">replay + prune</text>
+        </svg>
+        <div class="timeline" id="auto-steps">
+          <span class="step active">tick</span>
+          <span class="step">→</span>
+          <span class="step">development</span>
+          <span class="step">→</span>
+          <span class="step">pressure check</span>
+          <span class="step">→</span>
+          <span class="step">sleep if due</span>
+        </div>
+        <p style="font-size:0.8rem;color:var(--muted)">
+          <code>fluctlight tick 5</code> or <code>fluctlight run 30</code> (every 30s)
+        </p>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>4. Live brain metrics</h2>
+      <div class="metrics" id="metrics">
+        <div class="metric"><div class="v" id="m-stage">—</div><div class="k">stage</div></div>
+        <div class="metric"><div class="v" id="m-tick">0</div><div class="k">autonomic ticks</div></div>
+        <div class="metric"><div class="v" id="m-pressure">0%</div><div class="k">synapse pressure</div></div>
+        <div class="metric"><div class="v" id="m-engrams">0</div><div class="k">engrams</div></div>
+        <div class="metric"><div class="v" id="m-sleep">0</div><div class="k">sleep cycles</div></div>
+        <div class="metric"><div class="v" id="m-sep">—</div><div class="k">last separation</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>5. Developmental growth (automatic)</h2>
+      <svg viewBox="0 0 720 80" xmlns="http://www.w3.org/2000/svg">
+        <g font-size="10" fill="#8ba3c7">
+          <rect x="10" y="30" width="70" height="24" rx="4" fill="#1e2a40"/><text x="45" y="46" text-anchor="middle">embryo</text>
+          <rect x="90" y="30" width="70" height="24" rx="4" fill="#1e2a40"/><text x="125" y="46" text-anchor="middle">newborn</text>
+          <rect x="170" y="30" width="70" height="24" rx="4" fill="#1a3330" stroke="#70c1b3"/><text x="205" y="46" text-anchor="middle">infant</text>
+          <rect x="250" y="30" width="70" height="24" rx="4" fill="#1e2a40"/><text x="285" y="46" text-anchor="middle">child</text>
+          <rect x="330" y="30" width="80" height="24" rx="4" fill="#1e2a40"/><text x="370" y="46" text-anchor="middle">adolescent</text>
+          <rect x="420" y="30" width="70" height="24" rx="4" fill="#1e2a40"/><text x="455" y="46" text-anchor="middle">adult</text>
+          <rect x="500" y="30" width="70" height="24" rx="4" fill="#2a1a3d" stroke="#9b5de5"/><text x="535" y="46" text-anchor="middle">expert</text>
+        </g>
+        <path d="M10 20 Q360 5 710 20" stroke="#06d6a0" fill="none" stroke-width="2" opacity="0.5"/>
+        <text x="360" y="15" text-anchor="middle" fill="#06d6a0" font-size="11">experience + sleep → auto advance (no manual flags)</text>
+      </svg>
+    </section>
+  </main>
+  <script>
+    const demo = {
+      stage: "infant",
+      tick: 12,
+      synapse_pressure: 0.18,
+      engrams: 4,
+      development: { sleep_cycles: 1, experiences: 4 },
+      recent_separations: [
+        { max_overlap_before: 0.42, max_overlap_after: 0.12, separation_index: 0.88, separators_added: 2, token_count: 14 },
+        { max_overlap_before: 0.38, max_overlap_after: 0.15, separation_index: 0.85, separators_added: 1, token_count: 13 }
+      ]
+    };
+
+    function pct(v) { return Math.round(v * 100) + '%'; }
+
+    function renderSeparation(data) {
+      const seps = data.recent_separations || [];
+      const el = document.getElementById('sep-bars');
+      if (!seps.length) { el.textContent = 'No separation data yet.'; return; }
+      el.innerHTML = seps.slice(-3).map((s, i) => `
+        <div class="bar-row">
+          <div class="bar-label"><span>Memory ${i + 1} overlap before</span><span>${pct(s.max_overlap_before)}</span></div>
+          <div class="bar"><span style="width:${pct(s.max_overlap_before)};background:#e76f51"></span></div>
+          <div class="bar-label"><span>after SEPARATE()</span><span>${pct(s.max_overlap_after)} · index ${pct(s.separation_index)}</span></div>
+          <div class="bar"><span style="width:${pct(s.max_overlap_after)};background:#70c1b3"></span></div>
+          <div class="bar-label"><span>separator neurons added</span><span>${s.separators_added}</span></div>
+        </div>
+      `).join('');
+    }
+
+    function renderMetrics(data) {
+      document.getElementById('m-stage').textContent = data.stage || '—';
+      document.getElementById('m-tick').textContent = data.tick ?? 0;
+      document.getElementById('m-pressure').textContent = pct(data.synapse_pressure || 0);
+      document.getElementById('m-engrams').textContent = data.engrams ?? 0;
+      document.getElementById('m-sleep').textContent = data.development?.sleep_cycles ?? 0;
+      const last = (data.recent_separations || []).slice(-1)[0];
+      document.getElementById('m-sep').textContent = last ? pct(last.separation_index) : '—';
+    }
+
+    function load(data) {
+      renderSeparation(data);
+      renderMetrics(data);
+    }
+
+    load(demo);
+
+    document.getElementById('viz-file').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => { try { load(JSON.parse(r.result)); } catch (err) { alert('Invalid JSON'); } };
+      r.readAsText(f);
+    });
+
+    let step = 0;
+    setInterval(() => {
+      const steps = document.querySelectorAll('#auto-steps .step');
+      steps.forEach(s => s.classList.remove('active'));
+      if (steps[step * 2]) steps[step * 2].classList.add('active');
+      step = (step + 1) % 4;
+    }, 1200);
+  </script>
+</body>
+</html>
