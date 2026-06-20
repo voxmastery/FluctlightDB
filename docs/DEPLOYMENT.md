@@ -36,8 +36,10 @@ FluctlightDB v1 targets **single-host industrial agents** with primary + replica
 
 ## Primary server
 
+Download the latest `fluctlight` binary from [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases), or build from source:
+
 ```bash
-cargo build --release
+cargo build --release   # contributors / operators only
 ./target/release/fluctlight tenant provision default --role admin
 sudo cp systemd/fluctlight-serve.service.d/production.conf /etc/systemd/system/fluctlight-serve.service.d/
 sudo systemctl enable --now fluctlight-serve
