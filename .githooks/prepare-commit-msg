@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Strip Cursor co-author trailers so they never appear in public history.
+sed -i '/^Co-authored-by: Cursor <cursoragent@cursor.com>$/d' "$1"

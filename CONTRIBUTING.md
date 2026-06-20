@@ -36,6 +36,7 @@ Report SDK bugs with your `pip show fluctlightdb` version and Python version.
 
 - Create a feature branch from `main`.
 - Keep changes focused; prefer small, reviewable PRs.
+- This repo uses `.githooks/` (enabled via `core.hooksPath`) to strip automated co-author trailers from commits.
 - Run `cargo fmt` and `cargo clippy` before opening a PR (Rust changes).
 - Add or update tests when behavior changes.
 - Update docs (`README.md`, `docs/`) when user-facing behavior changes.
