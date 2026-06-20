@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # Remove automated tool attribution trailers from commit messages.
 sed -i \
-  -e '/^Co-authored-by: Cursor <cursoragent@cursor.com>$/d' \
-  -e '/^Co-authored-by: Cursor$/d' \
-  -e '/^Made-with: Cursor$/d' \
-  -e '/^Made with Cursor$/d' \
+  -e '/cursoragent@/d' \
+  -e '/^Made-with:/d' \
   "$1"
