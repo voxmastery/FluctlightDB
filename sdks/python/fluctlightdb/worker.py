@@ -4,9 +4,26 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import threading
+from pathlib import Path
 from typing import Any, Optional, Protocol
+
+
+def _default_fluctlight_bin() -> str:
+    env = os.environ.get("FLUCTLIGHT_BIN")
+    if env:
+        return env
+    repo_root = Path(__file__).resolve().parents[3]
+    release = repo_root / "target" / "release" / "fluctlight"
+    if release.is_file():
+        return str(release)
+    debug = repo_root / "target" / "debug" / "fluctlight"
+    if debug.is_file():
+        return str(debug)
+    found = shutil.which("fluctlight")
+    return found if found else "fluctlight"
 
 
 class RecallClient(Protocol):
@@ -77,9 +94,7 @@ class FluctlightWorker:
         bin_path: Optional[str] = None,
     ) -> None:
         self.brain_path = brain_path
-        self.bin_path = bin_path or os.environ.get(
-            "FLUCTLIGHT_BIN", "/home/ambugo/fluctlightdb/target/release/fluctlight"
-        )
+        self.bin_path = bin_path or _default_fluctlight_bin()
         self._lock = threading.Lock()
         self._id = 0
         self._proc: Optional[subprocess.Popen[str]] = None

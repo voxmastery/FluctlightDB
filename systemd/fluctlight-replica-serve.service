@@ -1,16 +1,16 @@
 [Unit]
-Description=FluctlightDB read-only replica HTTP API
+Description=FluctlightDB read replica HTTP API
 After=network.target fluctlight-replicate.service
 Wants=fluctlight-replicate.service
 
 [Service]
 Type=simple
-User=ambugo
-WorkingDirectory=/home/ambugo
-Environment=HOME=/home/ambugo
+User=fluctlight
+Group=fluctlight
+EnvironmentFile=/etc/fluctlight/environment
 Environment=FLUCTLIGHT_STORAGE=v4
-EnvironmentFile=-/home/ambugo/.fluctlight/auth.env
-ExecStart=/home/ambugo/fluctlightdb/target/release/fluctlight serve --replica --addr 127.0.0.1:8794 --path /home/ambugo/.fluctlight/replica/brain
+EnvironmentFile=-/etc/fluctlight/auth.env
+ExecStart=/bin/sh -ec 'exec "$FLUCTLIGHT_INSTALL/target/release/fluctlight" serve --replica --addr 127.0.0.1:8794 --path "$FLUCTLIGHT_REPLICA_DIR/brain"'
 Restart=on-failure
 RestartSec=3
 

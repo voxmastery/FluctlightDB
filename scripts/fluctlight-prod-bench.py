@@ -14,7 +14,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-SDK = Path(__file__).resolve().parents[1] / "sdks" / "python"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SDK = REPO_ROOT / "sdks" / "python"
+DEFAULT_BIN = REPO_ROOT / "target" / "release" / "fluctlight"
 if SDK.is_dir() and str(SDK) not in sys.path:
     sys.path.insert(0, str(SDK))
 
@@ -63,7 +65,7 @@ def load_corpus_from_export() -> list[dict]:
                 return raw.get("engrams") or []
             except Exception:
                 pass
-    bin_path = Path(os.environ.get("FLUCTLIGHT_BIN", "/home/ambugo/fluctlightdb/target/release/fluctlight"))
+    bin_path = Path(os.environ.get("FLUCTLIGHT_BIN", str(DEFAULT_BIN)))
     if bin_path.is_file():
         import subprocess
 
