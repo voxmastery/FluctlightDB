@@ -1,14 +1,39 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluctlightdb"
 version = "0.4.0"
-description = "Python client for FluctlightDB agent memory HTTP API"
+description = "Python client for FluctlightDB — brain-native memory for AI agents"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Voxmastery", email = "voxmastery@roppashreeganesh.com" }]
+keywords = ["ai", "agents", "memory", "database", "llm", "recall"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Database",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/voxmastery/FluctlightDB"
+Documentation = "https://github.com/voxmastery/FluctlightDB/blob/main/docs/GETTING_STARTED.md"
+Repository = "https://github.com/voxmastery/FluctlightDB"
+Issues = "https://github.com/voxmastery/FluctlightDB/issues"
+
+[project.optional-dependencies]
+native = ["fluctlightdb-native>=0.4.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

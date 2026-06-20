@@ -4,40 +4,43 @@
 
 Give your agent a **mind it can grow** — episodic memory, verified facts, and recall by activation (not just cosine similarity).
 
+[![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/)
 **Repo:** [github.com/voxmastery/FluctlightDB](https://github.com/voxmastery/FluctlightDB)
 
 ---
 
 ## Install (Python agents — recommended)
 
-Like **`sqlite3`** (library in your process) or **`pip install qdrant-client`** (SDK + optional server):
+Like **`pip install qdrant-client`** — no Rust toolchain required:
 
 ```bash
-git clone https://github.com/voxmastery/FluctlightDB.git
-cd FluctlightDB
+pip install fluctlightdb
+```
 
-# One-time: build the native extension (~2 min)
-./scripts/install-native.sh
+Optional in-process recall (prebuilt wheels when available for your OS):
 
-# Use the Python SDK (no cargo in your agent code)
-pip install -e sdks/python   # optional; or add sdks/python to PYTHONPATH
+```bash
+pip install "fluctlightdb[native]"
 ```
 
 ```python
-import os
-os.environ["FLUCTLIGHT_NATIVE"] = "1"
+from fluctlightdb import FluctlightClient
 
+client = FluctlightClient.from_env()  # FLUCTLIGHT_SERVE_URL + FLUCTLIGHT_API_KEY
+client.experience("user prefers dark mode", context="settings")
+print(client.activate_lite("theme preference"))
+```
+
+Point at a running FluctlightDB server — download a [release binary](https://github.com/voxmastery/FluctlightDB/releases) or use your own deployment (see [DEPLOYMENT.md](docs/DEPLOYMENT.md)). **Agent code never needs `cargo`.**
+
+### Optional: in-process recall
+
+```python
 from fluctlightdb import get_recall_client
 
 brain = get_recall_client("~/.fluctlight/tenants/default/brain")
-
-# Recall — sub-ms, in-process (like sqlite3.execute)
-print(brain.activate("what did the user prefer for theme"))
-
-# Writes go through HTTP serve (see below) or Rust CLI
+print(brain.activate("dark mode"))  # sub-ms when fluctlightdb-native is installed
 ```
-
-That’s the **recommended industrial path**: native library for hot recall, HTTP for writes when needed.
 
 ---
 
@@ -59,55 +62,54 @@ Legacy single-file `.flct` still loads; new installs use the v4 directory layout
 
 | | **SQLite** | **Qdrant / Pinecone** | **FluctlightDB** |
 |---|------------|----------------------|------------------|
-| **README leads with** | `sqlite3`, any language | `pip install`, Docker, REST | **`pip` + native lib** (this README) |
-| **First line of code** | `import sqlite3` | `from qdrant_client import …` | `from fluctlightdb import get_recall_client` |
+| **README leads with** | `sqlite3`, any language | `pip install`, Docker, REST | **`pip install fluctlightdb`** |
+| **First line of code** | `import sqlite3` | `from qdrant_client import …` | `from fluctlightdb import FluctlightClient` |
 | **Query** | SQL strings | vector + filter | **`activate(cue)`** |
-| **Explore data** | `sqlite3`, DBeaver | Web UI / scroll API | **`fluctlight shell`** |
-| **Build from source** | optional (amalgamation) | optional (Rust) | optional (`cargo build` — for contributors) |
-
-SQL and vector READMEs **don’t ask app devs to run `cargo`**. Neither should we — `cargo` is only for building Fluctlight itself or the native wheel once.
+| **Explore data** | `sqlite3`, DBeaver | Web UI / scroll API | **`fluctlight shell`** (server binary) |
+| **Build from source** | optional | optional | **optional** — Rust only for [contributors](#contributing) |
 
 ---
 
 ## Quick start (5 minutes)
 
-### 1. Interactive REPL (like `psql` or `sqlite3`)
+### 1. Install the Python SDK
 
 ```bash
-# Requires one-time: cargo build --release  (or download a release binary later)
-./target/release/fluctlight shell --local --path /tmp/my-agent-brain
+pip install fluctlightdb
+```
+
+### 2. Run a server (operators)
+
+Download `fluctlight` from [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases) (or build from source if you maintain the server):
+
+```bash
+fluctlight tenant provision myagent --role admin
+fluctlight serve --path ~/.fluctlight/tenants/myagent/brain
+```
+
+### 3. Use from your agent
+
+```python
+import os
+os.environ["FLUCTLIGHT_SERVE_URL"] = "http://127.0.0.1:8792"
+os.environ["FLUCTLIGHT_API_KEY"] = "your-key"
+
+from fluctlightdb import FluctlightClient
+client = FluctlightClient.from_env()
+client.experience("deployment succeeded", context="ci")
+print(client.activate_lite("last deployment"))
+```
+
+### 4. Interactive REPL (optional — needs server binary)
+
+```bash
+fluctlight shell --local --path /tmp/my-agent-brain
 ```
 
 ```
 fluctlight> experience user prefers dark mode
 fluctlight> recall dark mode
-fluctlight> list 5
 fluctlight> quit
-```
-
-### 2. Python agent (recommended)
-
-```bash
-./scripts/install-native.sh
-export FLUCTLIGHT_NATIVE=1
-python3 -c "
-from fluctlightdb import get_recall_client
-print(get_recall_client('/tmp/my-agent-brain').activate('dark mode'))
-"
-```
-
-### 3. HTTP server (writes, multi-tenant — like Qdrant Docker)
-
-```bash
-./target/release/fluctlight tenant provision myagent --role admin
-./target/release/fluctlight serve --path ~/.fluctlight/tenants/myagent/brain
-```
-
-```python
-from fluctlightdb import FluctlightClient
-client = FluctlightClient.from_env()
-client.experience("deployment succeeded", context="ci")
-client.activate_lite("last deployment")  # HTTP keep-alive, top-1 only
 ```
 
 ---
@@ -135,22 +137,18 @@ Full mapping: [docs/CLI.md](docs/CLI.md)
 
 ---
 
-## Build from source (contributors / no wheel yet)
+## Build from source (contributors only)
+
+Agent developers should use **`pip install fluctlightdb`**. Rust is only needed if you hack on the core database or CLI:
 
 ```bash
+git clone https://github.com/voxmastery/FluctlightDB.git
+cd FluctlightDB
 cargo build --release
-./target/release/fluctlight --help
+cargo test --release
 ```
 
-Rust API:
-
-```rust
-use fluctlightdb::{Episode, FluctlightBrain};
-
-let mut brain = FluctlightBrain::open("/path/to/brain").unwrap();
-brain.experience(Episode::new("fixed cache bug", "debug", 0.8)).unwrap();
-let recalls = brain.activate("cache bug");
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -159,6 +157,7 @@ let recalls = brain.activate("cache bug");
 - **[Getting started](docs/GETTING_STARTED.md)** — UX deep-dive, FAQ  
 - [CLI.md](docs/CLI.md) — SQL/vector → Fluctlight commands  
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md) — replica, backup, industrial HA  
+- [PUBLISHING.md](docs/PUBLISHING.md) — PyPI releases (maintainers)  
 - [Manifesto.md](docs/Manifesto.md) — philosophy  
 - [openapi.yaml](docs/openapi.yaml) — HTTP API  
 

@@ -2,7 +2,19 @@
 
 Thanks for your interest in contributing. FluctlightDB is an open-source brain-native memory store for AI agents (MIT licensed).
 
-## Getting started
+## Two audiences
+
+### Python agent developers
+
+Use PyPI — **no clone or Rust required**:
+
+```bash
+pip install fluctlightdb
+```
+
+Report SDK bugs with your `pip show fluctlightdb` version and Python version.
+
+### Rust / core contributors
 
 1. Fork and clone the repository.
 2. Install Rust (stable) and Python 3.10+.
@@ -13,20 +25,21 @@ Thanks for your interest in contributing. FluctlightDB is an open-source brain-n
    cargo test --release
    ```
 
-4. Optional — Python SDK and native extension:
+4. Optional — test the Python SDK from source:
 
    ```bash
-   ./scripts/install-native.sh
    pip install -e sdks/python
+   ./scripts/install-native.sh   # local native wheel for recall tests
    ```
 
 ## Development workflow
 
 - Create a feature branch from `main`.
 - Keep changes focused; prefer small, reviewable PRs.
-- Run `cargo fmt` and `cargo clippy` before opening a PR.
+- Run `cargo fmt` and `cargo clippy` before opening a PR (Rust changes).
 - Add or update tests when behavior changes.
 - Update docs (`README.md`, `docs/`) when user-facing behavior changes.
+- Do not tell agent developers to run `cargo` unless they are contributing to the Rust core.
 
 ## Pull requests
 
@@ -35,13 +48,18 @@ Thanks for your interest in contributing. FluctlightDB is an open-source brain-n
 - Ensure CI passes (`cargo test --release`).
 - Do not commit secrets, production brain paths, or personal hostnames.
 
+## Publishing (maintainers)
+
+See [docs/PUBLISHING.md](docs/PUBLISHING.md) for PyPI release steps.
+
 ## Reporting issues
 
 Use GitHub Issues with:
 
 - Steps to reproduce
 - Expected vs actual behavior
-- Rust version (`rustc --version`) and OS
+- Rust version (`rustc --version`) and OS — for core bugs
+- `pip show fluctlightdb` — for SDK bugs
 
 For security vulnerabilities, see [SECURITY.md](SECURITY.md) — please do not open public issues for sensitive reports.
 
