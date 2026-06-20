@@ -1,3 +1,8 @@
 #!/usr/bin/env bash
-# Strip Cursor co-author trailers so they never appear in public history.
-sed -i '/^Co-authored-by: Cursor <cursoragent@cursor.com>$/d' "$1"
+# Strip Cursor attribution trailers from commit messages (Agent adds these by default).
+sed -i \
+  -e '/^Co-authored-by: Cursor <cursoragent@cursor.com>$/d' \
+  -e '/^Co-authored-by: Cursor$/d' \
+  -e '/^Made-with: Cursor$/d' \
+  -e '/^Made with Cursor$/d' \
+  "$1"

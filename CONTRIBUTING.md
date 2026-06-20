@@ -18,14 +18,20 @@ Report SDK bugs with your `pip show fluctlightdb` version and Python version.
 
 1. Fork and clone the repository.
 2. Install Rust (stable) and Python 3.10+.
-3. Build and test:
+3. Enable git hooks (strips Cursor attribution from commits):
+
+   ```bash
+   ./scripts/setup-git-hooks.sh
+   ```
+
+4. Build and test:
 
    ```bash
    cargo build --release
    cargo test --release
    ```
 
-4. Optional — test the Python SDK from source:
+5. Optional — test the Python SDK from source:
 
    ```bash
    pip install -e sdks/python
@@ -36,7 +42,24 @@ Report SDK bugs with your `pip show fluctlightdb` version and Python version.
 
 - Create a feature branch from `main`.
 - Keep changes focused; prefer small, reviewable PRs.
-- This repo uses `.githooks/` (enabled via `core.hooksPath`) to strip automated co-author trailers from commits.
+- This repo uses `.githooks/` (run `./scripts/setup-git-hooks.sh` once) to strip automated co-author trailers from commits.
+
+### Disable Cursor commit attribution (optional)
+
+Cursor adds `Co-authored-by: Cursor` by default. There is **no VS Code Settings search entry** for this — use one or both:
+
+1. **Cursor Settings → Agent → Attribution** — turn off **Commit attribution** (and PR attribution if you want). Fully restart Cursor after changing.
+2. **CLI / terminal agent** — in `~/.cursor/cli-config.json`:
+
+   ```json
+   "attribution": {
+     "attributeCommitsToAgent": false,
+     "attributePRsToAgent": false
+   }
+   ```
+
+The repo git hook above is the reliable fallback even if Cursor re-adds trailers.
+
 - Run `cargo fmt` and `cargo clippy` before opening a PR (Rust changes).
 - Add or update tests when behavior changes.
 - Update docs (`README.md`, `docs/`) when user-facing behavior changes.
