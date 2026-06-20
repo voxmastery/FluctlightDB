@@ -162,6 +162,12 @@ let recalls = brain.activate("cache bug");
 - [Manifesto.md](docs/Manifesto.md) — philosophy  
 - [openapi.yaml](docs/openapi.yaml) — HTTP API  
 
+## Contributing
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — build, test, PR guidelines  
+- [SECURITY.md](SECURITY.md) — report vulnerabilities privately  
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)  
+
 ## License
 
 MIT OR Apache-2.0 — see `LICENSE` (GitHub), `LICENSE-MIT`, `LICENSE-APACHE`.

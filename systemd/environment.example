@@ -1,0 +1,12 @@
+# Copy to /etc/fluctlight/environment and adjust for your host.
+# See systemd/README.md for install steps.
+
+FLUCTLIGHT_INSTALL=/opt/FluctlightDB
+FLUCTLIGHT_DATA=/var/lib/fluctlight
+FLUCTLIGHT_BRAIN_PATH=/var/lib/fluctlight/tenants/default/brain
+FLUCTLIGHT_REPLICA_DIR=/var/lib/fluctlight/replica
+FLUCTLIGHT_PRIMARY_BRAIN=/var/lib/fluctlight/tenants/default/brain
+FLUCTLIGHT_SDK_PATH=/opt/FluctlightDB/sdks/python
+
+# Optional: API keys for serve (comma-separated tenant:key:role entries)
+# FLUCTLIGHT_API_KEYS=default:change-me:write

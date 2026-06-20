@@ -34,7 +34,7 @@ When `fluctlight-serve` is running, read-only CLI commands prefer HTTP automatic
 fluctlight shell [--path BRAIN] [--writable] [--local]
 ```
 
-Example session (ServerBrain wallet):
+Example session (agent wallet memory):
 
 ```
 fluctlight> status
@@ -140,7 +140,7 @@ w.activate("wallet balance")  # sub-ms after first call
 | `FLUCTLIGHT_CACHE_TTL_SECS` | `60` | Cache TTL |
 | `FLUCTLIGHT_CANDIDATE_CAP` | `128` | Max engrams scored per activate |
 | `FLUCTLIGHT_SEPARATION_GATE` | `1` | Block near-duplicate chat ingest |
-| `FLUCTLIGHT_WORKER` | `0` | ServerBrain: persistent in-process worker |
+| `FLUCTLIGHT_WORKER` | `0` | Agent apps: persistent in-process worker |
 | `FLUCTLIGHT_EMBEDDED` | `0` | Same as `FLUCTLIGHT_WORKER=1` (alias) |
 
 ## Visualization

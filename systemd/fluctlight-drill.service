@@ -3,6 +3,7 @@ Description=Fluctlight weekly verify drill
 
 [Service]
 Type=oneshot
-User=ambugo
-Environment=HOME=/home/ambugo
-ExecStart=/home/ambugo/fluctlightdb/scripts/fluctlight-drill.sh
+User=fluctlight
+Group=fluctlight
+EnvironmentFile=/etc/fluctlight/environment
+ExecStart=/bin/sh -ec 'exec "$FLUCTLIGHT_INSTALL/scripts/fluctlight-drill.sh"'

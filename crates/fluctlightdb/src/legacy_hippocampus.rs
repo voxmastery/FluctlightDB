@@ -331,7 +331,10 @@ mod tests {
 
     #[test]
     fn load_prod_hippocampus_if_present() {
-        let path = std::path::Path::new("/home/ambugo/.fluctlight/tenants/default/brain");
+        let Some(path_str) = std::env::var("FLUCTLIGHT_TEST_BRAIN").ok() else {
+            return;
+        };
+        let path = std::path::Path::new(&path_str);
         if !path.join("hippocampus.seg").exists() {
             return;
         }
