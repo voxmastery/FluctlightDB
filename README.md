@@ -106,7 +106,10 @@ Open source: [github.com/voxmastery/FluctlightDB](https://github.com/voxmastery/
 
 ## Docs
 
-- `docs/Manifesto.md` — philosophy
+- **[Getting started](docs/GETTING_STARTED.md)** — UX vs SQL/vector, 5-minute tutorial  
+- [CLI.md](docs/CLI.md) — command mapping + REPL  
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) — replicas, backup, industrial HA  
+- [Manifesto.md](docs/Manifesto.md) — philosophy  
 - `docs/DevStages.md` — automatic growth stages
 - `docs/visual.html` — brain visualizer
 

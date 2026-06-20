@@ -167,6 +167,20 @@ class FluctlightClient:
             payload["agent_id"] = agent_id
         return self._post("/api/v1/activate", payload)
 
+    def activate_lite(
+        self,
+        cue: str,
+        semantic_vector: Optional[list[float]] = None,
+        agent_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Top-1 recall — minimal JSON (~200 B) for HTTP agent hot paths."""
+        payload: dict[str, Any] = {"cue": cue, "limit": 1}
+        if semantic_vector is not None:
+            payload["semantic_vector"] = semantic_vector
+        if agent_id is not None:
+            payload["agent_id"] = agent_id
+        return self._post("/api/v1/activate-lite", payload)
+
     def activate_batch(
         self,
         items: list[dict[str, Any]],
