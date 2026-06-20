@@ -1,6 +1,6 @@
-use std::sync::Mutex;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -18,21 +18,21 @@ use crate::development::{DevStage, DevelopmentState};
 use crate::engram::Engram;
 use crate::error::{Error, Result};
 use crate::graph::BrainGraph;
+use crate::graph_export::{export_graph, export_graph_lite, GraphExport};
 use crate::hippocampus::Hippocampus;
 use crate::index::RecallIndex;
 use crate::life::{CoreMemoryStore, LifeState};
 use crate::neuromodulator::Neuromodulators;
 use crate::prefrontal::Prefrontal;
+use crate::raw_export::{export_raw, RawExport};
 use crate::semantic::SemanticField;
 use crate::sleep::{separate_and_encode, sleep_cycle};
 use crate::sleep_trigger::SleepTrigger;
 use crate::store;
-use crate::graph_export::{export_graph, export_graph_lite, GraphExport};
-use crate::raw_export::{export_raw, RawExport};
-use crate::types::{
-    ActivationResult, Episode, ExperienceReport, SleepReport, VizExport, DevelopmentViz,
-};
 use crate::types::Region::HippocampusCa1;
+use crate::types::{
+    ActivationResult, DevelopmentViz, Episode, ExperienceReport, SleepReport, VizExport,
+};
 use crate::wal::{self, WalEntry};
 
 const MAX_RECENT_SEPARATIONS: usize = 12;
@@ -166,7 +166,8 @@ impl FluctlightBrain {
             return Err(Error::LifeEnded);
         }
 
-        if self.development.stage == DevStage::Embryonic && !episode.content.starts_with("reflex:") {
+        if self.development.stage == DevStage::Embryonic && !episode.content.starts_with("reflex:")
+        {
             return Err(Error::EmbryonicOnlyReflex);
         }
 
@@ -178,7 +179,8 @@ impl FluctlightBrain {
             }
         }
 
-        let salience = (episode.salience_hint + self.amygdala.weight_for(Uuid::nil())).clamp(0.0, 1.0);
+        let salience =
+            (episode.salience_hint + self.amygdala.weight_for(Uuid::nil())).clamp(0.0, 1.0);
         let gate = self.neuromodulators.plasticity_gate(salience);
         if episode.salience_hint > 0.5 {
             self.neuromodulators.on_surprise(episode.salience_hint);
@@ -193,11 +195,8 @@ impl FluctlightBrain {
             && !verified
             && !episode.context.starts_with("ledger:")
         {
-            let gate = crate::separation_gate::assess(
-                &self.hippocampus,
-                &episode,
-                self.life.life_id,
-            );
+            let gate =
+                crate::separation_gate::assess(&self.hippocampus, &episode, self.life.life_id);
             if !gate.allowed {
                 return Ok(ExperienceReport {
                     engram_id: Uuid::nil(),
@@ -232,9 +231,9 @@ impl FluctlightBrain {
         );
 
         if let Some(ref vector) = episode.semantic_vector {
-            let ec_sem = self
-                .semantic
-                .register_engram(engram.id, self.life.life_id, vector.clone());
+            let ec_sem =
+                self.semantic
+                    .register_engram(engram.id, self.life.life_id, vector.clone());
             for &n in &ec_sem {
                 engram.ec_neurons.push(n);
                 self.graph.register_neuron(n, HippocampusCa1);
@@ -276,16 +275,11 @@ impl FluctlightBrain {
             .semantic_vector
             .clone()
             .or_else(|| self.semantic.engram_vectors.get(&engram_id).cloned());
-        self.index_engram(
-            engram_id,
-            &content_for_index,
-            vector_for_index.as_deref(),
-        );
+        self.index_engram(engram_id, &content_for_index, vector_for_index.as_deref());
         self.activation_cache.lock().unwrap().invalidate();
 
-        let active = crate::activation::active_set_from_engram(
-            self.hippocampus.engrams.last().unwrap(),
-        );
+        let active =
+            crate::activation::active_set_from_engram(self.hippocampus.engrams.last().unwrap());
         self.graph.co_activate(&active, gate);
 
         self.push_separation(separation.clone());
@@ -371,12 +365,7 @@ impl FluctlightBrain {
         cue_vector: Option<&[f32]>,
         agent_id: Option<&str>,
     ) -> ActivationResult {
-        if let Some(cached) = self
-            .activation_cache
-            .lock()
-            .unwrap()
-            .get(cue, agent_id)
-        {
+        if let Some(cached) = self.activation_cache.lock().unwrap().get(cue, agent_id) {
             return cached;
         }
 
@@ -408,7 +397,9 @@ impl FluctlightBrain {
         for recall in &mut result.recalls {
             recall.activation += (cortex_boost + field_boost) * 0.1;
         }
-        result.recalls.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+        result
+            .recalls
+            .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
         if let Some(aid) = agent_id {
             result
                 .recalls
@@ -430,13 +421,7 @@ impl FluctlightBrain {
     ) -> Vec<ActivationResult> {
         items
             .iter()
-            .map(|(cue, vec, agent)| {
-                self.activate_scoped(
-                    cue,
-                    vec.as_deref(),
-                    agent.as_deref(),
-                )
-            })
+            .map(|(cue, vec, agent)| self.activate_scoped(cue, vec.as_deref(), agent.as_deref()))
             .collect()
     }
 
@@ -477,15 +462,15 @@ impl FluctlightBrain {
         for pkt in packets {
             let content = format!(
                 "[fix{}] {} | …{}… {} …",
-                pkt.fixation,
-                pkt.foveal,
-                pkt.peripheral_before,
-                pkt.peripheral_after
+                pkt.fixation, pkt.foveal, pkt.peripheral_before, pkt.peripheral_after
             );
             let chunk_id = format!("fovea-{}", pkt.fixation);
             let report = self.experience(Episode {
                 content,
-                context: format!("fovea:{}", path.file_name().and_then(|s| s.to_str()).unwrap_or("file")),
+                context: format!(
+                    "fovea:{}",
+                    path.file_name().and_then(|s| s.to_str()).unwrap_or("file")
+                ),
                 outcome: None,
                 salience_hint: pkt.salience_hint,
                 semantic_vector: None,
@@ -524,12 +509,8 @@ impl FluctlightBrain {
     pub fn neurogenesis_pulse(&mut self) -> Result<crate::neurogenesis::NeurogenesisReport> {
         let tick = self.development.metrics.ticks;
         let stage = self.development.stage as u8;
-        let report = crate::neurogenesis::pulse(
-            &mut self.hippocampus,
-            self.life.life_id,
-            tick,
-            stage,
-        );
+        let report =
+            crate::neurogenesis::pulse(&mut self.hippocampus, self.life.life_id, tick, stage);
         self.maybe_checkpoint()?;
         Ok(report)
     }
@@ -694,7 +675,11 @@ impl FluctlightBrain {
                 salience: e.salience,
             })
             .collect();
-        items.sort_by(|a, b| b.salience.partial_cmp(&a.salience).unwrap_or(std::cmp::Ordering::Equal));
+        items.sort_by(|a, b| {
+            b.salience
+                .partial_cmp(&a.salience)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         items.truncate(limit);
         items
     }
@@ -911,9 +896,8 @@ fn annotate_recall_trust(recalls: &mut [crate::types::RecallResult]) {
             || c.contains("total")
             || c.chars().any(|ch| ch.is_ascii_digit());
         if looks_factual {
-            recall.trust_note = Some(
-                "recalled utterance — not verified ground truth; check ledger/tools".into(),
-            );
+            recall.trust_note =
+                Some("recalled utterance — not verified ground truth; check ledger/tools".into());
         }
     }
 }
@@ -968,9 +952,9 @@ mod tests {
                     semantic_vector: None,
                     agent_id: None,
                     tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+                    rag: None,
+                    provenance: None,
+                })
                 .unwrap();
         }
         assert_eq!(brain.stage(), DevStage::Infant);
@@ -986,8 +970,8 @@ mod tests {
                 outcome: Some("retry succeeded".into()),
                 salience_hint: 0.8,
                 semantic_vector: None,
-            agent_id: None,
-            tenant_id: None,
+                agent_id: None,
+                tenant_id: None,
                 rag: None,
                 provenance: None,
             })
@@ -1019,8 +1003,8 @@ mod tests {
                 outcome: None,
                 salience_hint: 0.5,
                 semantic_vector: None,
-            agent_id: None,
-            tenant_id: None,
+                agent_id: None,
+                tenant_id: None,
                 rag: None,
                 provenance: None,
             })
@@ -1039,8 +1023,8 @@ mod tests {
                 outcome: None,
                 salience_hint: 0.9,
                 semantic_vector: None,
-            agent_id: None,
-            tenant_id: None,
+                agent_id: None,
+                tenant_id: None,
                 rag: None,
                 provenance: None,
             })
@@ -1048,7 +1032,11 @@ mod tests {
             .engram_id;
         brain.mark_core(id, "user_style".into()).unwrap();
         brain.death("session reset").unwrap();
-        assert!(brain.core_memories.memories.iter().any(|m| m.key == "user_style"));
+        assert!(brain
+            .core_memories
+            .memories
+            .iter()
+            .any(|m| m.key == "user_style"));
     }
 
     #[test]

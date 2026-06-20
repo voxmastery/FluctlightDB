@@ -76,7 +76,10 @@ pub fn preplay_forward(
         activation.remove(&best_node);
     }
 
-    let mut terminal: Vec<String> = path.iter().filter_map(|p| p.engram_preview.clone()).collect();
+    let mut terminal: Vec<String> = path
+        .iter()
+        .filter_map(|p| p.engram_preview.clone())
+        .collect();
     terminal.sort();
     terminal.dedup();
     terminal.truncate(8);

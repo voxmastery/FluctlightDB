@@ -176,7 +176,10 @@ impl ShellSession {
                     t.push(vec!["synapses".into(), s.synapses.to_string()]);
                     t.push(vec!["experiences".into(), s.experiences.to_string()]);
                     t.push(vec!["sleep_cycles".into(), s.sleep_cycles.to_string()]);
-                    t.push(vec!["synapse_pressure".into(), format!("{:.3}", s.synapse_pressure)]);
+                    t.push(vec![
+                        "synapse_pressure".into(),
+                        format!("{:.3}", s.synapse_pressure),
+                    ]);
                     t.push(vec!["pfc_unlocked".into(), yes_no(s.pfc_unlocked).into()]);
                     t.push(vec!["wal_seq".into(), s.wal_seq.to_string()]);
                     t.print();
@@ -188,7 +191,8 @@ impl ShellSession {
                 if self.json_mode {
                     println!("{body}");
                 } else {
-                    let v: serde_json::Value = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+                    let v: serde_json::Value =
+                        serde_json::from_str(&body).map_err(|e| e.to_string())?;
                     let mut t = Table::new(&["field", "value"]);
                     if let Some(obj) = v.as_object() {
                         for (k, val) in obj {
@@ -242,7 +246,8 @@ impl ShellSession {
                 if self.json_mode {
                     println!("{resp}");
                 } else {
-                    let v: serde_json::Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
+                    let v: serde_json::Value =
+                        serde_json::from_str(&resp).map_err(|e| e.to_string())?;
                     render_recalls_json(&v, t0);
                 }
             }
@@ -269,7 +274,8 @@ impl ShellSession {
                 if self.json_mode {
                     println!("{resp}");
                 } else {
-                    let v: serde_json::Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
+                    let v: serde_json::Value =
+                        serde_json::from_str(&resp).map_err(|e| e.to_string())?;
                     if let Some(content) = v
                         .get("episode")
                         .and_then(|e| e.get("content"))
@@ -310,18 +316,21 @@ impl ShellSession {
                 if self.json_mode {
                     println!("{resp}");
                 } else {
-                    let v: serde_json::Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
+                    let v: serde_json::Value =
+                        serde_json::from_str(&resp).map_err(|e| e.to_string())?;
                     let mut t = Table::new(&["confidence", "content"]);
-                    for f in v.get("facts").and_then(|x| x.as_array()).into_iter().flatten() {
+                    for f in v
+                        .get("facts")
+                        .and_then(|x| x.as_array())
+                        .into_iter()
+                        .flatten()
+                    {
                         t.push(vec![
                             format!(
                                 "{:.0}%",
                                 f.get("confidence").and_then(|c| c.as_f64()).unwrap_or(0.0) * 100.0
                             ),
-                            truncate(
-                                f.get("content").and_then(|c| c.as_str()).unwrap_or(""),
-                                60,
-                            ),
+                            truncate(f.get("content").and_then(|c| c.as_str()).unwrap_or(""), 60),
                         ]);
                     }
                     t.print();
@@ -391,9 +400,15 @@ impl ShellSession {
                 if self.json_mode {
                     println!("{resp}");
                 } else {
-                    let v: serde_json::Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
+                    let v: serde_json::Value =
+                        serde_json::from_str(&resp).map_err(|e| e.to_string())?;
                     let mut t = Table::new(&["hop", "activation", "preview"]);
-                    for s in v.get("path").and_then(|p| p.as_array()).into_iter().flatten() {
+                    for s in v
+                        .get("path")
+                        .and_then(|p| p.as_array())
+                        .into_iter()
+                        .flatten()
+                    {
                         t.push(vec![
                             s.get("hop")
                                 .and_then(|h| h.as_u64())
@@ -429,10 +444,7 @@ impl ShellSession {
                 } else {
                     let mut t = Table::new(&["field", "value"]);
                     t.push(vec!["stage".into(), r.stage]);
-                    t.push(vec![
-                        "next_stage".into(),
-                        r.next_stage.unwrap_or_default(),
-                    ]);
+                    t.push(vec!["next_stage".into(), r.next_stage.unwrap_or_default()]);
                     t.push(vec!["myelination".into(), format!("{:.2}", r.myelination)]);
                     t.push(vec![
                         "synapse_pressure".into(),
@@ -451,7 +463,8 @@ impl ShellSession {
                 if self.json_mode {
                     println!("{resp}");
                 } else {
-                    let v: serde_json::Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
+                    let v: serde_json::Value =
+                        serde_json::from_str(&resp).map_err(|e| e.to_string())?;
                     let mut t = Table::new(&["field", "value"]);
                     if let Some(obj) = v.as_object() {
                         for (k, val) in obj {
@@ -487,7 +500,8 @@ impl ShellSession {
                 }
             }
             Backend::Http => {
-                let body = serde_json::json!({"query": {"op": "forget", "engram_id": id.to_string()}});
+                let body =
+                    serde_json::json!({"query": {"op": "forget", "engram_id": id.to_string()}});
                 let resp = http_post("/api/v1/query", &body.to_string())?;
                 println!("{resp}");
             }
@@ -498,7 +512,9 @@ impl ShellSession {
     fn cmd_export(&mut self, kind: &str, file: Option<String>) -> Result<(), String> {
         match &self.backend {
             Backend::Local(brain) => {
-                let path = file.map(PathBuf::from).unwrap_or_else(|| default_export_path(kind));
+                let path = file
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| default_export_path(kind));
                 match kind {
                     "viz" => {
                         let v = brain.export_viz();

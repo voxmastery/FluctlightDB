@@ -63,7 +63,10 @@ pub fn activate_from_hybrid(
             let id_list: Vec<Uuid> = ids.iter().copied().collect();
             crate::index::RecallIndex::semantic_sims_for_candidates(semantic, Some(vec), &id_list)
         } else {
-            semantic.engram_similarities(vec, &engram_refs.iter().map(|e| (*e).clone()).collect::<Vec<_>>())
+            semantic.engram_similarities(
+                vec,
+                &engram_refs.iter().map(|e| (*e).clone()).collect::<Vec<_>>(),
+            )
         }
     } else {
         HashMap::new()

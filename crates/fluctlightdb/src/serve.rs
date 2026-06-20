@@ -25,15 +25,15 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::auth::{AuthConfig, AuthContext, Role};
+use crate::autonomic::TickReport;
 use crate::brain::FluctlightBrain;
 use crate::compact::CompactReport;
 use crate::error::{Error, Result};
 use crate::metrics::{Metrics, Timer};
 use crate::query::{self, QueryRequest};
+use crate::store;
 use crate::tenant::{default_tenant_root, TenantConfig};
 use crate::types::{ActivationResult, Episode, ExperienceReport};
-use crate::store;
-use crate::autonomic::TickReport;
 
 const MAX_BODY_BYTES: usize = 1_048_576;
 const MAX_IDEMPOTENCY_KEYS: usize = 10_000;
@@ -73,7 +73,12 @@ impl ConnectionGate {
             }
             if self
                 .0
-                .compare_exchange(cur, cur + 1, AtomicOrdering::AcqRel, AtomicOrdering::Relaxed)
+                .compare_exchange(
+                    cur,
+                    cur + 1,
+                    AtomicOrdering::AcqRel,
+                    AtomicOrdering::Relaxed,
+                )
                 .is_ok()
             {
                 metrics
@@ -480,7 +485,12 @@ fn serve_one_request(
     let parsed = parse_http(req_text)?;
 
     if parsed.body.len() > MAX_BODY_BYTES {
-        write_json_conn(stream, 413, &serde_json::json!({"error": "payload too large"}), keep_alive)?;
+        write_json_conn(
+            stream,
+            413,
+            &serde_json::json!({"error": "payload too large"}),
+            keep_alive,
+        )?;
         return Ok(false);
     }
 
@@ -510,9 +520,7 @@ fn serve_one_request(
     }
 
     let (tenant_from_path, subpath) = split_tenant_path(parsed.path);
-    let tenant_hint = tenant_from_path
-        .clone()
-        .or_else(|| {
+    let tenant_hint = tenant_from_path.clone().or_else(|| {
         if parsed.body.trim().is_empty() {
             None
         } else {
@@ -666,11 +674,10 @@ fn dispatch(
                 rag,
                 provenance,
             };
-            let report: ExperienceReport =
-                server.with_brain_write(tenant_id, |b| {
-                    enforce_tenant_limits(b, &cfg)?;
-                    b.experience(episode)
-                })?;
+            let report: ExperienceReport = server.with_brain_write(tenant_id, |b| {
+                enforce_tenant_limits(b, &cfg)?;
+                b.experience(episode)
+            })?;
             server.metrics.record_experience(timer.elapsed_ms());
             server.metrics.record_tenant_experience(tenant_id);
             Ok(serde_json::to_value(report).unwrap())
@@ -682,10 +689,7 @@ fn dispatch(
             let content = api_body
                 .content
                 .ok_or_else(|| Error::Store("missing content".into()))?;
-            let doc_id = api_body
-                .doc_id
-                .clone()
-                .unwrap_or_else(|| "document".into());
+            let doc_id = api_body.doc_id.clone().unwrap_or_else(|| "document".into());
             let chunk_id = api_body.chunk_id.clone().unwrap_or_else(|| "0".into());
             let timer = Timer::start();
             let report: ExperienceReport = server.with_brain_write(tenant_id, |b| {
@@ -732,7 +736,9 @@ fn dispatch(
                 ))
             })?;
             crate::api_slim::slim_activation_for_api(&mut result, Some(1));
-            server.metrics.record_activate(timer.elapsed_us().max(1) / 1000);
+            server
+                .metrics
+                .record_activate(timer.elapsed_us().max(1) / 1000);
             server.metrics.record_tenant_activate(tenant_id);
             let top = result.recalls.first().map(|r| {
                 serde_json::json!({
@@ -762,7 +768,9 @@ fn dispatch(
                 ))
             })?;
             crate::api_slim::slim_activation_for_api(&mut result, api_body.limit);
-            server.metrics.record_activate(timer.elapsed_us().max(1) / 1000);
+            server
+                .metrics
+                .record_activate(timer.elapsed_us().max(1) / 1000);
             server.metrics.record_tenant_activate(tenant_id);
             Ok(serde_json::to_value(result).unwrap())
         }
@@ -785,7 +793,9 @@ fn dispatch(
             for result in &mut results {
                 crate::api_slim::slim_activation_for_api(result, api_body.limit);
             }
-            server.metrics.record_activate(timer.elapsed_us().max(1) / 1000);
+            server
+                .metrics
+                .record_activate(timer.elapsed_us().max(1) / 1000);
             server.metrics.record_tenant_activate(tenant_id);
             Ok(serde_json::json!({"results": results, "count": results.len()}))
         }
@@ -856,19 +866,27 @@ fn dispatch(
         }
         "/api/v1/export-viz" | "/export-viz" => {
             require_role(auth, Role::Read)?;
-            server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.export_viz()).unwrap()))
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::to_value(b.export_viz()).unwrap())
+            })
         }
         "/api/v1/export-graph-lite" | "/export-graph-lite" => {
             require_role(auth, Role::Read)?;
-            server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.export_graph_lite()).unwrap()))
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::to_value(b.export_graph_lite()).unwrap())
+            })
         }
         "/api/v1/export-graph" | "/export-graph" => {
             require_role(auth, Role::Read)?;
-            server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.export_graph()).unwrap()))
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::to_value(b.export_graph()).unwrap())
+            })
         }
         "/api/v1/export-raw" | "/export-raw" => {
             require_role(auth, Role::Read)?;
-            server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.export_raw()).unwrap()))
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::to_value(b.export_raw()).unwrap())
+            })
         }
         "/api/v1/consolidate" | "/consolidate" => {
             require_role(auth, Role::Read)?;
@@ -929,10 +947,7 @@ fn dispatch(
         }
         "/api/v1/preplay" | "/preplay" => {
             require_role(auth, Role::Read)?;
-            let goal = api_body
-                .goal
-                .or(api_body.cue.clone())
-                .unwrap_or_default();
+            let goal = api_body.goal.or(api_body.cue.clone()).unwrap_or_default();
             let steps = api_body.steps.unwrap_or(4).min(16);
             let result = server.with_brain_read(tenant_id, |b| Ok(b.preplay(&goal, steps)))?;
             Ok(serde_json::to_value(result).unwrap())
@@ -956,7 +971,8 @@ fn dispatch(
         }
         "/api/v1/admin/tenants" | "/admin/tenants" => {
             require_role(auth, Role::Admin)?;
-            let store = crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
+            let store =
+                crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
             let tenants = store.list_tenants()?;
             Ok(serde_json::json!({"tenants": tenants}))
         }
@@ -969,7 +985,8 @@ fn dispatch(
             let cfg = TenantConfig::default_for(&tid, &default_tenant_root());
             cfg.ensure_dirs().map_err(Error::Io)?;
             let _ = FluctlightBrain::open(&cfg.brain_path)?;
-            let store = crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
+            let store =
+                crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
             let key = store.issue_key(&tid, Role::Write)?;
             Ok(serde_json::to_value(key).unwrap())
         }
@@ -979,7 +996,8 @@ fn dispatch(
                 .kid
                 .clone()
                 .ok_or_else(|| Error::Store("missing kid".into()))?;
-            let store = crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
+            let store =
+                crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
             let removed = store.revoke_key(&kid)?;
             Ok(serde_json::json!({"revoked": removed}))
         }
@@ -1005,7 +1023,9 @@ fn dispatch(
         }
         "/api/v1/query" | "/query" => {
             require_role(auth, Role::Read)?;
-            let req = api_body.query.ok_or_else(|| Error::Store("missing query".into()))?;
+            let req = api_body
+                .query
+                .ok_or_else(|| Error::Store("missing query".into()))?;
             let needs_write = matches!(
                 req,
                 QueryRequest::Forget { .. } | QueryRequest::ForgetBefore { .. }
@@ -1140,10 +1160,7 @@ fn split_tenant_path(path: &str) -> (Option<String>, String) {
             };
             return (Some(tenant.to_string()), subpath);
         }
-        return (
-            Some(rest.to_string()),
-            "/api/v1/status".to_string(),
-        );
+        return (Some(rest.to_string()), "/api/v1/status".to_string());
     }
     (None, path.to_string())
 }
@@ -1195,9 +1212,7 @@ fn parse_http(raw: &str) -> Result<HttpRequest<'_>> {
     let method = parts
         .next()
         .ok_or_else(|| Error::Store("no method".into()))?;
-    let path = parts
-        .next()
-        .ok_or_else(|| Error::Store("no path".into()))?;
+    let path = parts.next().ok_or_else(|| Error::Store("no path".into()))?;
     let path = path.split('?').next().unwrap_or(path);
 
     let mut content_length = 0usize;
@@ -1220,10 +1235,7 @@ fn parse_http(raw: &str) -> Result<HttpRequest<'_>> {
             idempotency = Some(rest.trim());
         }
     }
-    let body_start = raw
-        .find("\r\n\r\n")
-        .map(|i| i + 4)
-        .unwrap_or(raw.len());
+    let body_start = raw.find("\r\n\r\n").map(|i| i + 4).unwrap_or(raw.len());
     let body = if content_length > 0 && body_start + content_length <= raw.len() {
         &raw[body_start..body_start + content_length]
     } else if body_start < raw.len() {

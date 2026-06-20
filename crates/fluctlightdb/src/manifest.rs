@@ -131,8 +131,8 @@ mod tests {
                 outcome: None,
                 salience_hint: 0.5,
                 semantic_vector: None,
-            agent_id: None,
-            tenant_id: None,
+                agent_id: None,
+                tenant_id: None,
                 rag: None,
                 provenance: None,
             })

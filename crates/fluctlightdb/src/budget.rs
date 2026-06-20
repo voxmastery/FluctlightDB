@@ -83,12 +83,7 @@ pub fn wire_chain(
     }
 }
 
-pub fn wire_dg_to_ec(
-    graph: &mut BrainGraph,
-    dg: &[NeuronId],
-    ec: &[NeuronId],
-    max_links: usize,
-) {
+pub fn wire_dg_to_ec(graph: &mut BrainGraph, dg: &[NeuronId], ec: &[NeuronId], max_links: usize) {
     let mut added = 0usize;
     'outer: for &d in dg {
         for &e in ec {

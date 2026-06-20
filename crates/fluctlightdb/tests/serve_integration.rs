@@ -6,7 +6,7 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
-use fluctlightdb::{BrainServer, request_shutdown};
+use fluctlightdb::{request_shutdown, BrainServer};
 use tempfile::tempdir;
 
 fn post(port: u16, path: &str, body: &str, token: Option<&str>) -> (u16, String) {

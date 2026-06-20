@@ -11,10 +11,11 @@ FluctlightDB ships two Python packages:
 
 1. Create accounts on [pypi.org](https://pypi.org) and [test.pypi.org](https://test.pypi.org) (optional).
 2. Register both project names: `fluctlightdb` and `fluctlightdb-native`.
-3. Enable **trusted publishing** for this GitHub repo (recommended):
-   - PyPI → Your project → Publishing → Add GitHub Actions publisher
-   - Owner: `voxmastery`, repo: `FluctlightDB`, workflow: `publish-pypi.yml`, environment: `pypi`
-4. In GitHub: Settings → Environments → create **`pypi`** (no secrets needed if using trusted publishing).
+3. Enable **trusted publishing** (recommended) or add a **`PYPI_API_TOKEN`** repository secret:
+   - Trusted: PyPI → Your project → Publishing → Add GitHub Actions publisher
+   - Token: PyPI → Account → API tokens → scope to `fluctlightdb` + `fluctlightdb-native`
+   - GitHub → Settings → Secrets → Actions → `PYPI_API_TOKEN`
+4. Push a tag and publish a GitHub Release (see below). No separate `pypi` environment is required.
 
 Alternative: store `PYPI_API_TOKEN` as a repository secret and remove `id-token: write` if not using trusted publishing.
 

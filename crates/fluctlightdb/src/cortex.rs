@@ -51,10 +51,7 @@ impl Cortex {
         if tokens.is_empty() {
             return 0.0;
         }
-        let sum: f32 = tokens
-            .iter()
-            .filter_map(|t| self.facts.get(t))
-            .sum();
+        let sum: f32 = tokens.iter().filter_map(|t| self.facts.get(t)).sum();
         sum / tokens.len() as f32
     }
 

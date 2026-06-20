@@ -12,7 +12,6 @@ jobs:
   publish-sdk:
     name: fluctlightdb (Python SDK)
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - uses: actions/checkout@v4
 
@@ -30,11 +29,11 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: sdks/python/dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
   publish-native:
     name: fluctlightdb-native (Linux wheels)
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - uses: actions/checkout@v4
 
@@ -51,3 +50,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: crates/fluctlight-py/dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}

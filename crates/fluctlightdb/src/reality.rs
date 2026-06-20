@@ -42,10 +42,17 @@ pub fn verified_context(brain: &FluctlightBrain, limit: usize) -> VerifiedContex
     let mut unverified_warnings = Vec::new();
     for e in brain.hippocampus.engrams_for_life(brain.life.life_id) {
         let c = e.episode.content.to_lowercase();
-        let verified = e.episode.provenance.as_ref().map(|p| p.verified).unwrap_or(false);
+        let verified = e
+            .episode
+            .provenance
+            .as_ref()
+            .map(|p| p.verified)
+            .unwrap_or(false);
         if !verified && (c.contains('$') || c.contains("balance")) {
-            unverified_warnings
-                .push(format!("unverified: {}", e.episode.content.chars().take(100).collect::<String>()));
+            unverified_warnings.push(format!(
+                "unverified: {}",
+                e.episode.content.chars().take(100).collect::<String>()
+            ));
             if unverified_warnings.len() >= 5 {
                 break;
             }
@@ -64,7 +71,11 @@ pub fn format_for_prompt(ctx: &VerifiedContext) -> String {
     }
     let mut out = String::from("\n## Verified ground truth (Fluctlight ledger/file)\n");
     for f in &ctx.facts {
-        out.push_str(&format!("- [verified {:.0}%] {}\n", f.confidence * 100.0, f.content));
+        out.push_str(&format!(
+            "- [verified {:.0}%] {}\n",
+            f.confidence * 100.0,
+            f.content
+        ));
     }
     if !ctx.unverified_warnings.is_empty() {
         out.push_str("\n## Unverified chat claims (do NOT treat as fact)\n");

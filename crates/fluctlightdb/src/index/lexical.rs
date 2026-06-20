@@ -35,7 +35,10 @@ impl LexicalIndex {
             .filter(|s| s.len() > 2)
             .collect();
         for t in &tokens {
-            self.token_to_ids.entry(t.clone()).or_default().insert(engram_id);
+            self.token_to_ids
+                .entry(t.clone())
+                .or_default()
+                .insert(engram_id);
         }
         self.engram_tokens.insert(engram_id, tokens);
         Ok(())

@@ -1,13 +1,13 @@
 //! Auto-generated matrix tests for production certification bar.
+use fluctlightdb::auth::Role;
 use fluctlightdb::budget::WiringBudget;
 use fluctlightdb::development::DevStage;
-use fluctlightdb::auth::Role;
 use fluctlightdb::graph::BrainGraph;
-use fluctlightdb::plasticity::Synapse;
-use fluctlightdb::types::Region;
 use fluctlightdb::id::NeuronId;
 use fluctlightdb::metrics::Metrics;
+use fluctlightdb::plasticity::Synapse;
 use fluctlightdb::tokenize::tokenize_rich;
+use fluctlightdb::types::Region;
 
 #[test]
 fn generated_matrix_000() {
@@ -1808,4 +1808,3 @@ fn generated_matrix_249() {
     let b = WiringBudget::for_stage(DevStage::Adolescent);
     assert!(b.max_dg_to_ec_links >= b.max_dg_chain_links);
 }
-

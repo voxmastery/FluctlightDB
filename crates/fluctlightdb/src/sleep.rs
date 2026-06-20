@@ -5,7 +5,6 @@ use crate::amygdala::Amygdala;
 use crate::budget::{self, WiringBudget};
 use crate::cortex::Cortex;
 use crate::dentate::{separate_episode, SeparationResult};
-use crate::separation_gate;
 use crate::development::{DevStage, DevelopmentState};
 use crate::engram::Engram;
 use crate::graph::BrainGraph;
@@ -13,8 +12,9 @@ use crate::hippocampus::Hippocampus;
 use crate::life::LifeState;
 use crate::neuromodulator::Neuromodulators;
 use crate::semantic::SemanticField;
+use crate::separation_gate;
+use crate::types::Region::{HippocampusCa1, HippocampusCa3, HippocampusDg};
 use crate::types::{Episode, SleepReport};
-use crate::types::Region::{HippocampusCa3, HippocampusDg, HippocampusCa1};
 
 /// Offline processing — sharp-wave replay, consolidation, pruning (Wilson/McNaughton).
 pub fn sleep_cycle(

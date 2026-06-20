@@ -49,10 +49,7 @@ pub fn tokenize_rich(content: &str, context: &str, outcome: Option<&str>) -> Vec
 
     let content_words = words(content);
     for pair in content_words.windows(2) {
-        push(
-            format!("bg:c:{}_{}", pair[0], pair[1]),
-            TokenKind::Bigram,
-        );
+        push(format!("bg:c:{}_{}", pair[0], pair[1]), TokenKind::Bigram);
     }
     for tri in content_words.windows(3) {
         push(
@@ -61,12 +58,12 @@ pub fn tokenize_rich(content: &str, context: &str, outcome: Option<&str>) -> Vec
         );
     }
 
+    push(format!("ctx@{}", slug(context)), TokenKind::Structural);
     push(
-        format!("ctx@{}", slug(context)),
-        TokenKind::Structural,
-    );
-    push(
-        format!("sum@{}", slug(&content.chars().take(48).collect::<String>())),
+        format!(
+            "sum@{}",
+            slug(&content.chars().take(48).collect::<String>())
+        ),
         TokenKind::Structural,
     );
 

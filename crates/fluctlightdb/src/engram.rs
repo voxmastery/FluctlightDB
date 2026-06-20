@@ -5,8 +5,8 @@ use uuid::Uuid;
 
 use crate::dentate::SeparationResult;
 use crate::id::{EngramId, NeuronId};
-use crate::tokenize::tokenize_rich;
 use crate::tokenize::tokenize;
+use crate::tokenize::tokenize_rich;
 use crate::types::Episode;
 
 /// Physical memory trace — sparse neuron ensemble + metadata (Tonegawa engram).
@@ -107,9 +107,7 @@ pub fn cue_neurons(content: &str, context: &str) -> Vec<NeuronId> {
     let rich = tokenize_rich(content, context, None);
     rich.iter()
         .flat_map(|t| {
-            (0..2).map(move |g| {
-                NeuronId::from_seeds(&["dg", "cue", &t.surface, &g.to_string()])
-            })
+            (0..2).map(move |g| NeuronId::from_seeds(&["dg", "cue", &t.surface, &g.to_string()]))
         })
         .collect()
 }

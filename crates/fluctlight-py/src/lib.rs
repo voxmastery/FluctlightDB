@@ -44,11 +44,9 @@ impl PyBrain {
         agent_id: Option<String>,
         limit: Option<usize>,
     ) -> PyResult<Py<PyAny>> {
-        let mut result = self.inner.activate_scoped(
-            cue,
-            semantic_vector.as_deref(),
-            agent_id.as_deref(),
-        );
+        let mut result =
+            self.inner
+                .activate_scoped(cue, semantic_vector.as_deref(), agent_id.as_deref());
         api_slim::slim_activation_for_api(&mut result, limit);
         Python::with_gil(|py| {
             let dict = PyDict::new(py);
