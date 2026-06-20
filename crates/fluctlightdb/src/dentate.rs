@@ -32,7 +32,7 @@ pub fn separate_episode(
     life_id: Uuid,
     engram_id: Uuid,
     tick: u64,
-    existing: &[Engram],
+    existing: &[&Engram],
 ) -> SeparationResult {
     let rich = tokenize_rich(
         &episode.content,
@@ -111,11 +111,11 @@ fn expand_granules(tokens: &[RichToken], life_id: Uuid) -> Vec<NeuronId> {
     out
 }
 
-fn max_jaccard(dg: &[NeuronId], existing: &[Engram]) -> f32 {
+fn max_jaccard(dg: &[NeuronId], existing: &[&Engram]) -> f32 {
     max_jaccard_single(dg, existing)
 }
 
-fn max_jaccard_single(dg: &[NeuronId], existing: &[Engram]) -> f32 {
+fn max_jaccard_single(dg: &[NeuronId], existing: &[&Engram]) -> f32 {
     existing
         .iter()
         .map(|e| jaccard(dg, engram_dg(e)))
@@ -180,7 +180,7 @@ mod tests {
         rag: None,
                 provenance: None,
     };
-        let r2 = separate_episode(&e2, life, Uuid::new_v4(), 2, &[engram1]);
+        let r2 = separate_episode(&e2, life, Uuid::new_v4(), 2, &[&engram1]);
 
         assert!(r2.max_overlap_before > 0.15);
         assert!(

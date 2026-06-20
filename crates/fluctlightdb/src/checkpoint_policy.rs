@@ -21,7 +21,7 @@ impl CheckpointPolicy {
         let every_n_writes = std::env::var("FLUCTLIGHT_CHECKPOINT_EVERY_N")
             .ok()
             .and_then(|v| v.parse().ok())
-            .unwrap_or(1);
+            .unwrap_or(64);
         let interval_secs = std::env::var("FLUCTLIGHT_CHECKPOINT_INTERVAL_SEC")
             .ok()
             .and_then(|v| v.parse().ok())
@@ -50,5 +50,9 @@ impl CheckpointPolicy {
     pub fn mark_checkpointed(&mut self) {
         self.writes_since = 0;
         self.last_checkpoint = Instant::now();
+    }
+
+    pub fn pending_writes(&self) -> u64 {
+        self.writes_since
     }
 }

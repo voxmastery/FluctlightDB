@@ -27,6 +27,13 @@ pub fn min_separation_threshold() -> f32 {
         .unwrap_or(0.35)
 }
 
+pub fn overlap_window() -> usize {
+    std::env::var("FLUCTLIGHT_SEPARATION_OVERLAP_WINDOW")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(512)
+}
+
 pub fn assess(hippocampus: &Hippocampus, episode: &Episode, life_id: uuid::Uuid) -> SeparationGateResult {
     let probe: HashSet<String> = episode
         .content
@@ -42,9 +49,11 @@ pub fn assess(hippocampus: &Hippocampus, episode: &Episode, life_id: uuid::Uuid)
             reason: None,
         };
     }
+    let window = overlap_window();
+    let peers = hippocampus.tail_for_life(life_id, window);
     let mut best_overlap = 0.0f32;
     let mut best_sep = 1.0f32;
-    for e in hippocampus.engrams_for_life(life_id) {
+    for e in peers {
         let existing: HashSet<String> = e
             .episode
             .content

@@ -216,8 +216,9 @@ class FluctlightClient:
     def export_viz(self) -> dict[str, Any]:
         return self._post("/api/v1/export-viz")
 
-    def export_graph(self) -> dict[str, Any]:
-        return self._post("/api/v1/export-graph")
+    def export_graph(self, *, lite: bool = False) -> dict[str, Any]:
+        path = "/api/v1/export-graph-lite" if lite else "/api/v1/export-graph"
+        return self._post(path)
 
     def export_raw(self) -> dict[str, Any]:
         return self._post("/api/v1/export-raw")

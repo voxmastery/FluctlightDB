@@ -2,122 +2,166 @@
 
 **A brain-native database for AI agents.** Not a vector database. Not SQL.
 
-FluctlightDB gives agents a mind they can **grow** — where they **live, experience, remember, sleep, and learn** from a brain shaped like biological memory, not a search index.
+Give your agent a **mind it can grow** — episodic memory, verified facts, and recall by activation (not just cosine similarity).
 
-Built for any agent runtime: coding assistants, autonomous workers, game NPCs, research agents, personal companions. One `.flct` brain file per agent. The agent gets smarter and more *alive* over time because it **experiences** life, not because it reads more documents.
+**Repo:** [github.com/voxmastery/FluctlightDB](https://github.com/voxmastery/FluctlightDB)
 
-## Why agents need this
+---
 
-| Today | Problem | FluctlightDB |
-|-------|---------|--------------|
-| Vector DB | Similarity ≠ memory | **Engrams** + spreading **activation** |
-| SQL / KV | Facts without life | **Regions**, **plasticity**, **development** |
-| RAG | Memory outside the agent | **Lived experience** inside the agent |
-| Prompt history | Forgets, no growth | **Sleep**, **consolidation**, **maturation** |
+## Install (Python agents — recommended)
 
-## What it does for agents
+Like **`sqlite3`** (library in your process) or **`pip install qdrant-client`** (SDK + optional server):
 
-- **Experience** — every action, outcome, and context becomes an engram
-- **Recall** — `ACTIVATE(cue)` spreads activation through what the agent *lived*, not vector search
-- **Grow** — developmental stages unlock automatically (newborn → expert)
-- **Sleep** — replay and consolidate memories offline; prune noise
-- **Persist identity** — core memories survive resets; episodic memory can be scoped per life
-- **Get livelier** — neuromodulators (reward, surprise, arousal) gate what sticks
+```bash
+git clone https://github.com/voxmastery/FluctlightDB.git
+cd FluctlightDB
 
-## Core primitives
+# One-time: build the native extension (~2 min)
+./scripts/install-native.sh
 
-- **Engram** — sparse neuron ensemble = one memory trace
-- **Synapse** — weighted connection with plasticity state
-- **SEPARATE()** — dentate gyrus pattern separation (similar events stay distinct)
-- **ACTIVATE(cue)** — spreading activation recall
-- **COMPLETE(cue)** — pattern completion from partial cue
-- **SLEEP()** — replay, consolidation, pruning
-- **tick()** — autonomic heartbeat + auto-sleep in the background
-
-## Developmental growth (automatic)
-
-The brain **matures by itself** from experience + sleep — no manual stage flags:
-
-```
-embryonic → newborn → infant → child → adolescent → adult → expert
+# Use the Python SDK (no cargo in your agent code)
+pip install -e sdks/python   # optional; or add sdks/python to PYTHONPATH
 ```
 
-Each stage unlocks capabilities: faster recall (myelination), executive control (PFC), smarter pruning, higher synapse capacity.
+```python
+import os
+os.environ["FLUCTLIGHT_NATIVE"] = "1"
 
-## Quick start
+from fluctlightdb import get_recall_client
+
+brain = get_recall_client("~/.fluctlight/tenants/default/brain")
+
+# Recall — sub-ms, in-process (like sqlite3.execute)
+print(brain.activate("what did the user prefer for theme"))
+
+# Writes go through HTTP serve (see below) or Rust CLI
+```
+
+That’s the **recommended industrial path**: native library for hot recall, HTTP for writes when needed.
+
+---
+
+## How is storage “one thing”?
+
+| System | What you point at | Feels like |
+|--------|-------------------|------------|
+| **SQLite** | One file: `agent.db` | Single portable file |
+| **Qdrant (local)** | One folder: `./qdrant_storage/` | Directory + segments |
+| **FluctlightDB (v4)** | One folder: `~/.fluctlight/tenants/default/brain/` | Directory + `recall_index.sqlite` sidecar |
+
+So yes — **one brain per agent** is the right mental model (like one SQLite file or one Qdrant collection path). Under the hood v4 is a **small directory**, not a single `.flct` blob — same idea as Qdrant local or Postgres data dir.
+
+Legacy single-file `.flct` still loads; new installs use the v4 directory layout.
+
+---
+
+## Developer UX vs SQL vs Vector
+
+| | **SQLite** | **Qdrant / Pinecone** | **FluctlightDB** |
+|---|------------|----------------------|------------------|
+| **README leads with** | `sqlite3`, any language | `pip install`, Docker, REST | **`pip` + native lib** (this README) |
+| **First line of code** | `import sqlite3` | `from qdrant_client import …` | `from fluctlightdb import get_recall_client` |
+| **Query** | SQL strings | vector + filter | **`activate(cue)`** |
+| **Explore data** | `sqlite3`, DBeaver | Web UI / scroll API | **`fluctlight shell`** |
+| **Build from source** | optional (amalgamation) | optional (Rust) | optional (`cargo build` — for contributors) |
+
+SQL and vector READMEs **don’t ask app devs to run `cargo`**. Neither should we — `cargo` is only for building Fluctlight itself or the native wheel once.
+
+---
+
+## Quick start (5 minutes)
+
+### 1. Interactive REPL (like `psql` or `sqlite3`)
+
+```bash
+# Requires one-time: cargo build --release  (or download a release binary later)
+./target/release/fluctlight shell --local --path /tmp/my-agent-brain
+```
+
+```
+fluctlight> experience user prefers dark mode
+fluctlight> recall dark mode
+fluctlight> list 5
+fluctlight> quit
+```
+
+### 2. Python agent (recommended)
+
+```bash
+./scripts/install-native.sh
+export FLUCTLIGHT_NATIVE=1
+python3 -c "
+from fluctlightdb import get_recall_client
+print(get_recall_client('/tmp/my-agent-brain').activate('dark mode'))
+"
+```
+
+### 3. HTTP server (writes, multi-tenant — like Qdrant Docker)
+
+```bash
+./target/release/fluctlight tenant provision myagent --role admin
+./target/release/fluctlight serve --path ~/.fluctlight/tenants/myagent/brain
+```
+
+```python
+from fluctlightdb import FluctlightClient
+client = FluctlightClient.from_env()
+client.experience("deployment succeeded", context="ci")
+client.activate_lite("last deployment")  # HTTP keep-alive, top-1 only
+```
+
+---
+
+## Operator UX (terminal)
+
+| You want to… | SQLite | Vector DB | Fluctlight |
+|--------------|--------|-----------|------------|
+| Connect | `sqlite3 db` | Dashboard / curl | `fluctlight shell` |
+| Browse | `SELECT * LIMIT 10` | scroll | `list 10` |
+| Search | `WHERE … LIKE` | similarity search | `recall <cue>` |
+| Truth | your columns | payload | `verified` / `warnings` |
+
+Full mapping: [docs/CLI.md](docs/CLI.md)
+
+---
+
+## Why not just SQL or vectors?
+
+| Today | Problem | Fluctlight |
+|-------|---------|------------|
+| Vector DB | Similarity ≠ lived memory | Engrams + spreading activation |
+| SQL | Rows without provenance/growth | Provenance, sleep, maturation |
+| RAG | Memory outside the agent | Experience inside the agent |
+
+---
+
+## Build from source (contributors / no wheel yet)
 
 ```bash
 cargo build --release
-./target/release/fluctlight status
-./target/release/fluctlight experience "user asked for refactor" coding-session
-./target/release/fluctlight activate "refactor"
-./target/release/fluctlight tick 5          # autonomic heartbeat + auto-sleep
-./target/release/fluctlight demo-separate   # pattern separation demo
-./target/release/fluctlight export-viz      # → ~/.fluctlight/brain-viz.json
-# Open docs/visual.html in browser and load the JSON file
+./target/release/fluctlight --help
 ```
 
-## Rust API
+Rust API:
 
 ```rust
 use fluctlightdb::{Episode, FluctlightBrain};
 
-let mut brain = FluctlightBrain::open("/path/to/agent.brain.flct").unwrap();
-
-// Agent lives a moment
-brain.experience(Episode {
-    content: "fixed race condition in cache".into(),
-    context: "debugging session".into(),
-    outcome: Some("tests pass".into()),
-    salience_hint: 0.8,
-}).unwrap();
-
-// Agent remembers by activation, not embedding search
-let recalls = brain.activate("race condition cache");
-
-// Background maturation
-brain.tick().unwrap();
+let mut brain = FluctlightBrain::open("/path/to/brain").unwrap();
+brain.experience(Episode::new("fixed cache bug", "debug", 0.8)).unwrap();
+let recalls = brain.activate("cache bug");
 ```
 
-## Integrate with your agent
-
-1. Call `experience()` after every meaningful turn (tool result, user message, outcome).
-2. Call `activate(cue)` before planning — inject what the agent has lived.
-3. Run `tick()` on a timer or after idle — sleep and growth happen automatically.
-4. Mark `core` memories for values and identity that must survive resets.
-
-## Quick start
-
-```bash
-cargo build --release
-fluctlight shell --local          # interactive REPL
-fluctlight serve --addr 127.0.0.1:8792   # HTTP API (multi-tenant / remote)
-```
-
-**Python agents — library call (recommended, like `sqlite3`):**
-
-```bash
-./scripts/install-native.sh       # builds PyO3 extension
-export FLUCTLIGHT_NATIVE=1
-python3 -c "from fluctlightdb import get_recall_client; print(get_recall_client().activate('hello'))"
-```
-
-Open source: [github.com/voxmastery/FluctlightDB](https://github.com/voxmastery/FluctlightDB)
+---
 
 ## Docs
 
-- **[Getting started](docs/GETTING_STARTED.md)** — UX vs SQL/vector, 5-minute tutorial  
-- [CLI.md](docs/CLI.md) — command mapping + REPL  
-- [DEPLOYMENT.md](docs/DEPLOYMENT.md) — replicas, backup, industrial HA  
+- **[Getting started](docs/GETTING_STARTED.md)** — UX deep-dive, FAQ  
+- [CLI.md](docs/CLI.md) — SQL/vector → Fluctlight commands  
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) — replica, backup, industrial HA  
 - [Manifesto.md](docs/Manifesto.md) — philosophy  
-- `docs/DevStages.md` — automatic growth stages
-- `docs/visual.html` — brain visualizer
+- [openapi.yaml](docs/openapi.yaml) — HTTP API  
 
 ## License
 
-Dual-licensed under **MIT OR Apache-2.0** (same as the Rust ecosystem standard).
-
-- `LICENSE-MIT`
-- `LICENSE-APACHE`
-
-For GitHub: choose **MIT** as the displayed license if you only pick one; the repo legally offers either license.
+MIT OR Apache-2.0 — see `LICENSE` (GitHub), `LICENSE-MIT`, `LICENSE-APACHE`.

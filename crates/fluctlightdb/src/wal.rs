@@ -13,6 +13,12 @@ use crate::types::Episode;
 
 const MAX_SEGMENT_BYTES: u64 = 64 * 1024 * 1024;
 
+pub fn wal_enabled() -> bool {
+    std::env::var("FLUCTLIGHT_WAL")
+        .map(|v| v != "0" && !v.eq_ignore_ascii_case("false"))
+        .unwrap_or(true)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum WalEntry {
