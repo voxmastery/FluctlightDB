@@ -184,7 +184,8 @@ fn tail_copy(src: &Path, dst: &Path, offset: u64) -> Result<u64> {
         .write(true)
         .open(dst)
         .map_err(Error::Io)?;
-    src_f.seek(std::io::SeekFrom::Start(offset))
+    src_f
+        .seek(std::io::SeekFrom::Start(offset))
         .map_err(Error::Io)?;
     let mut buf = [0u8; 8192];
     let mut copied = 0u64;
@@ -204,8 +205,8 @@ fn tail_copy(src: &Path, dst: &Path, offset: u64) -> Result<u64> {
 mod tests {
     use super::*;
     use crate::manifest::save_v4_dir;
-    use tempfile::tempdir;
     use crate::{Episode, FluctlightBrain};
+    use tempfile::tempdir;
 
     #[test]
     fn incremental_sync_skips_unchanged_manifest() {

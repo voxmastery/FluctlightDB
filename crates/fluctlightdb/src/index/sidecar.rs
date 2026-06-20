@@ -47,7 +47,10 @@ impl SidecarIndex {
     pub fn upsert(&self, engram_id: Uuid, content: &str, vector: Option<&[f32]>) -> Result<()> {
         let id_str = engram_id.to_string();
         let conn = self.conn.lock().map_err(lock_err)?;
-        conn.execute("DELETE FROM engram_fts WHERE engram_id = ?1", params![id_str])?;
+        conn.execute(
+            "DELETE FROM engram_fts WHERE engram_id = ?1",
+            params![id_str],
+        )?;
         conn.execute(
             "INSERT INTO engram_fts(content, engram_id) VALUES (?1, ?2)",
             params![content, id_str],
@@ -94,8 +97,14 @@ impl SidecarIndex {
     pub fn remove(&self, engram_id: Uuid) -> Result<()> {
         let id_str = engram_id.to_string();
         let conn = self.conn.lock().map_err(lock_err)?;
-        conn.execute("DELETE FROM engram_fts WHERE engram_id = ?1", params![id_str])?;
-        conn.execute("DELETE FROM engram_vec WHERE engram_id = ?1", params![id_str])?;
+        conn.execute(
+            "DELETE FROM engram_fts WHERE engram_id = ?1",
+            params![id_str],
+        )?;
+        conn.execute(
+            "DELETE FROM engram_vec WHERE engram_id = ?1",
+            params![id_str],
+        )?;
         drop(conn);
         self.rebuild_hnsw_from_db()?;
         Ok(())
@@ -111,7 +120,8 @@ impl SidecarIndex {
         if query.is_empty() {
             return Ok(Vec::new());
         }
-        let sql = "SELECT engram_id FROM engram_fts WHERE engram_fts MATCH ?1 ORDER BY rank LIMIT ?2";
+        let sql =
+            "SELECT engram_id FROM engram_fts WHERE engram_fts MATCH ?1 ORDER BY rank LIMIT ?2";
         let mut stmt = conn.prepare(sql)?;
         let rows = stmt.query_map(params![query, limit as i64], |row| {
             let id: String = row.get(0)?;
@@ -212,9 +222,7 @@ fn new_hnsw() -> LabeledIndex<Cosine, String> {
 }
 
 fn vector_to_blob(vec: &[f32]) -> Vec<u8> {
-    vec.iter()
-        .flat_map(|f| f.to_le_bytes())
-        .collect()
+    vec.iter().flat_map(|f| f.to_le_bytes()).collect()
 }
 
 fn blob_to_vector(blob: &[u8], dim: usize) -> Vec<f32> {
@@ -260,9 +268,7 @@ mod tests {
         assert_eq!(h.len(), 256);
         drop(h);
 
-        let hits = idx
-            .semantic_search(&unit_vec(42, 8), 5)
-            .unwrap();
+        let hits = idx.semantic_search(&unit_vec(42, 8), 5).unwrap();
         assert!(!hits.is_empty());
     }
 
@@ -275,7 +281,8 @@ mod tests {
         let vec = unit_vec(3, 8);
         idx.upsert(id, "alpha beta gamma", Some(&vec)).unwrap();
         let before = idx.hnsw.lock().unwrap().len();
-        idx.upsert(id, "alpha beta gamma delta", Some(&vec)).unwrap();
+        idx.upsert(id, "alpha beta gamma delta", Some(&vec))
+            .unwrap();
         assert_eq!(idx.hnsw.lock().unwrap().len(), before);
     }
 }

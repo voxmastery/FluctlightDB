@@ -103,7 +103,12 @@ fn expand_granules(tokens: &[RichToken], life_id: Uuid) -> Vec<NeuronId> {
     let mut out = Vec::new();
     for t in tokens {
         for g in 0..GRANULES_PER_TOKEN {
-            out.push(NeuronId::from_seeds(&["dg", &life, &t.surface, &g.to_string()]));
+            out.push(NeuronId::from_seeds(&[
+                "dg",
+                &life,
+                &t.surface,
+                &g.to_string(),
+            ]));
         }
     }
     out.sort_unstable();
@@ -159,11 +164,11 @@ mod tests {
             outcome: None,
             salience_hint: 0.5,
             semantic_vector: None,
-        agent_id: None,
-        tenant_id: None,
-        rag: None,
-                provenance: None,
-    };
+            agent_id: None,
+            tenant_id: None,
+            rag: None,
+            provenance: None,
+        };
         let id1 = Uuid::new_v4();
         let r1 = separate_episode(&e1, life, id1, 1, &[]);
         let mut engram1 = Engram::from_separation(life, e1.clone(), 0.5, 1, 1, &r1);
@@ -175,16 +180,14 @@ mod tests {
             outcome: None,
             salience_hint: 0.5,
             semantic_vector: None,
-        agent_id: None,
-        tenant_id: None,
-        rag: None,
-                provenance: None,
-    };
+            agent_id: None,
+            tenant_id: None,
+            rag: None,
+            provenance: None,
+        };
         let r2 = separate_episode(&e2, life, Uuid::new_v4(), 2, &[&engram1]);
 
         assert!(r2.max_overlap_before > 0.15);
-        assert!(
-            r2.separators_added > 0 || r2.max_overlap_after < r2.max_overlap_before
-        );
+        assert!(r2.separators_added > 0 || r2.max_overlap_after < r2.max_overlap_before);
     }
 }

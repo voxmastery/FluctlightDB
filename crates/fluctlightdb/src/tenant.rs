@@ -28,11 +28,12 @@ fn env_usize(key: &str, default: usize) -> usize {
 impl TenantConfig {
     pub fn default_for(tenant_id: &str, base: &Path) -> Self {
         let root = base.join("tenants").join(tenant_id);
-        let brain_path = if crate::storage::format_from_env() == crate::storage::StorageFormat::V4Dir {
-            root.join("brain")
-        } else {
-            root.join("brain.flct")
-        };
+        let brain_path =
+            if crate::storage::format_from_env() == crate::storage::StorageFormat::V4Dir {
+                root.join("brain")
+            } else {
+                root.join("brain.flct")
+            };
         let mut cfg = Self {
             tenant_id: tenant_id.to_string(),
             brain_path,
@@ -110,8 +111,10 @@ mod tests {
     fn tenant_layout() {
         let dir = tempdir().unwrap();
         let cfg = TenantConfig::default_for("agent_a", dir.path());
-        assert!(cfg.brain_path.ends_with("tenants/agent_a/brain")
-            || cfg.brain_path.ends_with("tenants/agent_a/brain.flct"));
+        assert!(
+            cfg.brain_path.ends_with("tenants/agent_a/brain")
+                || cfg.brain_path.ends_with("tenants/agent_a/brain.flct")
+        );
     }
 
     #[test]

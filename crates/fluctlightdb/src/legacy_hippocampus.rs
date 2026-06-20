@@ -140,7 +140,11 @@ fn upgrade_engram_on_disk(e: EngramOnDisk) -> Engram {
 
 fn from_on_disk(legacy: HippocampusOnDisk) -> Hippocampus {
     let mut h = Hippocampus {
-        engrams: legacy.engrams.into_iter().map(upgrade_engram_on_disk).collect(),
+        engrams: legacy
+            .engrams
+            .into_iter()
+            .map(upgrade_engram_on_disk)
+            .collect(),
         rag_index: Default::default(),
     };
     h.rebuild_rag_index();
@@ -270,7 +274,9 @@ pub fn read_hippocampus_segment(base: &std::path::Path) -> Result<Hippocampus> {
     if let Ok(h) = crate::segment::read_segment::<Hippocampus>(base, "hippocampus") {
         return Ok(h);
     }
-    if let Ok(legacy) = crate::segment::read_segment::<HippocampusPreProvenance>(base, "hippocampus") {
+    if let Ok(legacy) =
+        crate::segment::read_segment::<HippocampusPreProvenance>(base, "hippocampus")
+    {
         return Ok(from_pre_prov(legacy));
     }
     if let Ok(legacy) = crate::segment::read_segment::<HippocampusPreNoIndex>(base, "hippocampus") {

@@ -151,7 +151,8 @@ fn save_v3_atomic(brain: &FluctlightBrain, path: &Path) -> Result<()> {
 }
 
 fn verify_encoded(encoded: &[u8]) -> Result<()> {
-    let snap: BrainSnapshot = bincode::deserialize(encoded).map_err(|e| Error::Serde(e.to_string()))?;
+    let snap: BrainSnapshot =
+        bincode::deserialize(encoded).map_err(|e| Error::Serde(e.to_string()))?;
     let _ = snap;
     Ok(())
 }
@@ -163,13 +164,13 @@ fn decode_snapshot_bytes(raw: &[u8]) -> Result<FluctlightBrain> {
     let version = u32::from_le_bytes(raw[8..12].try_into().unwrap());
     match version {
         2 => {
-            let v2: legacy_v2::BrainSnapshotV2 = bincode::deserialize(&raw[12..])
-                .map_err(|e| Error::Serde(e.to_string()))?;
+            let v2: legacy_v2::BrainSnapshotV2 =
+                bincode::deserialize(&raw[12..]).map_err(|e| Error::Serde(e.to_string()))?;
             return Ok(v2.upgrade().into_brain());
         }
         1 => {
-            let old: BrainSnapshotV1 = bincode::deserialize(&raw[12..])
-                .map_err(|e| Error::Serde(e.to_string()))?;
+            let old: BrainSnapshotV1 =
+                bincode::deserialize(&raw[12..]).map_err(|e| Error::Serde(e.to_string()))?;
             return Ok(old.upgrade().into_brain());
         }
         3 => {}
@@ -233,8 +234,8 @@ fn load_snapshot(path: &Path) -> Result<FluctlightBrain> {
 }
 
 fn try_deserialize_snapshot(payload_bytes: &[u8]) -> Result<FluctlightBrain> {
-    let snapshot: BrainSnapshot = bincode::deserialize(payload_bytes)
-        .map_err(|e| Error::Serde(e.to_string()))?;
+    let snapshot: BrainSnapshot =
+        bincode::deserialize(payload_bytes).map_err(|e| Error::Serde(e.to_string()))?;
     Ok(snapshot.into_brain())
 }
 

@@ -82,7 +82,8 @@ pub fn scan_text(text: &str, source_uri: &str, cfg: &FoveaConfig) -> Vec<FoveaPa
         let peri_start = center.saturating_sub(cfg.foveal_tokens);
         let peri_before = peripheral_summary(&tokens, peri_start, center, cfg.peripheral_chars);
         let peri_after_end = (foveal_end + cfg.foveal_tokens).min(tokens.len());
-        let peri_after = peripheral_summary(&tokens, foveal_end, peri_after_end, cfg.peripheral_chars);
+        let peri_after =
+            peripheral_summary(&tokens, foveal_end, peri_after_end, cfg.peripheral_chars);
         let salience = 0.45 + 0.1 * (fixation as f32).min(3.0);
         packets.push(FoveaPacket {
             fixation,
@@ -102,13 +103,12 @@ pub fn scan_text(text: &str, source_uri: &str, cfg: &FoveaConfig) -> Vec<FoveaPa
     packets
 }
 
-pub fn scan_file(path: &std::path::Path, cfg: &FoveaConfig) -> crate::error::Result<Vec<FoveaPacket>> {
+pub fn scan_file(
+    path: &std::path::Path,
+    cfg: &FoveaConfig,
+) -> crate::error::Result<Vec<FoveaPacket>> {
     let text = std::fs::read_to_string(path).map_err(crate::error::Error::Io)?;
-    Ok(scan_text(
-        &text,
-        &format!("file://{}", path.display()),
-        cfg,
-    ))
+    Ok(scan_text(&text, &format!("file://{}", path.display()), cfg))
 }
 
 #[cfg(test)]

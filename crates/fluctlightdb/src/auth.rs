@@ -62,7 +62,11 @@ impl AuthConfig {
         cfg
     }
 
-    pub fn authorize(&self, bearer: Option<&str>, tenant_hint: Option<&str>) -> Option<AuthContext> {
+    pub fn authorize(
+        &self,
+        bearer: Option<&str>,
+        tenant_hint: Option<&str>,
+    ) -> Option<AuthContext> {
         if self.keys.is_empty() && !self.require_auth {
             return Some(AuthContext {
                 tenant_id: tenant_hint.unwrap_or("default").to_string(),
@@ -79,9 +83,14 @@ impl AuthConfig {
                 role: *role,
             });
         }
-        if let Ok(store) = crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path()) {
+        if let Ok(store) =
+            crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())
+        {
             if let Some((tenant, role)) = store.lookup(token) {
-                return Some(AuthContext { tenant_id: tenant, role });
+                return Some(AuthContext {
+                    tenant_id: tenant,
+                    role,
+                });
             }
         }
         None

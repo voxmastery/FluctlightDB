@@ -23,10 +23,9 @@ pub struct StageConsolidationReport {
 pub fn report(brain: &FluctlightBrain) -> StageConsolidationReport {
     let stage = brain.development.stage;
     let m = &brain.development.metrics;
-    let pressure = brain.autonomic.synapse_pressure(
-        brain.graph.synapse_count(),
-        stage.max_synapses(),
-    );
+    let pressure = brain
+        .autonomic
+        .synapse_pressure(brain.graph.synapse_count(), stage.max_synapses());
     StageConsolidationReport {
         stage: stage.as_str().into(),
         next_stage: stage.next().map(|s| s.as_str().into()),
@@ -38,10 +37,9 @@ pub fn report(brain: &FluctlightBrain) -> StageConsolidationReport {
         sleep_cycles: m.sleep_cycles,
         progress_to_next: progress_to_next(stage, m),
         pfc_unlocked: brain.prefrontal.unlocked,
-        auto_sleep_due: brain.autonomic.should_sleep(
-            brain.graph.synapse_count(),
-            stage.max_synapses(),
-        ),
+        auto_sleep_due: brain
+            .autonomic
+            .should_sleep(brain.graph.synapse_count(), stage.max_synapses()),
     }
 }
 

@@ -5,9 +5,11 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
-use fluctlightdb::{default_brain_path, migrate_v3_file_to_v4, BrainServer, Episode, FluctlightBrain};
 use fluctlightdb::storage;
 use fluctlightdb::store_lock::StoreLock;
+use fluctlightdb::{
+    default_brain_path, migrate_v3_file_to_v4, BrainServer, Episode, FluctlightBrain,
+};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -53,7 +55,9 @@ fn serve_addr() -> String {
 
 pub(crate) fn serve_may_be_running() -> bool {
     TcpStream::connect_timeout(
-        &serve_addr().parse().unwrap_or_else(|_| "127.0.0.1:8792".parse().unwrap()),
+        &serve_addr()
+            .parse()
+            .unwrap_or_else(|_| "127.0.0.1:8792".parse().unwrap()),
         Duration::from_millis(200),
     )
     .is_ok()
@@ -76,9 +80,13 @@ pub(crate) fn http_post_json(path: &str, body: &str) -> Result<String, String> {
         "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n{auth}\r\n{body}",
         body.len()
     );
-    stream.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
+    stream
+        .write_all(req.as_bytes())
+        .map_err(|e| e.to_string())?;
     let mut resp = String::new();
-    stream.read_to_string(&mut resp).map_err(|e| e.to_string())?;
+    stream
+        .read_to_string(&mut resp)
+        .map_err(|e| e.to_string())?;
     let body_start = resp.find("\r\n\r\n").map(|i| i + 4).unwrap_or(0);
     Ok(resp[body_start..].to_string())
 }
@@ -220,9 +228,8 @@ fn main() {
     }
 
     if args[1] == "migrate-v4" {
-        let src = parse_flag_path(&args, "--from").unwrap_or_else(|| {
-            dirs_home().join(".fluctlight").join("serverbrain.flct")
-        });
+        let src = parse_flag_path(&args, "--from")
+            .unwrap_or_else(|| dirs_home().join(".fluctlight").join("serverbrain.flct"));
         let dst = parse_flag_path(&args, "--out")
             .unwrap_or_else(|| fluctlightdb::default_tenant_brain_dir("default"));
         if !src.exists() {
@@ -291,8 +298,7 @@ fn main() {
         cfg.ensure_dirs().expect("tenant dirs");
         let _ = FluctlightBrain::open(&cfg.brain_path).expect("init tenant brain");
         let api_key = fluctlightdb::auth::generate_api_key();
-        let keys_line =
-            fluctlightdb::auth::format_key_entry(&tenant_id, &api_key, auth_role);
+        let keys_line = fluctlightdb::auth::format_key_entry(&tenant_id, &api_key, auth_role);
         let auth_env = dirs_home().join(".fluctlight").join("auth.env");
         let _ = std::fs::create_dir_all(auth_env.parent().unwrap());
         let mut env_body = String::new();
@@ -533,10 +539,7 @@ fn main() {
                         (Some(rest[0].clone()), 0.5)
                     }
                 }
-                _ => (
-                    Some(rest[0].clone()),
-                    rest[1].parse::<f32>().unwrap_or(0.5),
-                ),
+                _ => (Some(rest[0].clone()), rest[1].parse::<f32>().unwrap_or(0.5)),
             };
             let report = brain
                 .experience(Episode {
@@ -571,7 +574,10 @@ fn main() {
         "verify-fact" => {
             let engram_id = args.get(2).expect("verify-fact ENGRAM_ID");
             let id = Uuid::parse_str(engram_id).expect("valid engram uuid");
-            let kind = args.get(3).cloned().unwrap_or_else(|| "ledger_verified".into());
+            let kind = args
+                .get(3)
+                .cloned()
+                .unwrap_or_else(|| "ledger_verified".into());
             let pk = match kind.as_str() {
                 "chat_assertion" => fluctlightdb::ProvenanceKind::ChatAssertion,
                 "file_observation" => fluctlightdb::ProvenanceKind::FileObservation,
@@ -579,9 +585,7 @@ fn main() {
                 "user_explicit" => fluctlightdb::ProvenanceKind::UserExplicit,
                 _ => fluctlightdb::ProvenanceKind::LedgerVerified,
             };
-            brain
-                .verify_fact(id, pk, None, 0.95)
-                .expect("verify-fact");
+            brain.verify_fact(id, pk, None, 0.95).expect("verify-fact");
             brain.save().expect("save");
             println!("{{\"ok\":true,\"engram_id\":\"{engram_id}\"}}");
         }

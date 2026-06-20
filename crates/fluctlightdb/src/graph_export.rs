@@ -320,7 +320,8 @@ pub fn export_graph_lite(
     core: &CoreMemoryStore,
 ) -> GraphExport {
     let mut full = export_graph(hippocampus, graph, core);
-    full.nodes.retain(|n| matches!(n.kind.as_str(), "engram" | "region" | "core"));
+    full.nodes
+        .retain(|n| matches!(n.kind.as_str(), "engram" | "region" | "core"));
     let keep: HashSet<String> = full.nodes.iter().map(|n| n.id.clone()).collect();
     full.links.retain(|l| {
         matches!(l.kind.as_str(), "associate" | "region" | "core")

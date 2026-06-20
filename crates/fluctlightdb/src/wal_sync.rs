@@ -68,7 +68,9 @@ pub fn append_and_sync(brain_path: &Path, file: &mut File, line_bytes: usize) ->
         WalFsyncMode::Always => file.sync_all().map_err(Error::Io),
         WalFsyncMode::Batched => {
             let key = brain_path.to_path_buf();
-            let mut map = state_map().lock().map_err(|_| Error::Store("wal sync lock".into()))?;
+            let mut map = state_map()
+                .lock()
+                .map_err(|_| Error::Store("wal sync lock".into()))?;
             let slot = map.entry(key).or_insert(WalSyncSlot {
                 pending_bytes: 0,
                 pending_records: 0,

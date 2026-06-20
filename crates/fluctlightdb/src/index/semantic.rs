@@ -1,7 +1,7 @@
 //! Semantic top-k index — cosine similarity seeds without full brain scan.
 
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use uuid::Uuid;
 

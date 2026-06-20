@@ -28,8 +28,7 @@ impl ShardRouter {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(8792),
-            host: std::env::var("FLUCTLIGHT_SHARD_HOST")
-                .unwrap_or_else(|_| "127.0.0.1".into()),
+            host: std::env::var("FLUCTLIGHT_SHARD_HOST").unwrap_or_else(|_| "127.0.0.1".into()),
         }
     }
 

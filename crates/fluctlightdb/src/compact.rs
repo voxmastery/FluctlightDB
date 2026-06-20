@@ -2,14 +2,14 @@
 
 use std::collections::HashSet;
 
-use serde::{Serialize};
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::brain::FluctlightBrain;
-use crate::id::NeuronId;
 use crate::engram::Engram;
 use crate::graph::BrainGraph;
 use crate::hippocampus::Hippocampus;
+use crate::id::NeuronId;
 use crate::plasticity::Synapse;
 use crate::semantic::cosine_similarity;
 
@@ -48,7 +48,10 @@ pub fn compact_brain(brain: &mut FluctlightBrain) -> CompactReport {
     for c in &mut brain.semantic.centroids {
         c.engram_ids.retain(|id| live.contains(id));
     }
-    brain.semantic.centroids.retain(|c| !c.engram_ids.is_empty());
+    brain
+        .semantic
+        .centroids
+        .retain(|c| !c.engram_ids.is_empty());
 
     CompactReport {
         merged_engrams: merge_result.merged,
@@ -192,8 +195,18 @@ mod tests {
         let mut graph = BrainGraph::default();
         let a = crate::id::NeuronId::from_token("a");
         let b = crate::id::NeuronId::from_token("b");
-        graph.add_synapse(Synapse::new(a, b, crate::types::Region::HippocampusCa3, 0.5));
-        graph.add_synapse(Synapse::new(a, b, crate::types::Region::HippocampusCa3, 0.6));
+        graph.add_synapse(Synapse::new(
+            a,
+            b,
+            crate::types::Region::HippocampusCa3,
+            0.5,
+        ));
+        graph.add_synapse(Synapse::new(
+            a,
+            b,
+            crate::types::Region::HippocampusCa3,
+            0.6,
+        ));
         let n = dedupe_synapses(&mut graph);
         assert_eq!(n, 0);
         assert_eq!(graph.synapse_count(), 1);
@@ -209,11 +222,11 @@ mod tests {
             outcome: None,
             salience_hint: 0.5,
             semantic_vector: None,
-        agent_id: None,
-        tenant_id: None,
-        rag: None,
-                provenance: None,
-    };
+            agent_id: None,
+            tenant_id: None,
+            rag: None,
+            provenance: None,
+        };
         brain.experience(ep.clone()).unwrap();
         let second = brain.experience(ep).unwrap();
         if second.gate_rejected {

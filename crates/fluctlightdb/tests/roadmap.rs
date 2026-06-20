@@ -44,7 +44,7 @@ fn tenant_scoped_recall_isolation() {
             agent_id: Some("agent_a".into()),
             tenant_id: Some("t1".into()),
             rag: None,
-                provenance: None,
+            provenance: None,
         })
         .unwrap();
     brain
@@ -57,13 +57,19 @@ fn tenant_scoped_recall_isolation() {
             agent_id: Some("agent_b".into()),
             tenant_id: Some("t1".into()),
             rag: None,
-                provenance: None,
+            provenance: None,
         })
         .unwrap();
     let a = brain.activate_scoped("secret project", None, Some("agent_a"));
     let b = brain.activate_scoped("secret project", None, Some("agent_b"));
-    assert!(a.recalls.iter().all(|r| r.episode.agent_id.as_deref() == Some("agent_a")));
-    assert!(b.recalls.iter().all(|r| r.episode.agent_id.as_deref() == Some("agent_b")));
+    assert!(a
+        .recalls
+        .iter()
+        .all(|r| r.episode.agent_id.as_deref() == Some("agent_a")));
+    assert!(b
+        .recalls
+        .iter()
+        .all(|r| r.episode.agent_id.as_deref() == Some("agent_b")));
 }
 
 #[test]
@@ -80,9 +86,9 @@ fn v4_manifest_roundtrip_persists_engrams() {
             semantic_vector: None,
             agent_id: None,
             tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+            rag: None,
+            provenance: None,
+        })
         .unwrap();
     save_v4_dir(&brain, &v4).unwrap();
     let loaded = load_v4_dir(&v4).unwrap();
@@ -138,9 +144,9 @@ fn serve_reloads_after_external_snapshot_write() {
             semantic_vector: None,
             agent_id: None,
             tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+            rag: None,
+            provenance: None,
+        })
         .unwrap();
     drop(external);
 
@@ -164,9 +170,9 @@ fn query_list_and_forget() {
             semantic_vector: None,
             agent_id: None,
             tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+            rag: None,
+            provenance: None,
+        })
         .unwrap();
     let list = query::execute(
         &brain,
@@ -221,9 +227,9 @@ fn concurrent_activate_during_experience() {
             semantic_vector: None,
             agent_id: None,
             tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+            rag: None,
+            provenance: None,
+        })
         .unwrap();
     }
     t1.join().unwrap();
@@ -233,16 +239,56 @@ fn concurrent_activate_during_experience() {
 #[test]
 fn semantic_recall_benchmark_fixture_pairs() {
     let pairs: [(&str, &str, Vec<f32>); 10] = [
-        ("database connection pool exhausted", "db pool timeout", vec![0.9, 0.1, 0.0]),
-        ("redis cache miss storm", "cache invalidation spike", vec![0.85, 0.15, 0.0]),
-        ("kubernetes pod crash loop", "k8s container restart loop", vec![0.88, 0.12, 0.0]),
-        ("payment webhook signature invalid", "stripe webhook auth failed", vec![0.92, 0.08, 0.0]),
-        ("user login brute force", "account lockout threshold", vec![0.8, 0.2, 0.0]),
-        ("nginx upstream timeout", "reverse proxy gateway timeout", vec![0.87, 0.13, 0.0]),
-        ("postgres replication lag", "db replica delay high", vec![0.91, 0.09, 0.0]),
-        ("s3 upload multipart failure", "object storage upload aborted", vec![0.86, 0.14, 0.0]),
-        ("graphql query complexity limit", "api query cost exceeded", vec![0.84, 0.16, 0.0]),
-        ("mqtt broker disconnect storm", "iot broker connection drop", vec![0.83, 0.17, 0.0]),
+        (
+            "database connection pool exhausted",
+            "db pool timeout",
+            vec![0.9, 0.1, 0.0],
+        ),
+        (
+            "redis cache miss storm",
+            "cache invalidation spike",
+            vec![0.85, 0.15, 0.0],
+        ),
+        (
+            "kubernetes pod crash loop",
+            "k8s container restart loop",
+            vec![0.88, 0.12, 0.0],
+        ),
+        (
+            "payment webhook signature invalid",
+            "stripe webhook auth failed",
+            vec![0.92, 0.08, 0.0],
+        ),
+        (
+            "user login brute force",
+            "account lockout threshold",
+            vec![0.8, 0.2, 0.0],
+        ),
+        (
+            "nginx upstream timeout",
+            "reverse proxy gateway timeout",
+            vec![0.87, 0.13, 0.0],
+        ),
+        (
+            "postgres replication lag",
+            "db replica delay high",
+            vec![0.91, 0.09, 0.0],
+        ),
+        (
+            "s3 upload multipart failure",
+            "object storage upload aborted",
+            vec![0.86, 0.14, 0.0],
+        ),
+        (
+            "graphql query complexity limit",
+            "api query cost exceeded",
+            vec![0.84, 0.16, 0.0],
+        ),
+        (
+            "mqtt broker disconnect storm",
+            "iot broker connection drop",
+            vec![0.83, 0.17, 0.0],
+        ),
     ];
     let mut brain = FluctlightBrain::new();
     for (content, _cue, vec) in &pairs {
@@ -318,7 +364,10 @@ fn rag_ingest_recall_and_search_by_doc() {
     );
     if let QueryResponse::SearchByRag { total, items, .. } = found {
         assert_eq!(total, 1);
-        assert_eq!(items[0].rag.as_ref().and_then(|r| r.chunk_id.as_deref()), Some("3"));
+        assert_eq!(
+            items[0].rag.as_ref().and_then(|r| r.chunk_id.as_deref()),
+            Some("3")
+        );
     } else {
         panic!("expected SearchByRag");
     }
@@ -345,7 +394,7 @@ fn tenant_limits_reject_when_full() {
             agent_id: None,
             tenant_id: None,
             rag: None,
-                provenance: None,
+            provenance: None,
         })
         .unwrap();
     let err = cfg.check_limits(&brain);
@@ -355,7 +404,8 @@ fn tenant_limits_reject_when_full() {
 #[test]
 fn fovea_saccadic_scan_produces_packets() {
     let text = "The quick brown fox jumps over the lazy dog while reading uses many saccadic fixations across lines of text";
-    let packets = fluctlightdb::scan_text(text, "test://doc", &fluctlightdb::FoveaConfig::default());
+    let packets =
+        fluctlightdb::scan_text(text, "test://doc", &fluctlightdb::FoveaConfig::default());
     assert!(packets.len() >= 2);
     assert!(packets[0].foveal.contains("The"));
 }
@@ -422,7 +472,7 @@ fn replicate_sync_preserves_engrams() {
             agent_id: None,
             tenant_id: None,
             rag: None,
-                provenance: None,
+            provenance: None,
         })
         .unwrap();
     save_v4_dir(&brain, &primary).unwrap();

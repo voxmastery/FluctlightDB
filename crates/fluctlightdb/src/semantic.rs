@@ -63,7 +63,11 @@ impl SemanticField {
     }
 
     /// Cosine similarity recall boost per engram (hippocampal index lookup).
-    pub fn engram_similarities(&self, cue_vector: &[f32], engrams: &[Engram]) -> HashMap<Uuid, f32> {
+    pub fn engram_similarities(
+        &self,
+        cue_vector: &[f32],
+        engrams: &[Engram],
+    ) -> HashMap<Uuid, f32> {
         let mut out = HashMap::new();
         if cue_vector.is_empty() {
             return out;
@@ -246,11 +250,11 @@ mod tests {
                 outcome: None,
                 salience_hint: 0.5,
                 semantic_vector: Some(v),
-            agent_id: None,
-            tenant_id: None,
-                    rag: None,
+                agent_id: None,
+                tenant_id: None,
+                rag: None,
                 provenance: None,
-                },
+            },
             salience: 0.5,
             encoded_at_tick: 0,
             encoded_at_stage: 1,

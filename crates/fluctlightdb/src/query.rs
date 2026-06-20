@@ -277,11 +277,7 @@ pub fn execute(brain: &FluctlightBrain, req: QueryRequest) -> QueryResponse {
     }
 }
 
-fn paginate(
-    filtered: Vec<EngramSummary>,
-    page: usize,
-    page_size: usize,
-) -> QueryResponse {
+fn paginate(filtered: Vec<EngramSummary>, page: usize, page_size: usize) -> QueryResponse {
     let total = filtered.len();
     let start = page.saturating_mul(page_size);
     let items = filtered
@@ -303,7 +299,11 @@ fn paginate_verified(filtered: Vec<EngramSummary>, page: usize, page_size: usize
     QueryResponse::ListVerified { total, page, items }
 }
 
-fn paginate_unverified(filtered: Vec<EngramSummary>, page: usize, page_size: usize) -> QueryResponse {
+fn paginate_unverified(
+    filtered: Vec<EngramSummary>,
+    page: usize,
+    page_size: usize,
+) -> QueryResponse {
     let total = filtered.len();
     let start = page.saturating_mul(page_size);
     let items = filtered

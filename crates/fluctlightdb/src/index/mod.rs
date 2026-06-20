@@ -72,9 +72,9 @@ impl RecallIndex {
         let idx = Self::open_in_memory()?;
         if let Ok(guard) = idx.backend.lock() {
             if let IndexBackend::Memory(lex_mtx) = &*guard {
-                let mut lex = lex_mtx.lock().map_err(|e| {
-                    crate::error::Error::Store(format!("lexical lock: {e}"))
-                })?;
+                let mut lex = lex_mtx
+                    .lock()
+                    .map_err(|e| crate::error::Error::Store(format!("lexical lock: {e}")))?;
                 lex.clear();
                 for e in brain.hippocampus.engrams_for_life(brain.life.life_id) {
                     lex.upsert(e.id, &e.episode.content)?;
@@ -90,9 +90,10 @@ impl RecallIndex {
         content: &str,
         vector: Option<&[f32]>,
     ) -> Result<()> {
-        let guard = self.backend.lock().map_err(|e| {
-            crate::error::Error::Store(format!("recall index lock: {e}"))
-        })?;
+        let guard = self
+            .backend
+            .lock()
+            .map_err(|e| crate::error::Error::Store(format!("recall index lock: {e}")))?;
         match &*guard {
             IndexBackend::Sidecar(s) => s.upsert(engram_id, content, vector),
             IndexBackend::Memory(lex) => lex
@@ -103,9 +104,10 @@ impl RecallIndex {
     }
 
     pub fn remove_engram(&self, engram_id: Uuid) -> Result<()> {
-        let guard = self.backend.lock().map_err(|e| {
-            crate::error::Error::Store(format!("recall index lock: {e}"))
-        })?;
+        let guard = self
+            .backend
+            .lock()
+            .map_err(|e| crate::error::Error::Store(format!("recall index lock: {e}")))?;
         match &*guard {
             IndexBackend::Sidecar(s) => s.remove(engram_id),
             IndexBackend::Memory(lex) => lex
@@ -126,9 +128,10 @@ impl RecallIndex {
         let cap = cap.max(1).min(DEFAULT_CANDIDATE_CAP);
         let mut set = HashSet::new();
 
-        let guard = self.backend.lock().map_err(|e| {
-            crate::error::Error::Store(format!("recall index lock: {e}"))
-        })?;
+        let guard = self
+            .backend
+            .lock()
+            .map_err(|e| crate::error::Error::Store(format!("recall index lock: {e}")))?;
         match &*guard {
             IndexBackend::Sidecar(s) => {
                 for id in s.fts_search(cue, LEXICAL_SEED_LIMIT)? {
@@ -141,9 +144,9 @@ impl RecallIndex {
                 }
             }
             IndexBackend::Memory(lex) => {
-                let lex = lex.lock().map_err(|e| {
-                    crate::error::Error::Store(format!("lexical lock: {e}"))
-                })?;
+                let lex = lex
+                    .lock()
+                    .map_err(|e| crate::error::Error::Store(format!("lexical lock: {e}")))?;
                 for id in lex.search(cue, LEXICAL_SEED_LIMIT)? {
                     set.insert(id);
                 }

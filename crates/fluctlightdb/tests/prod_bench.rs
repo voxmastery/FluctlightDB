@@ -5,11 +5,31 @@ use std::time::Instant;
 use fluctlightdb::{Episode, FluctlightBrain, Provenance, ProvenanceKind};
 
 const PAIRS: &[(&str, &str, &[f32])] = &[
-    ("database connection pool exhausted", "db pool timeout", &[0.9, 0.1, 0.0]),
-    ("redis cache miss storm", "cache invalidation spike", &[0.85, 0.15, 0.0]),
-    ("kubernetes pod crash loop", "k8s container restart loop", &[0.88, 0.12, 0.0]),
-    ("payment webhook signature invalid", "stripe webhook auth failed", &[0.92, 0.08, 0.0]),
-    ("user login brute force", "account lockout threshold", &[0.8, 0.2, 0.0]),
+    (
+        "database connection pool exhausted",
+        "db pool timeout",
+        &[0.9, 0.1, 0.0],
+    ),
+    (
+        "redis cache miss storm",
+        "cache invalidation spike",
+        &[0.85, 0.15, 0.0],
+    ),
+    (
+        "kubernetes pod crash loop",
+        "k8s container restart loop",
+        &[0.88, 0.12, 0.0],
+    ),
+    (
+        "payment webhook signature invalid",
+        "stripe webhook auth failed",
+        &[0.92, 0.08, 0.0],
+    ),
+    (
+        "user login brute force",
+        "account lockout threshold",
+        &[0.8, 0.2, 0.0],
+    ),
 ];
 
 fn cosine(a: &[f32], b: &[f32]) -> f32 {
@@ -27,14 +47,14 @@ fn lexical_hit(corpus: &[(&str, Vec<f32>)], cue: &str) -> bool {
     let cue_l = cue.to_lowercase();
     corpus.iter().any(|(content, _)| {
         content.to_lowercase().contains(&cue_l)
-            || cue_l.split_whitespace().any(|w| content.to_lowercase().contains(w))
+            || cue_l
+                .split_whitespace()
+                .any(|w| content.to_lowercase().contains(w))
     })
 }
 
 fn vector_hit(corpus: &[(&str, Vec<f32>)], cue_vec: &[f32]) -> bool {
-    corpus
-        .iter()
-        .any(|(_, v)| cosine(v, cue_vec) >= 0.75)
+    corpus.iter().any(|(_, v)| cosine(v, cue_vec) >= 0.75)
 }
 
 #[test]
@@ -154,18 +174,18 @@ fn prod_bench_fluctlight_vs_baselines() {
     let verified = brain.verified_context(5);
 
     eprintln!("=== FluctlightDB production bench (in-process) ===");
-    eprintln!("activate avg: {:.3} ms/query (n={})", fl_activate_ms, 200 * PAIRS.len());
+    eprintln!(
+        "activate avg: {:.3} ms/query (n={})",
+        fl_activate_ms,
+        200 * PAIRS.len()
+    );
     eprintln!("baseline avg: {:.3} ms/query (lex+vec scan)", baseline_ms);
     eprintln!(
         "recall hits/fluctlight: {} / {} queries",
         fl_hits,
         200 * PAIRS.len()
     );
-    eprintln!(
-        "recall hits/lexical: {} / {}",
-        lex_hits,
-        200 * PAIRS.len()
-    );
+    eprintln!("recall hits/lexical: {} / {}", lex_hits, 200 * PAIRS.len());
     eprintln!(
         "recall hits/vector>=0.75: {} / {}",
         vec_hits,
@@ -184,7 +204,16 @@ fn prod_bench_fluctlight_vs_baselines() {
     );
     eprintln!("verified facts: {}", verified.facts.len());
 
-    assert!(fl_hits >= lex_hits / 2, "fluctlight should recall at least half of lexical hits");
-    assert!(verified_top && balance_ok, "verified ledger should win wallet cue");
-    assert!(gate_blocked, "separation gate should block near-duplicate chat balance");
+    assert!(
+        fl_hits >= lex_hits / 2,
+        "fluctlight should recall at least half of lexical hits"
+    );
+    assert!(
+        verified_top && balance_ok,
+        "verified ledger should win wallet cue"
+    );
+    assert!(
+        gate_blocked,
+        "separation gate should block near-duplicate chat balance"
+    );
 }

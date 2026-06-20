@@ -87,9 +87,7 @@ impl AutonomicState {
             return false;
         }
         // Rate-limit interval-driven sleep; synapse pressure always allowed.
-        if !pressure_sleep
-            && self.sleeps_in_window >= self.config.max_auto_sleeps_per_hour
-        {
+        if !pressure_sleep && self.sleeps_in_window >= self.config.max_auto_sleeps_per_hour {
             return false;
         }
         true

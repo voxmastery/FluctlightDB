@@ -115,10 +115,7 @@ pub fn append(brain_path: &Path, seq: u64, entry: &WalEntry) -> Result<()> {
         entry: entry.clone(),
     };
     let line = serde_json::to_string(&record).map_err(|e| Error::Serde(e.to_string()))?;
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(&path)?;
     writeln!(file, "{line}")?;
     crate::wal_sync::append_and_sync(brain_path, &mut file, line.len() + 1)?;
     Ok(())
@@ -264,7 +261,7 @@ mod tests {
                     agent_id: None,
                     tenant_id: None,
                     rag: None,
-                provenance: None,
+                    provenance: None,
                 },
             },
         )
@@ -282,7 +279,11 @@ mod tests {
         brain.checkpoint().unwrap();
         let wal = active_segment(&path);
         {
-            let mut f = OpenOptions::new().create(true).append(true).open(&wal).unwrap();
+            let mut f = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&wal)
+                .unwrap();
             writeln!(f, "{{not valid json").unwrap();
             let good = WalRecord {
                 seq: 1,
@@ -297,7 +298,7 @@ mod tests {
                         agent_id: None,
                         tenant_id: None,
                         rag: None,
-                provenance: None,
+                        provenance: None,
                     },
                 },
             };

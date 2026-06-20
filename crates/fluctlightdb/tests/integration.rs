@@ -37,9 +37,9 @@ fn separation_quality_similar_events_stay_distinct() {
             semantic_vector: Some(vec![1.0, 0.0, 0.0]),
             agent_id: None,
             tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+            rag: None,
+            provenance: None,
+        })
         .unwrap();
     let b = brain
         .experience(Episode {
@@ -50,9 +50,9 @@ fn separation_quality_similar_events_stay_distinct() {
             semantic_vector: Some(vec![0.95, 0.05, 0.0]),
             agent_id: None,
             tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+            rag: None,
+            provenance: None,
+        })
         .unwrap();
     assert!(b.separation.separation_index >= a.separation.separation_index * 0.5);
     assert_ne!(a.engram_id, b.engram_id);
@@ -70,9 +70,9 @@ fn semantic_recall_crosses_lexical_gap() {
             semantic_vector: Some(vec![0.9, 0.1, 0.0]),
             agent_id: None,
             tenant_id: None,
-                rag: None,
-                provenance: None,
-            })
+            rag: None,
+            provenance: None,
+        })
         .unwrap();
     let cue = vec![0.88, 0.12, 0.0];
     let result = brain.activate_with_semantic("memory store bug", Some(&cue));

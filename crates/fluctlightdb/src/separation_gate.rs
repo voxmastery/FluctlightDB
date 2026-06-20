@@ -34,7 +34,11 @@ pub fn overlap_window() -> usize {
         .unwrap_or(512)
 }
 
-pub fn assess(hippocampus: &Hippocampus, episode: &Episode, life_id: uuid::Uuid) -> SeparationGateResult {
+pub fn assess(
+    hippocampus: &Hippocampus,
+    episode: &Episode,
+    life_id: uuid::Uuid,
+) -> SeparationGateResult {
     let probe: HashSet<String> = episode
         .content
         .split_whitespace()

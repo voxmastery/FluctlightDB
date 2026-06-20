@@ -95,7 +95,10 @@ fn scale_recall_10k() {
         "ingest done: {n} engrams in {:.1}s",
         ingest_start.elapsed().as_secs_f64()
     ));
-    assert!(brain.has_sidecar_index(), "FTS5+HNSW sidecar required at scale");
+    assert!(
+        brain.has_sidecar_index(),
+        "FTS5+HNSW sidecar required at scale"
+    );
 
     let query_n = (n / 10).max(100).min(1000);
     let mut hits = 0usize;

@@ -3,16 +3,56 @@
 use fluctlightdb::{Episode, FluctlightBrain};
 
 const PAIRS: &[(&str, &str, &[f32])] = &[
-    ("database connection pool exhausted", "db pool timeout", &[0.9, 0.1, 0.0]),
-    ("redis cache miss storm", "cache invalidation spike", &[0.85, 0.15, 0.0]),
-    ("kubernetes pod crash loop", "k8s container restart loop", &[0.88, 0.12, 0.0]),
-    ("payment webhook signature invalid", "stripe webhook auth failed", &[0.92, 0.08, 0.0]),
-    ("user login brute force", "account lockout threshold", &[0.8, 0.2, 0.0]),
-    ("nginx upstream timeout", "reverse proxy gateway timeout", &[0.87, 0.13, 0.0]),
-    ("postgres replication lag", "db replica delay high", &[0.91, 0.09, 0.0]),
-    ("s3 upload multipart failure", "object storage upload aborted", &[0.86, 0.14, 0.0]),
-    ("graphql query complexity limit", "api query cost exceeded", &[0.84, 0.16, 0.0]),
-    ("mqtt broker disconnect storm", "iot broker connection drop", &[0.83, 0.17, 0.0]),
+    (
+        "database connection pool exhausted",
+        "db pool timeout",
+        &[0.9, 0.1, 0.0],
+    ),
+    (
+        "redis cache miss storm",
+        "cache invalidation spike",
+        &[0.85, 0.15, 0.0],
+    ),
+    (
+        "kubernetes pod crash loop",
+        "k8s container restart loop",
+        &[0.88, 0.12, 0.0],
+    ),
+    (
+        "payment webhook signature invalid",
+        "stripe webhook auth failed",
+        &[0.92, 0.08, 0.0],
+    ),
+    (
+        "user login brute force",
+        "account lockout threshold",
+        &[0.8, 0.2, 0.0],
+    ),
+    (
+        "nginx upstream timeout",
+        "reverse proxy gateway timeout",
+        &[0.87, 0.13, 0.0],
+    ),
+    (
+        "postgres replication lag",
+        "db replica delay high",
+        &[0.91, 0.09, 0.0],
+    ),
+    (
+        "s3 upload multipart failure",
+        "object storage upload aborted",
+        &[0.86, 0.14, 0.0],
+    ),
+    (
+        "graphql query complexity limit",
+        "api query cost exceeded",
+        &[0.84, 0.16, 0.0],
+    ),
+    (
+        "mqtt broker disconnect storm",
+        "iot broker connection drop",
+        &[0.83, 0.17, 0.0],
+    ),
 ];
 
 #[test]

@@ -101,5 +101,8 @@ pub fn print_footer(rows: usize, elapsed_ms: f64) {
 }
 
 pub fn print_json<T: serde::Serialize + ?Sized>(value: &T) {
-    println!("{}", serde_json::to_string_pretty(value).unwrap_or_else(|_| "{}".into()));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(value).unwrap_or_else(|_| "{}".into())
+    );
 }

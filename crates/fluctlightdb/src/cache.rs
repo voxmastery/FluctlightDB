@@ -72,8 +72,7 @@ impl ActivationCache {
     }
 
     fn evict_expired(&mut self) {
-        self.entries
-            .retain(|_, e| e.inserted.elapsed() < self.ttl);
+        self.entries.retain(|_, e| e.inserted.elapsed() < self.ttl);
     }
 }
 
