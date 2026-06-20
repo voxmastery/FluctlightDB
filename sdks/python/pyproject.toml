@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fluctlightdb"
+version = "0.4.0"
+description = "Python client for FluctlightDB agent memory HTTP API"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fluctlightdb*"]

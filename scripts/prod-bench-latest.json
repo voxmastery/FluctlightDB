@@ -1,0 +1,77 @@
+{
+  "fluctlight": {
+    "queries": 200,
+    "hits": 80,
+    "p50_ms": 50.4118,
+    "p95_ms": 55.3294,
+    "avg_ms": 50.7829,
+    "wallet_recall": {
+      "wallet balance": {
+        "verified": true,
+        "content": "ledger verified: agent wallet balance is $0.00 at level 1 (source: wallet.json \u2014 ground truth, not chat memory)",
+        "activation": 10.0
+      },
+      "my balance": {
+        "verified": true,
+        "content": "ledger verified: agent wallet balance is $0.00 at level 1 (source: wallet.json \u2014 ground truth, not chat memory)",
+        "activation": 10.0
+      },
+      "what is my balance": {
+        "verified": true,
+        "content": "ledger verified: agent wallet balance is $0.00 at level 1 (source: wallet.json \u2014 ground truth, not chat memory)",
+        "activation": 10.0
+      }
+    },
+    "brain": {
+      "alive": true,
+      "auto_sleeps": 0,
+      "autonomic_ticks": 294,
+      "core_memories": 1,
+      "engrams": 174,
+      "experiences": 17,
+      "life_id": "8637a809-3cd8-455c-9869-04192469d919",
+      "pfc_unlocked": false,
+      "semantic_centroids": 0,
+      "semantic_engrams": 135,
+      "sleep_cycles": 0,
+      "sleeps_in_window": 0,
+      "stage": "infant",
+      "synapse_pressure": 0.050919998437166214,
+      "synapses": 10184,
+      "ticks_since_sleep": 294,
+      "wal_seq": 315
+    },
+    "stage": {
+      "auto_sleep_due": false,
+      "experiences": 17,
+      "max_synapses": 200000,
+      "myelination": 0.3499999940395355,
+      "next_stage": "child",
+      "pfc_unlocked": false,
+      "progress_to_next": 0.6666666865348816,
+      "prune_threshold": 0.009999999776482582,
+      "sleep_cycles": 0,
+      "stage": "infant",
+      "synapse_pressure": 0.050919998437166214
+    },
+    "verified_facts": 1,
+    "unverified_warnings": 5
+  },
+  "sqlite_lexical": {
+    "queries": 400,
+    "hits": 80,
+    "p50_ms": 0.1118,
+    "p95_ms": 0.1819,
+    "avg_ms": 0.1065
+  },
+  "vector_brute_force": {
+    "queries": 400,
+    "hits": 0,
+    "p50_ms": 2.1975,
+    "p95_ms": 2.7879,
+    "avg_ms": 2.2566,
+    "corpus_vectors": 135
+  },
+  "engrams": 174,
+  "brain_mb": 1.64
+}

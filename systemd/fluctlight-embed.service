@@ -1,0 +1,17 @@
+[Unit]
+Description=Fluctlight semantic embed sidecar
+After=network.target
+
+[Service]
+Type=simple
+User=ambugo
+WorkingDirectory=/home/ambugo/fluctlightdb/embed-server
+Environment=HOME=/home/ambugo
+Environment=FLUCTLIGHT_EMBED_HOST=127.0.0.1
+Environment=FLUCTLIGHT_EMBED_PORT=8793
+ExecStart=/home/ambugo/fluctlightdb/embed-server/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8793
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

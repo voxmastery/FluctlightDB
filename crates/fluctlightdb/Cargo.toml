@@ -1,0 +1,23 @@
+[package]
+name = "fluctlightdb"
+description = "Brain-native database for AI agents — engrams, plasticity, developmental growth"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+bincode = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+fast-hnsw = "1.0.1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

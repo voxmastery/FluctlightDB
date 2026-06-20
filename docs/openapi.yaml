@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: FluctlightDB HTTP API
+  version: "1.0.0"
+  description: Brain-native storage API (single-host production v1)
+servers:
+  - url: http://127.0.0.1:8792
+paths:
+  /api/v1/health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses:
+        "200":
+          description: text/plain metrics
+  /api/v1/status:
+    post:
+      summary: Brain status snapshot
+      security:
+        - bearerAuth: []
+      responses:
+        "200": { description: BrainStatus JSON }
+        "401": { description: Unauthorized }
+  /api/v1/experience:
+    post:
+      summary: Encode experience
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content: { type: string }
+                context: { type: string }
+                salience: { type: number }
+                semantic_vector: { type: array, items: { type: number } }
+                agent_id: { type: string }
+                tenant_id: { type: string }
+      responses:
+        "200": { description: ExperienceReport }
+        "401": { description: Unauthorized }
+        "413": { description: Payload too large }
+        "429": { description: Rate limited }
+  /api/v1/activate:
+    post:
+      summary: Spreading activation recall
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cue: { type: string }
+                semantic_vector: { type: array, items: { type: number } }
+                agent_id: { type: string }
+      responses:
+        "200": { description: ActivationResult }
+  /api/v1/activate-batch:
+    post:
+      summary: Batch spreading activation (max 64 cues)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                batch:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      cue: { type: string }
+                      semantic_vector: { type: array, items: { type: number } }
+                      agent_id: { type: string }
+      responses:
+        "200": { description: "{ results, count }" }
+  /api/v1/query:
+    post:
+      summary: Brain-native query layer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  oneOf:
+                    - type: object
+                      properties:
+                        op:
+                          enum:
+                            - list_engrams
+                            - list_verified
+                            - list_unverified
+                            - get_engram
+                            - forget
+                            - forget_before
+                            - search_hybrid
+                            - search_by_rag
+                            - stats
+      responses:
+        "200": { description: QueryResponse }
+  /api/v1/tick:
+    post:
+      summary: Autonomic tick(s)
+      responses:
+        "200": { description: TickReport array }
+  /api/v1/sleep:
+    post:
+      summary: Manual sleep cycle
+      responses:
+        "200": { description: SleepReport }
+  /api/v1/compact:
+    post:
+      summary: Compact brain (admin)
+      responses:
+        "200": { description: CompactReport }
+        "403": { description: Forbidden }
+  /api/v1/query:
+    post:
+      summary: Brain-native query layer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  oneOf:
+                    - type: object
+                      properties:
+                        op: { enum: [list_engrams, get_engram, forget, forget_before, search_hybrid, stats] }
+      responses:
+        "200": { description: QueryResponse }
+  /api/v1/tenants/{tenant_id}/experience:
+    post:
+      summary: Tenant-scoped experience
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: ExperienceReport }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    IdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      schema: { type: string }

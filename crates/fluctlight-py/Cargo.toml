@@ -1,0 +1,18 @@
+[package]
+name = "fluctlightdb-native"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Python extension — in-process FluctlightDB library calls (like sqlite3)"
+
+[lib]
+name = "fluctlightdb_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+fluctlightdb = { path = "../fluctlightdb" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
