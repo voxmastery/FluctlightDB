@@ -48,6 +48,23 @@ paths:
         "401": { description: Unauthorized }
         "413": { description: Payload too large }
         "429": { description: Rate limited }
+  /api/v1/activate-lite:
+    post:
+      summary: Top-1 recall (minimal JSON, use with HTTP keep-alive)
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cue: { type: string }
+                semantic_vector: { type: array, items: { type: number } }
+                agent_id: { type: string }
+                limit: { type: integer }
+      responses:
+        "200": { description: "{ cue, top, count }" }
   /api/v1/activate:
     post:
       summary: Spreading activation recall

@@ -4,6 +4,7 @@
 __pycache__/
 .venv/
 embed-server/.venv/
+embed-server/__pycache__/
 *.egg-info/
 dist/
 .maturin/
@@ -13,3 +14,4 @@ dist/
 .DS_Store
 .fluctlight_history
 --path
+*.whl

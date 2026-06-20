@@ -355,13 +355,14 @@ impl BrainServer {
                         continue;
                     };
                     thread::spawn(move || {
+                        let _ = stream.set_nodelay(true);
                         if let Err(e) = handle_connection(stream, &server) {
                             eprintln!("serve error: {e}");
                         }
                     });
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(50));
+                    thread::sleep(Duration::from_millis(1));
                 }
                 Err(e) => return Err(Error::Io(e)),
             }
@@ -454,16 +455,39 @@ fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> 
     stream
         .set_read_timeout(Some(Duration::from_secs(30)))
         .map_err(Error::Io)?;
-    let req_text = read_http_request(&mut stream)?;
-    let parsed = parse_http(&req_text)?;
+    loop {
+        let req_text = match read_http_request(&mut stream) {
+            Ok(t) => t,
+            Err(_) => break,
+        };
+        let keep_alive = request_keep_alive(&req_text);
+        if !serve_one_request(&mut stream, server, &req_text, keep_alive)? {
+            break;
+        }
+        if !keep_alive {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn serve_one_request(
+    stream: &mut TcpStream,
+    server: &BrainServer,
+    req_text: &str,
+    keep_alive: bool,
+) -> Result<bool> {
+    let parsed = parse_http(req_text)?;
 
     if parsed.body.len() > MAX_BODY_BYTES {
-        return write_json(&mut stream, 413, &serde_json::json!({"error": "payload too large"}));
+        write_json_conn(stream, 413, &serde_json::json!({"error": "payload too large"}), keep_alive)?;
+        return Ok(false);
     }
 
     if parsed.method == "GET" && parsed.path == "/metrics" {
         let body = server.metrics().render_prometheus();
-        return write_text(&mut stream, 200, "text/plain; version=0.0.4", &body);
+        write_text_conn(stream, 200, "text/plain; version=0.0.4", &body, keep_alive)?;
+        return Ok(keep_alive);
     }
 
     if parsed.method == "GET"
@@ -471,15 +495,18 @@ fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> 
             || parsed.path == "/api/health"
             || parsed.path == "/api/v1/health")
     {
-        return write_json(&mut stream, 200, &serde_json::json!({"ok": true}));
+        write_json_conn(stream, 200, &serde_json::json!({"ok": true}), keep_alive)?;
+        return Ok(keep_alive);
     }
 
     if parsed.method != "POST" {
-        return write_json(
-            &mut stream,
+        write_json_conn(
+            stream,
             405,
             &serde_json::json!({"error": "method not allowed"}),
-        );
+            keep_alive,
+        )?;
+        return Ok(false);
     }
 
     let (tenant_from_path, subpath) = split_tenant_path(parsed.path);
@@ -497,11 +524,13 @@ fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> 
     let auth_ctx = match server.auth.authorize(parsed.auth, tenant_hint.as_deref()) {
         Some(c) => c,
         None => {
-            return write_json(
-                &mut stream,
+            write_json_conn(
+                stream,
                 401,
                 &serde_json::json!({"error": "unauthorized"}),
-            );
+                keep_alive,
+            )?;
+            return Ok(false);
         }
     };
 
@@ -515,11 +544,13 @@ fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> 
             seen.clear();
         }
         if !seen.insert(scoped) {
-            return write_json(
-                &mut stream,
+            write_json_conn(
+                stream,
                 409,
                 &serde_json::json!({"error": "duplicate idempotency key"}),
-            );
+                keep_alive,
+            )?;
+            return Ok(false);
         }
     }
 
@@ -534,51 +565,68 @@ fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> 
         .unwrap_or(auth_ctx.tenant_id.clone());
 
     if let Err(e) = enforce_tenant_access(&auth_ctx, &tenant_id) {
-        return write_json(&mut stream, 403, &serde_json::json!({"error": e.to_string()}));
+        write_json_conn(
+            stream,
+            403,
+            &serde_json::json!({"error": e.to_string()}),
+            keep_alive,
+        )?;
+        return Ok(false);
     }
 
     if !rate_limit_allow(&tenant_id) {
-        return write_json(
-            &mut stream,
+        write_json_conn(
+            stream,
             429,
             &serde_json::json!({"error": "rate limit exceeded", "retry_after_secs": 1}),
-        );
+            keep_alive,
+        )?;
+        return Ok(false);
     }
 
     let path = subpath.as_str();
     let (status, response) = match dispatch(server, &auth_ctx, &tenant_id, path, api_body) {
         Ok(v) => (200, v),
         Err(Error::Store(msg)) if msg == "unauthorized" => {
-            return write_json(
-                &mut stream,
+            write_json_conn(
+                stream,
                 403,
                 &serde_json::json!({"error": "forbidden"}),
-            );
+                keep_alive,
+            )?;
+            return Ok(false);
         }
         Err(Error::Store(msg)) if msg == "not found" => {
-            return write_json(
-                &mut stream,
+            write_json_conn(
+                stream,
                 404,
                 &serde_json::json!({"error": "not found", "path": path}),
-            );
+                keep_alive,
+            )?;
+            return Ok(false);
         }
         Err(Error::Store(msg)) if msg == "read-only replica" => {
-            return write_json(
-                &mut stream,
+            write_json_conn(
+                stream,
                 503,
                 &serde_json::json!({"error": "read-only replica"}),
-            );
+                keep_alive,
+            )?;
+            return Ok(false);
         }
         Err(e) => {
-            return write_json(
-                &mut stream,
+            write_json_conn(
+                stream,
                 500,
                 &serde_json::json!({"error": e.to_string()}),
-            );
+                keep_alive,
+            )?;
+            return Ok(false);
         }
     };
 
-    write_json(&mut stream, status, &response)
+    write_json_conn(stream, status, &response, keep_alive)?;
+    Ok(keep_alive)
 }
 
 fn dispatch(
@@ -670,6 +718,36 @@ fn dispatch(
             server.metrics.record_experience(timer.elapsed_ms());
             server.metrics.record_tenant_experience(tenant_id);
             Ok(serde_json::to_value(report).unwrap())
+        }
+        "/api/v1/activate-lite" | "/activate-lite" => {
+            require_role(auth, Role::Read)?;
+            let timer = Timer::start();
+            let cue = api_body.cue.unwrap_or_default();
+            let agent_id = api_body.agent_id.clone();
+            let mut result: ActivationResult = server.with_brain_read(tenant_id, |b| {
+                Ok(b.activate_scoped(
+                    &cue,
+                    api_body.semantic_vector.as_deref(),
+                    agent_id.as_deref(),
+                ))
+            })?;
+            crate::api_slim::slim_activation_for_api(&mut result, Some(1));
+            server.metrics.record_activate(timer.elapsed_us().max(1) / 1000);
+            server.metrics.record_tenant_activate(tenant_id);
+            let top = result.recalls.first().map(|r| {
+                serde_json::json!({
+                    "engram_id": r.engram_id,
+                    "activation": r.activation,
+                    "verified": r.verified,
+                    "content": r.episode.content,
+                    "trust_note": r.trust_note,
+                })
+            });
+            Ok(serde_json::json!({
+                "cue": cue,
+                "top": top,
+                "count": result.recalls.len(),
+            }))
         }
         "/api/v1/activate" | "/activate" => {
             require_role(auth, Role::Read)?;
@@ -1158,12 +1236,49 @@ fn parse_http(raw: &str) -> Result<HttpRequest<'_>> {
     })
 }
 
-fn write_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<()> {
-    let body = serde_json::to_string(value).map_err(|e| Error::Serde(e.to_string()))?;
-    write_text(stream, status, "application/json", &body)
+fn request_keep_alive(raw: &str) -> bool {
+    let mut http11 = false;
+    if let Some(line) = raw.lines().next() {
+        http11 = line.contains("HTTP/1.1");
+    }
+    for line in raw.lines() {
+        if let Some(v) = line.strip_prefix("Connection:") {
+            let v = v.trim();
+            if v.eq_ignore_ascii_case("close") {
+                return false;
+            }
+            if v.eq_ignore_ascii_case("keep-alive") {
+                return true;
+            }
+        }
+        if line.is_empty() {
+            break;
+        }
+    }
+    http11
 }
 
-fn write_text(stream: &mut TcpStream, status: u16, content_type: &str, body: &str) -> Result<()> {
+fn write_json_conn(
+    stream: &mut TcpStream,
+    status: u16,
+    value: &Value,
+    keep_alive: bool,
+) -> Result<()> {
+    let body = serde_json::to_string(value).map_err(|e| Error::Serde(e.to_string()))?;
+    write_text_conn(stream, status, "application/json", &body, keep_alive)
+}
+
+fn write_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<()> {
+    write_json_conn(stream, status, value, false)
+}
+
+fn write_text_conn(
+    stream: &mut TcpStream,
+    status: u16,
+    content_type: &str,
+    body: &str,
+    keep_alive: bool,
+) -> Result<()> {
     let status_text = match status {
         200 => "OK",
         401 => "Unauthorized",
@@ -1180,11 +1295,20 @@ fn write_text(stream: &mut TcpStream, status: u16, content_type: &str, body: &st
     } else {
         ""
     };
+    let conn = if keep_alive {
+        "Connection: keep-alive\r\n"
+    } else {
+        "Connection: close\r\n"
+    };
     let response = format!(
-        "HTTP/1.1 {status} {status_text}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n{retry}\r\n{body}",
+        "HTTP/1.1 {status} {status_text}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n{conn}{retry}\r\n{body}",
         body.len()
     );
     stream.write_all(response.as_bytes()).map_err(Error::Io)?;
     stream.flush().map_err(Error::Io)?;
     Ok(())
+}
+
+fn write_text(stream: &mut TcpStream, status: u16, content_type: &str, body: &str) -> Result<()> {
+    write_text_conn(stream, status, content_type, body, false)
 }
