@@ -312,3 +312,20 @@ pub fn export_graph(
         stats,
     }
 }
+
+/// Dashboard connectome — engrams, hubs, and associative links only (no per-neuron/synapse mesh).
+pub fn export_graph_lite(
+    hippocampus: &Hippocampus,
+    graph: &BrainGraph,
+    core: &CoreMemoryStore,
+) -> GraphExport {
+    let mut full = export_graph(hippocampus, graph, core);
+    full.nodes.retain(|n| matches!(n.kind.as_str(), "engram" | "region" | "core"));
+    let keep: HashSet<String> = full.nodes.iter().map(|n| n.id.clone()).collect();
+    full.links.retain(|l| {
+        matches!(l.kind.as_str(), "associate" | "region" | "core")
+            && keep.contains(&l.source)
+            && keep.contains(&l.target)
+    });
+    full
+}

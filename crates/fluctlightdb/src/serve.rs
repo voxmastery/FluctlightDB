@@ -858,6 +858,10 @@ fn dispatch(
             require_role(auth, Role::Read)?;
             server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.export_viz()).unwrap()))
         }
+        "/api/v1/export-graph-lite" | "/export-graph-lite" => {
+            require_role(auth, Role::Read)?;
+            server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.export_graph_lite()).unwrap()))
+        }
         "/api/v1/export-graph" | "/export-graph" => {
             require_role(auth, Role::Read)?;
             server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.export_graph()).unwrap()))

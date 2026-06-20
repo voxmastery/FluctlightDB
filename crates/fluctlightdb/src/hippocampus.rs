@@ -74,4 +74,20 @@ impl Hippocampus {
         v.truncate(n);
         v
     }
+
+    /// Last `n` engrams for a life (append order) — O(window), no full sort.
+    pub fn tail_for_life(&self, life_id: uuid::Uuid, n: usize) -> Vec<&Engram> {
+        let mut out = Vec::with_capacity(n.min(self.engrams.len()));
+        for e in self.engrams.iter().rev() {
+            if e.life_id != life_id {
+                continue;
+            }
+            out.push(e);
+            if out.len() >= n {
+                break;
+            }
+        }
+        out.reverse();
+        out
+    }
 }

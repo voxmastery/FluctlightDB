@@ -53,7 +53,7 @@ pub fn save_atomic(brain: &FluctlightBrain, path: &Path) -> Result<()> {
 }
 
 fn save_v4_atomic(brain: &FluctlightBrain, path: &Path) -> Result<()> {
-    if path.exists() && path.is_dir() {
+    if save_backup_enabled() && path.exists() && path.is_dir() {
         let bak = path
             .parent()
             .unwrap_or_else(|| Path::new("."))
@@ -64,13 +64,30 @@ fn save_v4_atomic(brain: &FluctlightBrain, path: &Path) -> Result<()> {
         let _ = copy_dir(path, &bak);
     }
     crate::manifest::save_v4_dir(brain, path)?;
-    let loaded = crate::manifest::load_v4_dir(path)?;
-    if loaded.hippocampus.engrams.len() != brain.hippocampus.engrams.len()
-        || loaded.graph.synapse_count() != brain.graph.synapse_count()
-    {
-        return Err(Error::Store("v4 pre-commit verify failed".into()));
+    if save_verify_enabled() {
+        let loaded = crate::manifest::load_v4_dir(path)?;
+        if loaded.hippocampus.engrams.len() != brain.hippocampus.engrams.len()
+            || loaded.graph.synapse_count() != brain.graph.synapse_count()
+        {
+            return Err(Error::Store("v4 pre-commit verify failed".into()));
+        }
     }
     Ok(())
+}
+
+fn env_flag(name: &str) -> bool {
+    std::env::var(name)
+        .ok()
+        .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+        .unwrap_or(false)
+}
+
+fn save_verify_enabled() -> bool {
+    env_flag("FLUCTLIGHT_SAVE_VERIFY")
+}
+
+fn save_backup_enabled() -> bool {
+    env_flag("FLUCTLIGHT_SAVE_BACKUP")
 }
 
 fn copy_dir(src: &Path, dst: &Path) -> std::io::Result<()> {

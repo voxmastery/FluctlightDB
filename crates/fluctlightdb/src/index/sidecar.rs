@@ -52,9 +52,20 @@ impl SidecarIndex {
             "INSERT INTO engram_fts(content, engram_id) VALUES (?1, ?2)",
             params![content, id_str],
         )?;
+        let mut vector_changed = false;
+        let mut had_vector = false;
         if let Some(vec) = vector {
             if !vec.is_empty() {
+                let prev: Option<Vec<u8>> = conn
+                    .query_row(
+                        "SELECT vec FROM engram_vec WHERE engram_id = ?1",
+                        params![id_str],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                had_vector = prev.is_some();
                 let blob = vector_to_blob(vec);
+                vector_changed = prev.as_ref() != Some(&blob);
                 conn.execute(
                     "INSERT INTO engram_vec(engram_id, dim, vec) VALUES (?1, ?2, ?3)
                      ON CONFLICT(engram_id) DO UPDATE SET dim=excluded.dim, vec=excluded.vec",
@@ -63,9 +74,20 @@ impl SidecarIndex {
             }
         }
         drop(conn);
-        if vector.is_some() {
-            self.rebuild_hnsw_from_db()?;
+        if vector_changed {
+            if had_vector {
+                // HNSW has no delete — rare update path rebuilds from SQLite.
+                self.rebuild_hnsw_from_db()?;
+            } else if let Some(vec) = vector {
+                self.hnsw_insert(vec, &id_str)?;
+            }
         }
+        Ok(())
+    }
+
+    fn hnsw_insert(&self, vector: &[f32], id_str: &str) -> Result<()> {
+        let mut h = self.hnsw.lock().map_err(lock_err)?;
+        h.insert(vector.to_vec(), id_str.to_string());
         Ok(())
     }
 
@@ -184,6 +206,7 @@ fn new_hnsw() -> LabeledIndex<Cosine, String> {
     Builder::new()
         .m(16)
         .ef_construction(200)
+        .capacity(16_384)
         .seed(42)
         .build_labeled(Cosine)
 }
@@ -206,4 +229,53 @@ fn blob_to_vector(blob: &[u8], dim: usize) -> Vec<f32> {
 
 fn lock_err<T: std::fmt::Display>(e: T) -> Error {
     Error::Store(format!("sidecar lock poisoned: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use uuid::Uuid;
+
+    fn unit_vec(i: usize, dim: usize) -> Vec<f32> {
+        let mut v = vec![0.0f32; dim];
+        v[i % dim] = 1.0;
+        v
+    }
+
+    #[test]
+    fn incremental_hnsw_inserts_without_rebuild() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("recall_index.sqlite");
+        let idx = SidecarIndex::open(&db).unwrap();
+
+        for i in 0..256 {
+            let id = Uuid::new_v4();
+            let vec = unit_vec(i, 8);
+            idx.upsert(id, &format!("doc {i} pool exhausted"), Some(&vec))
+                .unwrap();
+        }
+
+        let h = idx.hnsw.lock().unwrap();
+        assert_eq!(h.len(), 256);
+        drop(h);
+
+        let hits = idx
+            .semantic_search(&unit_vec(42, 8), 5)
+            .unwrap();
+        assert!(!hits.is_empty());
+    }
+
+    #[test]
+    fn content_only_upsert_skips_hnsw_rebuild() {
+        let dir = tempdir().unwrap();
+        let db = dir.path().join("recall_index.sqlite");
+        let idx = SidecarIndex::open(&db).unwrap();
+        let id = Uuid::new_v4();
+        let vec = unit_vec(3, 8);
+        idx.upsert(id, "alpha beta gamma", Some(&vec)).unwrap();
+        let before = idx.hnsw.lock().unwrap().len();
+        idx.upsert(id, "alpha beta gamma delta", Some(&vec)).unwrap();
+        assert_eq!(idx.hnsw.lock().unwrap().len(), before);
+    }
 }

@@ -27,7 +27,7 @@ use crate::semantic::SemanticField;
 use crate::sleep::{separate_and_encode, sleep_cycle};
 use crate::sleep_trigger::SleepTrigger;
 use crate::store;
-use crate::graph_export::{export_graph, GraphExport};
+use crate::graph_export::{export_graph, export_graph_lite, GraphExport};
 use crate::raw_export::{export_raw, RawExport};
 use crate::types::{
     ActivationResult, Episode, ExperienceReport, SleepReport, VizExport, DevelopmentViz,
@@ -149,9 +149,11 @@ impl FluctlightBrain {
 
     /// Encode lived experience — DG separate + CA3 wire + store engram.
     pub fn experience(&mut self, episode: Episode) -> Result<ExperienceReport> {
-        self.wal_append(WalEntry::Experience {
-            episode: episode.clone(),
-        })?;
+        if wal::wal_enabled() {
+            self.wal_append(WalEntry::Experience {
+                episode: episode.clone(),
+            })?;
+        }
         self.experience_internal(episode, true)
     }
 
@@ -180,11 +182,6 @@ impl FluctlightBrain {
         let gate = self.neuromodulators.plasticity_gate(salience);
         if episode.salience_hint > 0.5 {
             self.neuromodulators.on_surprise(episode.salience_hint);
-        }
-
-        let max = self.development.stage.max_synapses();
-        if self.graph.synapse_count() >= max {
-            self.sleep_internal(checkpoint, SleepTrigger::Pressure)?;
         }
 
         let verified = episode
@@ -680,6 +677,10 @@ impl FluctlightBrain {
         export_graph(&self.hippocampus, &self.graph, &self.core_memories)
     }
 
+    pub fn export_graph_lite(&self) -> GraphExport {
+        export_graph_lite(&self.hippocampus, &self.graph, &self.core_memories)
+    }
+
     pub fn consolidate_episodes(&self, min_salience: f32, limit: usize) -> Vec<ConsolidatedMemory> {
         let mut items: Vec<_> = self
             .hippocampus
@@ -913,6 +914,14 @@ fn annotate_recall_trust(recalls: &mut [crate::types::RecallResult]) {
             recall.trust_note = Some(
                 "recalled utterance — not verified ground truth; check ledger/tools".into(),
             );
+        }
+    }
+}
+
+impl Drop for FluctlightBrain {
+    fn drop(&mut self) {
+        if self.store_path.is_some() && self.checkpoint_policy.pending_writes() > 0 {
+            let _ = self.checkpoint();
         }
     }
 }

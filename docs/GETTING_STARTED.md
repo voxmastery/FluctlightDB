@@ -38,15 +38,20 @@ New here? This page compares **how it feels** to use Fluctlight vs SQL vs vector
 
 ## 5-minute quick start
 
-### 1. Build
+### 0. Prerequisite (one-time build)
+
+Fluctlight is written in Rust. **Agent developers** usually only run this once to get the CLI + native Python wheel — not on every project:
 
 ```bash
 git clone https://github.com/voxmastery/FluctlightDB.git
 cd FluctlightDB
-cargo build --release
+cargo build --release          # CLI + server binary
+./scripts/install-native.sh    # Python library (like building sqlite extension once)
 ```
 
-### 2. Try the REPL (like `psql`)
+Compare: Qdrant README says `docker pull` or `pip install qdrant-client`; SQLite is already on your system. We’re not published to PyPI yet, so `install-native.sh` is the equivalent.
+
+### 1. Try the REPL (like `psql` / `sqlite3`)
 
 ```bash
 ./target/release/fluctlight shell --local --path /tmp/demo-brain
@@ -60,7 +65,7 @@ fluctlight> help
 fluctlight> quit
 ```
 
-### 3. Python agent (library call — recommended)
+### 2. Python agent (recommended — like `import sqlite3`)
 
 ```bash
 ./scripts/install-native.sh
@@ -74,7 +79,7 @@ print(c.activate("dark mode"))
 PY
 ```
 
-### 4. HTTP API (multi-tenant / remote writes)
+### 3. HTTP API (like Qdrant Docker + REST client)
 
 ```bash
 ./target/release/fluctlight tenant provision myagent --role admin
@@ -91,22 +96,42 @@ Use the Python SDK with `FLUCTLIGHT_SERVE_URL` and `FLUCTLIGHT_API_KEY`.
 # open docs/visual.html in a browser and load the JSON
 ```
 
+## One brain per agent — is one file OK?
+
+**Yes, as a concept** — one logical store per agent, like one SQLite file or one Qdrant collection.
+
+| Store | Physical shape |
+|-------|----------------|
+| SQLite | `agent.db` (single file) |
+| Qdrant local | `./storage/collections/my_agent/` (folder) |
+| Fluctlight v4 | `~/.fluctlight/tenants/default/brain/` (folder + sidecar index) |
+
+You **copy/back up that path** like you would `agent.db` or a Qdrant storage dir. See [DEPLOYMENT.md](DEPLOYMENT.md) for backup scripts.
+
 ## Which path should I use?
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Agent recall every turn (hot path)                     │
-│  → fluctlightdb_native  (like sqlite3)                  │
+│  One brain directory per agent                          │
+│  ~/.fluctlight/tenants/<agent_id>/brain/                │
 ├─────────────────────────────────────────────────────────┤
-│  Writes from many services / tenants                    │
-│  → fluctlight serve + API key                           │
+│  Recall every turn (hot path)                           │
+│  → fluctlightdb_native  (in-process, default)           │
 ├─────────────────────────────────────────────────────────┤
-│  Debugging / exploring memory                           │
-│  → fluctlight shell                                     │
+│  Writes + multi-tenant                                  │
+│  → fluctlight serve (HTTP only)                         │
 ├─────────────────────────────────────────────────────────┤
-│  Structured business data (orders, users)               │
-│  → keep Postgres — not Fluctlight's job                 │
+│  Force HTTP for recall (debug only)                     │
+│  → FLUCTLIGHT_HTTP_RECALL=1                             │
 └─────────────────────────────────────────────────────────┘
+```
+
+Provision per-agent brain + API key:
+
+```bash
+./target/release/fluctlight tenant create agent-42
+./target/release/fluctlight tenant provision agent-42 --role admin
+# brain: ~/.fluctlight/tenants/agent-42/brain/
 ```
 
 ## Next steps
