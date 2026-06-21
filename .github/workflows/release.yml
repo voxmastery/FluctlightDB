@@ -17,7 +17,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE: ghcr.io/voxmastery/fluctlightdb
 
 jobs:
   build-binaries:
@@ -102,7 +102,9 @@ jobs:
             VERSION="$(grep '^version' sdks/python/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> "$GITHUB_OUTPUT"
+          echo "tags=${IMAGE}:${VERSION},${IMAGE}:latest" >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE: ${{ env.IMAGE }}
 
       - uses: docker/login-action@v3
         with:
