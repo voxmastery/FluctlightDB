@@ -91,8 +91,18 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: linux-x86_64
           path: dist
-          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-aarch64
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist
 
       - run: ls -la dist/
 
