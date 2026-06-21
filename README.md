@@ -137,9 +137,11 @@ Full mapping: [docs/CLI.md](docs/CLI.md)
 
 ---
 
-## Build from source (contributors only)
+## Build from source (contributors)
 
-Agent developers should use **`pip install fluctlightdb`**. Rust is only needed if you hack on the core database or CLI:
+**Using Fluctlight in your agent?** Use `pip install fluctlightdb` — no Rust required.
+
+**Changing the database, CLI, or server?** Clone and install [Rust (stable)](https://rustup.rs), then:
 
 ```bash
 git clone https://github.com/voxmastery/FluctlightDB.git
@@ -148,7 +150,7 @@ cargo build --release
 cargo test --release
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for repo layout, dev commands, and what to work on without vs with Rust.
 
 ---
 
@@ -163,7 +165,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Contributing
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — build, test, PR guidelines  
+FluctlightDB is a **Rust codebase** with a **Python client on PyPI**. Agent users only need `pip`; core contributors need [Rust + the guide below](CONTRIBUTING.md).
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Rust setup, repo layout, where to start  
 - [SECURITY.md](SECURITY.md) — report vulnerabilities privately  
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)  
 
