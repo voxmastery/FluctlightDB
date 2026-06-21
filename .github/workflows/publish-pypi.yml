@@ -47,6 +47,7 @@ jobs:
         with:
           packages-dir: sdks/python/dist/
           password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
 
   publish-native:
     name: fluctlightdb-native (Linux wheels)
@@ -78,3 +79,4 @@ jobs:
         with:
           packages-dir: crates/fluctlight-py/dist/
           password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
