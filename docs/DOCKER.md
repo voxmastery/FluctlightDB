@@ -14,9 +14,10 @@ docker run -d --name fluctlight \
   ghcr.io/voxmastery/fluctlightdb:latest
 ```
 
-Python client:
+Python client (use a venv on Debian/Ubuntu — see [GETTING_STARTED.md](GETTING_STARTED.md#faq-for-newcomers)):
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install fluctlightdb
 export FLUCTLIGHT_SERVE_URL=http://127.0.0.1:8792
 export FLUCTLIGHT_API_KEY=your-secret-key

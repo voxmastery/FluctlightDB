@@ -11,9 +11,11 @@ Give your agent a **mind it can grow** — episodic memory, verified facts, and 
 
 ## Install (Python agents — recommended)
 
-Like **`pip install qdrant-client`** — no Rust toolchain required:
+Like **`pip install qdrant-client`** — no Rust toolchain required. Use a **venv** on Debian/Ubuntu/Fedora (PEP 668 blocks global pip):
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install fluctlightdb
 ```
 
@@ -83,6 +85,8 @@ Legacy single-file `.flct` still loads; new installs use the v4 directory layout
 ### 1. Install the Python SDK
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install fluctlightdb
 ```
 
