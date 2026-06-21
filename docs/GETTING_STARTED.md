@@ -94,20 +94,24 @@ client.experience("agent learned user prefers dark mode", context="settings")
 print(client.activate("dark mode"))
 ```
 
-### 4. Optional — in-process recall (fastest)
+### 4. Optional — in-process brain (like `sqlite3`, fastest)
 
-When prebuilt wheels exist for your platform:
+When `fluctlightdb-native` is installed:
 
 ```bash
 pip install "fluctlightdb[native]"
 ```
 
 ```python
-from fluctlightdb import get_recall_client
+from fluctlightdb import connect
 
-brain = get_recall_client("~/.fluctlight/tenants/myagent/brain")
+brain = connect("/tmp/my-agent-brain")  # or connect(path, readonly=True)
+brain.experience("user prefers dark mode", context="settings", salience=0.7)
 print(brain.activate("dark mode"))
+brain.checkpoint()  # persist when using a path-backed brain
 ```
+
+Read-only hot recall: `get_recall_client(path)` (same native library, recall-only default).
 
 ### 5. Try the REPL (needs server binary)
 
