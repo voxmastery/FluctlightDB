@@ -49,17 +49,29 @@ Same as `pip install qdrant-client` — your agent project only needs Python.
 
 ### 2. Start a FluctlightDB server
 
-The server is a separate binary (like Qdrant Docker). **Download** from [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases):
+Like Qdrant: **Docker** or a **release binary** — no Rust required.
+
+**Docker:**
 
 ```bash
-# example after downloading fluctlight to your PATH
-fluctlight tenant provision myagent --role admin
-fluctlight serve --path ~/.fluctlight/tenants/myagent/brain
+docker pull ghcr.io/voxmastery/fluctlightdb:latest
+docker run -d -p 8792:8792 \
+  -e FLUCTLIGHT_API_KEYS=default:your-secret-key:write \
+  -v fluctlight-data:/data \
+  ghcr.io/voxmastery/fluctlightdb:latest
 ```
 
-Follow the printed `auth.env` lines for your API key.
+Use `your-secret-key` as `FLUCTLIGHT_API_KEY` in Python. Details: [DOCKER.md](DOCKER.md).
 
-> **Note:** Building from source with `cargo` is for [contributors](../CONTRIBUTING.md) and operators who prefer it — not required for Python agent development.
+**Release binary** ([GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases)):
+
+```bash
+tar xzf fluctlight-*-linux-x86_64.tar.gz
+export FLUCTLIGHT_API_KEYS=default:your-secret-key:write
+./fluctlight serve --path ~/.fluctlight/tenants/default/brain
+```
+
+> Building from source with `cargo` is for [contributors](../CONTRIBUTING.md) only.
 
 ### 3. Python agent (recommended)
 

@@ -1,0 +1,16 @@
+services:
+  fluctlight:
+    image: ghcr.io/voxmastery/fluctlightdb:latest
+    build: .
+    ports:
+      - "8792:8792"
+    environment:
+      FLUCTLIGHT_HOME: /data
+      FLUCTLIGHT_API_KEYS: "default:change-me-in-production:write"
+      FLUCTLIGHT_TENANT_ID: default
+    volumes:
+      - fluctlight-data:/data
+    restart: unless-stopped
+
+volumes:
+  fluctlight-data:

@@ -5,7 +5,7 @@ set -euo pipefail
 PRIMARY="${FLUCTLIGHT_PRIMARY_BRAIN:-$HOME/.fluctlight/tenants/default/brain}"
 REPLICA="${FLUCTLIGHT_REPLICA_DIR:-$HOME/.fluctlight/replica}"
 REPLICA_BRAIN="$REPLICA/brain"
-FLUCTLIGHT="${FLUCTLIGHT_BIN:-$HOME/fluctlightdb/target/release/fluctlight}"
+FLUCTLIGHT="$("$(dirname "$0")/fluctlight-bin.sh")
 STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 
 if [[ ! -f "$REPLICA_BRAIN/manifest.json" ]]; then

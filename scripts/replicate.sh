@@ -4,7 +4,7 @@ set -euo pipefail
 PRIMARY="${FLUCTLIGHT_PRIMARY_BRAIN:-$HOME/.fluctlight/tenants/default/brain}"
 REPLICA="${FLUCTLIGHT_REPLICA_DIR:-$HOME/.fluctlight/replica}"
 INTERVAL="${FLUCTLIGHT_REPLICA_INTERVAL_SEC:-2}"
-FLUCTLIGHT="${FLUCTLIGHT_BIN:-$HOME/fluctlightdb/target/release/fluctlight}"
+FLUCTLIGHT="$("$(dirname "$0")/fluctlight-bin.sh")
 
 if [[ -x "$FLUCTLIGHT" ]]; then
   exec "$FLUCTLIGHT" replicate --primary "$PRIMARY" --replica "$REPLICA" --interval "$INTERVAL"
