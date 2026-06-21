@@ -23,7 +23,7 @@ You do **not** need Rust to improve docs or the pure-Python SDK. You **do** need
 
 ## Git commit identity (maintainers)
 
-Use **one** GitHub-linked identity so the repo shows a single contributor graph:
+Use **one** GitHub-linked identity so the repo shows a single contributor graph. **Voxmastery** is the GitHub username / project brand; copyright is held by **Ganesh S** (see LICENSE).
 
 ```bash
 git config user.name "Voxmastery"
