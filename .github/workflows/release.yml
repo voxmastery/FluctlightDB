@@ -82,6 +82,26 @@ jobs:
           path: |
             fluctlight-*.tar.gz
             fluctlight-*.tar.gz.sha256
+          if-no-files-found: error
+
+  collect-artifacts:
+    name: Collect release assets
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "*"
+          merge-multiple: true
+
+      - run: ls -la dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: dist/
+          if-no-files-found: error
 
   docker:
     name: Docker image
@@ -123,15 +143,15 @@ jobs:
 
   release:
     name: GitHub Release
-    needs: [build-binaries, docker]
+    needs: [collect-artifacts, docker]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
+          name: release-bundle
           path: artifacts
-          merge-multiple: true
 
       - name: Resolve tag and version
         id: tag
@@ -157,25 +177,8 @@ jobs:
           VER="${{ steps.tag.outputs.version }}"
           find artifacts -type f -print
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --generate-notes \
-              --notes "## Install
-
-          **Python client:** \`pip install fluctlightdb==${VER}\`
-
-          **Docker:**
-          \`\`\`bash
-          docker pull ghcr.io/voxmastery/fluctlightdb:${VER}
-          docker run -p 8792:8792 \\
-            -e FLUCTLIGHT_API_KEYS=default:your-secret-key:write \\
-            -v fluctlight-data:/data \\
-            ghcr.io/voxmastery/fluctlightdb:${VER}
-          \`\`\`
-
-          **Binary:** download the tarball for your platform below.
-
-          See [docs/DOCKER.md](https://github.com/voxmastery/FluctlightDB/blob/main/docs/DOCKER.md)."
+            gh release create "$TAG" --title "$TAG" --generate-notes \
+              --notes "**Python:** \`pip install fluctlightdb==${VER}\` · **Docker:** \`docker pull ghcr.io/voxmastery/fluctlightdb:${VER}\`"
           fi
-          shopt -s globstar nullglob
-          gh release upload "$TAG" artifacts/**/* --clobber
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.sha256' \) -print0 \
+            | xargs -0 -I{} gh release upload "$TAG" "{}" --clobber
