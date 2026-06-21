@@ -858,21 +858,28 @@ fn prefer_ledger_truth_on_balance_cue(
         return;
     }
 
-    let ledger_id = hippocampus.engrams.iter().filter(|e| {
-        let prov = e.episode.provenance.as_ref();
-        let verified = prov.map(|p| p.verified).unwrap_or(false);
-        let ledger = e.episode.context.starts_with("ledger:")
-            || prov.map(|p| p.kind == ProvenanceKind::LedgerVerified).unwrap_or(false);
-        if !(verified && ledger) {
-            return false;
-        }
-        let c = e.episode.content.to_lowercase();
-        c.contains("wallet") || c.contains("balance") || c.contains("ledger")
-    }).max_by(|a, b| {
-        a.salience
-            .partial_cmp(&b.salience)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    }).map(|e| e.id);
+    let ledger_id = hippocampus
+        .engrams
+        .iter()
+        .filter(|e| {
+            let prov = e.episode.provenance.as_ref();
+            let verified = prov.map(|p| p.verified).unwrap_or(false);
+            let ledger = e.episode.context.starts_with("ledger:")
+                || prov
+                    .map(|p| p.kind == ProvenanceKind::LedgerVerified)
+                    .unwrap_or(false);
+            if !(verified && ledger) {
+                return false;
+            }
+            let c = e.episode.content.to_lowercase();
+            c.contains("wallet") || c.contains("balance") || c.contains("ledger")
+        })
+        .max_by(|a, b| {
+            a.salience
+                .partial_cmp(&b.salience)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .map(|e| e.id);
 
     if let Some(id) = ledger_id {
         boost_recall_engram(hippocampus, recalls, id);

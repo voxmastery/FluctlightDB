@@ -5,11 +5,7 @@ use fluctlightdb::{Episode, FluctlightBrain, Provenance, ProvenanceKind};
 macro_rules! check {
     ($name:expr, $cond:expr) => {{
         let ok = $cond;
-        eprintln!(
-            "[{}] {}",
-            if ok { "PASS" } else { "FAIL" },
-            $name
-        );
+        eprintln!("[{}] {}", if ok { "PASS" } else { "FAIL" }, $name);
         assert!(ok, "manifesto check failed: {}", $name);
     }};
 }
@@ -42,11 +38,7 @@ fn manifesto_audit_checklist() {
 
     // 3. Experience encodes lived moments with context.
     let rep = brain
-        .experience(Episode::new(
-            "deployment succeeded on staging",
-            "ci",
-            0.8,
-        ))
+        .experience(Episode::new("deployment succeeded on staging", "ci", 0.8))
         .unwrap();
     check!(
         "3. Experience encodes moments (engram id returned)",
@@ -142,7 +134,9 @@ fn manifesto_audit_checklist() {
     );
 
     // 8. Life chapters — death transitions life; core can persist.
-    brain.mark_core(ledger.engram_id, "ledger-wallet".into()).unwrap();
+    brain
+        .mark_core(ledger.engram_id, "ledger-wallet".into())
+        .unwrap();
     brain.death("manifesto audit chapter end").unwrap();
     check!(
         "8. Life has chapters (death transitions life)",
@@ -152,7 +146,11 @@ fn manifesto_audit_checklist() {
     // 9. Not a vector DB — recall path does not require embeddings.
     let mut vec_free = FluctlightBrain::new();
     vec_free
-        .experience(Episode::new("password rotation policy updated", "security", 0.7))
+        .experience(Episode::new(
+            "password rotation policy updated",
+            "security",
+            0.7,
+        ))
         .unwrap();
     let r = vec_free.activate("password rotation");
     check!(

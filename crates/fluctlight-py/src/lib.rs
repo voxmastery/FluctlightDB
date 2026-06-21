@@ -119,8 +119,8 @@ impl PyBrain {
 
     fn experience(&mut self, episode_json: &str) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
-        let episode: Episode =
-            serde_json::from_str(episode_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let episode: Episode = serde_json::from_str(episode_json)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         let report = self
             .inner
             .experience(episode)
