@@ -63,7 +63,8 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             VERSION="${GITHUB_REF_NAME#v}"
           elif [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version#v }}"
+            VERSION="${{ inputs.version }}"
+            VERSION="${VERSION#v}"
           else
             VERSION="$(grep '^version' sdks/python/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
           fi
@@ -95,7 +96,8 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             VERSION="${GITHUB_REF_NAME#v}"
           elif [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version#v }}"
+            VERSION="${{ inputs.version }}"
+            VERSION="${VERSION#v}"
           else
             VERSION="$(grep '^version' sdks/python/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')"
           fi
