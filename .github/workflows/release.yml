@@ -148,26 +148,34 @@ jobs:
           echo "name=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: ${{ steps.tag.outputs.name }}
-          generate_release_notes: true
-          files: artifacts/**/*
-          body: |
-            ## Install
+      - name: Create GitHub Release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          VER="${{ steps.tag.outputs.version }}"
+          find artifacts -type f -print
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              --notes "## Install
 
-            **Python client:** `pip install fluctlightdb==${{ steps.tag.outputs.version }}`
+          **Python client:** \`pip install fluctlightdb==${VER}\`
 
-            **Docker:**
-            ```bash
-            docker pull ghcr.io/voxmastery/fluctlightdb:${{ steps.tag.outputs.version }}
-            docker run -p 8792:8792 \
-              -e FLUCTLIGHT_API_KEYS=default:your-secret-key:write \
-              -v fluctlight-data:/data \
-              ghcr.io/voxmastery/fluctlightdb:${{ steps.tag.outputs.version }}
-            ```
+          **Docker:**
+          \`\`\`bash
+          docker pull ghcr.io/voxmastery/fluctlightdb:${VER}
+          docker run -p 8792:8792 \\
+            -e FLUCTLIGHT_API_KEYS=default:your-secret-key:write \\
+            -v fluctlight-data:/data \\
+            ghcr.io/voxmastery/fluctlightdb:${VER}
+          \`\`\`
 
-            **Binary:** download the tarball for your platform below, extract, and run `./fluctlight serve`.
+          **Binary:** download the tarball for your platform below.
 
-            See [docs/DOCKER.md](https://github.com/voxmastery/FluctlightDB/blob/main/docs/DOCKER.md).
+          See [docs/DOCKER.md](https://github.com/voxmastery/FluctlightDB/blob/main/docs/DOCKER.md)."
+          fi
+          shopt -s globstar nullglob
+          gh release upload "$TAG" artifacts/**/* --clobber
