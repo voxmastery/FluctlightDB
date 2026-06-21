@@ -4,16 +4,33 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  # Release workflow uses GITHUB_TOKEN — its `release: published` event does not
+  # re-trigger workflows. Chain publish after a successful Release run.
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
 
 permissions:
+  contents: read
   id-token: write
+  actions: read
 
 jobs:
   publish-sdk:
     name: fluctlightdb (Python SDK)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/fluctlightdb/
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -33,9 +50,19 @@ jobs:
 
   publish-native:
     name: fluctlightdb-native (Linux wheels)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/fluctlightdb-native/
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - uses: dtolnay/rust-toolchain@stable
 

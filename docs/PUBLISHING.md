@@ -19,6 +19,8 @@ FluctlightDB ships two Python packages:
 
 Alternative: store `PYPI_API_TOKEN` as a repository secret and remove `id-token: write` if not using trusted publishing.
 
+**Note:** GitHub Release workflows cannot trigger other workflows via `release: published` when the release is created by Actions (same `GITHUB_TOKEN`). This repo chains **Publish to PyPI** via `workflow_run` after the **Release** workflow succeeds, or you can run it manually.
+
 ## Release process
 
 1. Bump versions:
