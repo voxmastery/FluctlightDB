@@ -31,7 +31,15 @@ client.experience("user prefers dark mode", context="settings")
 print(client.activate_lite("theme preference"))
 ```
 
-Point at a running FluctlightDB server — download a [release binary](https://github.com/voxmastery/FluctlightDB/releases) or use your own deployment (see [DEPLOYMENT.md](docs/DEPLOYMENT.md)). **Agent code never needs `cargo`.**
+Point at a running FluctlightDB server — **Docker**, a [release binary](https://github.com/voxmastery/FluctlightDB/releases), or your own deployment ([DEPLOYMENT.md](docs/DEPLOYMENT.md)). **Agent code never needs `cargo`.**
+
+```bash
+docker pull ghcr.io/voxmastery/fluctlightdb:latest
+docker run -p 8792:8792 \
+  -e FLUCTLIGHT_API_KEYS=default:your-secret-key:write \
+  -v fluctlight-data:/data \
+  ghcr.io/voxmastery/fluctlightdb:latest
+```
 
 ### Optional: in-process recall
 
@@ -62,7 +70,7 @@ Legacy single-file `.flct` still loads; new installs use the v4 directory layout
 
 | | **SQLite** | **Qdrant / Pinecone** | **FluctlightDB** |
 |---|------------|----------------------|------------------|
-| **README leads with** | `sqlite3`, any language | `pip install`, Docker, REST | **`pip install fluctlightdb`** |
+| **README leads with** | `sqlite3`, any language | `pip install`, Docker, REST | **`pip install fluctlightdb`** + Docker |
 | **First line of code** | `import sqlite3` | `from qdrant_client import …` | `from fluctlightdb import FluctlightClient` |
 | **Query** | SQL strings | vector + filter | **`activate(cue)`** |
 | **Explore data** | `sqlite3`, DBeaver | Web UI / scroll API | **`fluctlight shell`** (server binary) |
@@ -80,12 +88,17 @@ pip install fluctlightdb
 
 ### 2. Run a server (operators)
 
-Download `fluctlight` from [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases) (or build from source if you maintain the server):
+**Docker (recommended):**
 
 ```bash
-fluctlight tenant provision myagent --role admin
-fluctlight serve --path ~/.fluctlight/tenants/myagent/brain
+docker pull ghcr.io/voxmastery/fluctlightdb:latest
+docker run -d -p 8792:8792 \
+  -e FLUCTLIGHT_API_KEYS=default:your-secret-key:write \
+  -v fluctlight-data:/data \
+  ghcr.io/voxmastery/fluctlightdb:latest
 ```
+
+Or download `fluctlight` from [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases) (Linux / macOS tarballs).
 
 ### 3. Use from your agent
 
@@ -159,6 +172,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for repo layout, dev commands, and what t
 - **[Getting started](docs/GETTING_STARTED.md)** — UX deep-dive, FAQ  
 - [CLI.md](docs/CLI.md) — SQL/vector → Fluctlight commands  
 - [DEPLOYMENT.md](docs/DEPLOYMENT.md) — replica, backup, industrial HA  
+- [DOCKER.md](docs/DOCKER.md) — Docker image and compose  
 - [PUBLISHING.md](docs/PUBLISHING.md) — PyPI releases (maintainers)  
 - [Manifesto.md](docs/Manifesto.md) — philosophy  
 - [openapi.yaml](docs/openapi.yaml) — HTTP API  

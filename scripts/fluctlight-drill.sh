@@ -2,7 +2,7 @@
 # Weekly DR drill — verify primary brain; alert if corrupt (exit 1).
 set -euo pipefail
 BRAIN="${FLUCTLIGHT_PRIMARY_BRAIN:-$HOME/.fluctlight/tenants/default/brain}"
-FLUCTLIGHT="${FLUCTLIGHT_BIN:-$HOME/fluctlightdb/target/release/fluctlight}"
+FLUCTLIGHT="$("$(dirname "$0")/fluctlight-bin.sh")
 OUT=$("$FLUCTLIGHT" verify --path "$BRAIN")
 OK=$(echo "$OUT" | grep -o '"ok":[^,]*' | head -1 || true)
 if echo "$OUT" | grep -q '"ok": true'; then

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 BRAIN="${FLUCTLIGHT_BRAIN_PATH:-$HOME/.fluctlight/tenants/default/brain}"
-FLUCTLIGHT="${FLUCTLIGHT_BIN:-$HOME/fluctlightdb/target/release/fluctlight}"
+FLUCTLIGHT="$("$(dirname "$0")/fluctlight-bin.sh")"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="${FLUCTLIGHT_BACKUP_DIR:-$HOME/.fluctlight/backups}/$STAMP"
 mkdir -p "$DEST"

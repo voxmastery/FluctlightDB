@@ -33,13 +33,25 @@ FluctlightDB v1 targets **single-host industrial agents** with primary + replica
 | **Backup timer** | `systemd/fluctlight-backup.timer` | Production v1 |
 | **FTS5 + HNSW sidecar** | 10k+ engram recall | Production v1 |
 | **Multi-region managed** | Hosted SaaS | Roadmap |
+| **Docker image (GHCR)** | `docker pull ghcr.io/voxmastery/fluctlightdb` | Production v1 |
+| **Release binaries** | GitHub Releases tarballs | Production v1 |
 
 ## Primary server
 
-Download the latest `fluctlight` binary from [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases), or build from source:
+**Docker:**
 
 ```bash
-cargo build --release   # contributors / operators only
+docker pull ghcr.io/voxmastery/fluctlightdb:latest
+docker run -d -p 8792:8792 \
+  -e FLUCTLIGHT_API_KEYS=default:your-secret-key:write \
+  -v fluctlight-data:/data \
+  ghcr.io/voxmastery/fluctlightdb:latest
+```
+
+See [DOCKER.md](DOCKER.md). **Release binaries:** [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases). **From source** (contributors only):
+
+```bash
+cargo build --release
 ./target/release/fluctlight tenant provision default --role admin
 sudo cp systemd/fluctlight-serve.service.d/production.conf /etc/systemd/system/fluctlight-serve.service.d/
 sudo systemctl enable --now fluctlight-serve
