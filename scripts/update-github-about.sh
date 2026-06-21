@@ -7,9 +7,9 @@ set -euo pipefail
 OWNER="${GITHUB_OWNER:-voxmastery}"
 REPO="${GITHUB_REPO:-FluctlightDB}"
 
-DESCRIPTION="Long-term memory for AI agents — episodic recall and provenance. Not a vector DB. Not SQL."
+DESCRIPTION="Brain-native database for AI agents — engrams, activation, provenance. Not vector DB, SQL, or mem0-style layers."
 HOMEPAGE="https://pypi.org/project/fluctlightdb/"
-TOPICS='agent-memory ai-agents database docker episodic-memory llm memory pypi python rust'
+TOPICS='agent-memory ai-agents brain-native database docker episodic-memory llm memory pypi python rust'
 
 auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json")
 
