@@ -41,11 +41,17 @@ New here? This page compares **how it feels** to use Fluctlight vs SQL vs vector
 
 ### 1. Install the Python SDK (no Rust required)
 
+On modern Linux (Debian 12+, Ubuntu 23.04+), system Python blocks global `pip install` ([PEP 668](https://peps.python.org/pep-0668/)). Use a venv in your agent project — not `sudo pip` or `--break-system-packages`:
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install fluctlightdb
 ```
 
-Same as `pip install qdrant-client` — your agent project only needs Python.
+Or from this repo: `./scripts/install-python-client.sh`
+
+Same idea as `pip install qdrant-client` inside your project venv — your agent only needs Python + a venv.
 
 ### 2. Start a FluctlightDB server
 
@@ -167,7 +173,10 @@ fluctlight tenant provision agent-42 --role admin
 No. Vectors are optional *input*; recall is graph activation + provenance, not pure cosine similarity.
 
 **Do I need Rust or cargo?**  
-No — for agent apps, `pip install fluctlightdb` is enough. Rust is only for contributors and optional server builds.
+No — for agent apps, `pip install fluctlightdb` inside a venv is enough. Rust is only for contributors and optional server builds.
+
+**Why does `pip install fluctlightdb` say `externally-managed-environment`?**  
+Your OS Python is reserved for system packages (PEP 668). Create a venv (`python3 -m venv .venv && source .venv/bin/activate`) then run `pip install` again. Do not use `--break-system-packages` unless you fully accept the risk to system Python.
 
 **Do I write SQL?**  
 No. Use `recall`, `experience`, `list`, or the REPL. SQL mental model maps in [CLI.md](CLI.md).

@@ -4,8 +4,18 @@ Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) —
 
 ## Install
 
+On **Debian/Ubuntu 23.04+**, **Debian 12+**, and **Fedora 38+**, system Python is [PEP 668](https://peps.python.org/pep-0668/) *externally managed* — bare `pip install` fails with `externally-managed-environment`. Use a **virtual environment** (same as any other PyPI library):
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install fluctlightdb
+```
+
+From a clone of this repo you can also run:
+
+```bash
+./scripts/install-python-client.sh
 ```
 
 Optional in-process recall (Rust extension, when wheels are available for your platform):
