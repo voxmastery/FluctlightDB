@@ -28,7 +28,8 @@ Use **one** GitHub-linked identity so the repo shows a single contributor graph.
 ```bash
 git config user.name "Voxmastery"
 git config user.email "roppashreeganesh@gmail.com"
-# or GitHub noreply: 118175632+voxmastery@users.noreply.github.com
+# or from repo clone:
+./scripts/setup-git-identity.sh
 ./scripts/setup-git-hooks.sh
 ```
 
