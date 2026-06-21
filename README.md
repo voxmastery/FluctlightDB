@@ -1,24 +1,28 @@
 # FluctlightDB
 
-**Long-term memory for AI agents** — store what your agent experienced, recall it by meaning, and tell verified facts from chat guesses.
+**A brain-native database for AI agents.** Not a vector database. Not SQL. Not a memory layer like mem0.
+
+Store what your agent **experienced**, recall by **spreading activation** (not just cosine similarity), and separate **verified facts from chat guesses**.
 
 [![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB)
-
-> **Not** a vector database. **Not** SQL. Episodic memory: things your agent *lived through*, with provenance.
 
 ---
 
 ## What is this?
 
+**FluctlightDB is a database** — a store you install (`pip install fluctlightdb`), open per agent (`connect(path)`), and query with brain-native verbs (`experience`, `activate`). It is shaped like **biological memory** (engrams, synapses, activation), not like a document index with an LLM wrapper on top.
+
 If you build agents (coding assistants, workers, NPCs, companions), they need memory beyond the current chat window.
 
-| Approach | Good at | Weak at |
-|----------|---------|---------|
-| **SQL** (Postgres, SQLite) | Structured rows, reports | “What did we decide last week?” |
-| **Vector DB** (Qdrant, Pinecone) | Similarity search | Truth — chat claim vs ledger fact |
-| **FluctlightDB** | **Episodes + recall + provenance** | Replacing your billing database |
+| | **Memory layers** (mem0, etc.) | **Vector DB** (Qdrant, Pinecone) | **FluctlightDB** |
+|---|-------------------------------|----------------------------------|------------------|
+| **What it is** | SDK + extraction pipeline over a vector store | Similarity search engine | **Brain-native database** |
+| **Unit stored** | facts / messages (often summarized) | embedding + payload | **engram** (lived episode) |
+| **Recall** | embed query → top-k similar | nearest neighbor | **spreading activation** from a cue |
+| **Truth** | LLM or metadata flags | payload fields | **provenance** (ledger beats chat) |
+| **Growth** | re-ingest / re-summarize | re-index | **sleep, plasticity, maturation** |
 
-**Mental model:** one **brain folder per agent** on disk — like one SQLite file or one Qdrant collection path. Your code **experiences** events and **activates** recall from a cue (not SQL strings, not pure cosine similarity).
+**Mental model:** one **brain folder per agent** on disk — like one SQLite file or one Qdrant collection path. Your agent **lives** in that brain; memory is not a sidecar RAG index you bolt on each turn.
 
 | Goal | API |
 |------|-----|
@@ -102,14 +106,26 @@ Release binaries (no `cargo`): [GitHub Releases](https://github.com/voxmastery/F
 
 ---
 
-## How is this different?
+## Brain-native vs mem0-style memory layers
 
-| | Vector DB | SQL | FluctlightDB |
-|---|-----------|-----|--------------|
-| **Unit of storage** | point + embedding | row | **engram** (episode) |
-| **Query** | nearest neighbor | `SELECT … WHERE` | **`activate(cue)`** |
-| **Truth** | payload flags | your columns | **ledger beats chat** |
-| **Typical install** | pip client + server | driver + server | **`pip install fluctlightdb`** |
+Tools like **mem0**, Zep, or LangMem are **memory layers**: they extract or summarize chat, embed it, and search a vector store. FluctlightDB is a **database whose model is a brain**:
+
+- **mem0-style:** “remember this fact about the user” → embed → retrieve similar chunks next turn  
+- **FluctlightDB:** `experience(...)` writes an engram → `activate(cue)` spreads activation through a graph → verified ledger outranks unverified chat  
+
+You can use both in one stack (mem0 for quick facts, Fluctlight for durable episodic brain state), but they solve different problems. Fluctlight is for agents that need a **persistent mind**, not just a better prompt prefix.
+
+Philosophy and automated checks: [Manifesto.md](docs/Manifesto.md) · `./scripts/manifesto-audit.sh`
+
+---
+
+## How is this different from SQL?
+
+| | SQL | Vector DB | FluctlightDB |
+|---|-----|-----------|--------------|
+| **Query** | `SELECT … WHERE` | nearest neighbor | **`activate(cue)`** |
+| **Best for** | billing, inventory, reports | similarity search | **episodic agent memory + truth** |
+| **Install** | driver + server | pip client + server | **`pip install fluctlightdb`** |
 
 Deeper comparisons (REPL, CLI mapping, FAQ): **[Getting started](docs/GETTING_STARTED.md)**
 

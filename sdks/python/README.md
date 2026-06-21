@@ -1,6 +1,6 @@
 # fluctlightdb
 
-Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) — episodic memory for AI agents (not a vector DB, not SQL).
+Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) — a **brain-native database** for AI agents (not a vector DB, not SQL, not a mem0-style memory layer).
 
 ## Install
 
