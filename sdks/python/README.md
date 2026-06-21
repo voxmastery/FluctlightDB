@@ -57,16 +57,21 @@ client = FluctlightClient.from_env()
 print(client.activate("dark mode"))
 ```
 
-## In-process recall (optional)
+## In-process brain (like `sqlite3`)
 
 When `fluctlightdb-native` is installed:
 
 ```python
-from fluctlightdb import get_recall_client
+from fluctlightdb import connect
 
-brain = get_recall_client("~/.fluctlight/tenants/default/brain")
+brain = connect("/tmp/my-agent-brain")
+brain.experience("user prefers dark mode", context="settings")
 print(brain.activate("dark mode"))
 ```
+
+Read-only recall path: `get_recall_client(path)`.
+
+## In-process recall (read-only helper)
 
 ## Docs
 

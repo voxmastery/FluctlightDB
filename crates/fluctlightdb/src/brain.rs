@@ -31,7 +31,8 @@ use crate::sleep_trigger::SleepTrigger;
 use crate::store;
 use crate::types::Region::HippocampusCa1;
 use crate::types::{
-    ActivationResult, DevelopmentViz, Episode, ExperienceReport, SleepReport, VizExport,
+    ActivationResult, DevelopmentViz, Episode, ExperienceReport, ProvenanceKind, SleepReport,
+    VizExport,
 };
 use crate::wal::{self, WalEntry};
 
@@ -396,6 +397,9 @@ impl FluctlightBrain {
             .unwrap_or(0.0);
         for recall in &mut result.recalls {
             recall.activation += (cortex_boost + field_boost) * 0.1;
+            if recall.verified {
+                recall.activation += 0.15;
+            }
         }
         result
             .recalls
@@ -848,28 +852,58 @@ fn prefer_ledger_truth_on_balance_cue(
     ) {
         return;
     }
+
     if let Some(id) = hippocampus.find_rag_chunk("ledger", "wallet-balance") {
-        if let Some(recall) = recalls.iter_mut().find(|r| r.engram_id == id) {
-            recall.activation = recall.activation.max(5.0) + 5.0;
-            recall.verified = true;
-            recall.trust_note = None;
-        } else if let Some(engram) = hippocampus.engrams.iter().find(|e| e.id == id) {
-            recalls.insert(
-                0,
-                crate::types::RecallResult {
-                    engram_id: id,
-                    activation: 10.0,
-                    episode: engram.episode.clone(),
-                    completion_strength: 1.0,
-                    separation_index: engram.separation_index,
-                    verified: true,
-                    trust_note: None,
-                },
-            );
-        }
-        recalls.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
-        recalls.truncate(8);
+        boost_recall_engram(hippocampus, recalls, id);
+        return;
     }
+
+    let ledger_id = hippocampus.engrams.iter().filter(|e| {
+        let prov = e.episode.provenance.as_ref();
+        let verified = prov.map(|p| p.verified).unwrap_or(false);
+        let ledger = e.episode.context.starts_with("ledger:")
+            || prov.map(|p| p.kind == ProvenanceKind::LedgerVerified).unwrap_or(false);
+        if !(verified && ledger) {
+            return false;
+        }
+        let c = e.episode.content.to_lowercase();
+        c.contains("wallet") || c.contains("balance") || c.contains("ledger")
+    }).max_by(|a, b| {
+        a.salience
+            .partial_cmp(&b.salience)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }).map(|e| e.id);
+
+    if let Some(id) = ledger_id {
+        boost_recall_engram(hippocampus, recalls, id);
+    }
+}
+
+fn boost_recall_engram(
+    hippocampus: &crate::hippocampus::Hippocampus,
+    recalls: &mut Vec<crate::types::RecallResult>,
+    id: uuid::Uuid,
+) {
+    if let Some(recall) = recalls.iter_mut().find(|r| r.engram_id == id) {
+        recall.activation = recall.activation.max(5.0) + 5.0;
+        recall.verified = true;
+        recall.trust_note = None;
+    } else if let Some(engram) = hippocampus.engrams.iter().find(|e| e.id == id) {
+        recalls.insert(
+            0,
+            crate::types::RecallResult {
+                engram_id: id,
+                activation: 10.0,
+                episode: engram.episode.clone(),
+                completion_strength: 1.0,
+                separation_index: engram.separation_index,
+                verified: true,
+                trust_note: None,
+            },
+        );
+    }
+    recalls.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+    recalls.truncate(8);
 }
 
 fn any_contains(hay: &str, needles: &[&str]) -> bool {

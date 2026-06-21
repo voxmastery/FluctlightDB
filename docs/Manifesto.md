@@ -43,3 +43,13 @@ FluctlightDB is **agent infrastructure**, not tied to any single product or comp
 ## What we build
 
 A `.flct` brain file that ** grows, sleeps, and learns** with the agent — helping it become more capable, more coherent, and more *present* the longer it lives.
+
+## Verify the build matches this manifesto
+
+From a clone:
+
+```bash
+./scripts/manifesto-audit.sh
+```
+
+This runs automated pass/fail checks for activation recall, provenance (ledger beats chat), separation gate, sleep/growth, and life chapters.

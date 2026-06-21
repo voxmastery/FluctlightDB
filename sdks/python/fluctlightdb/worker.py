@@ -58,6 +58,7 @@ class FluctlightNative:
         else:
             self._brain = native.Brain.open(brain_path)
         self.brain_path = brain_path
+        self.readonly = readonly
 
     def activate(
         self,
@@ -75,14 +76,54 @@ class FluctlightNative:
     ) -> dict[str, Any]:
         return self._brain.activate_batch_json(json.dumps(items), limit)
 
+    def experience(self, episode_json: str) -> dict[str, Any]:
+        if self.readonly:
+            raise RuntimeError("brain opened readonly — reopen with readonly=False")
+        return self._brain.experience(episode_json)
+
+    def experience_dict(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self.experience(json.dumps(payload))
+
+    def verify_fact(
+        self,
+        engram_id: str,
+        provenance_kind: str = "ledger_verified",
+        source_uri: Optional[str] = None,
+        confidence: float = 0.95,
+    ) -> None:
+        if self.readonly:
+            raise RuntimeError("brain opened readonly")
+        self._brain.verify_fact(engram_id, provenance_kind, source_uri, confidence)
+
+    def sleep(self) -> dict[str, Any]:
+        if self.readonly:
+            raise RuntimeError("brain opened readonly")
+        return self._brain.sleep()
+
+    def tick(self, n: int = 1) -> list[dict[str, Any]]:
+        if self.readonly:
+            raise RuntimeError("brain opened readonly")
+        return self._brain.tick(n)
+
+    def preplay(self, goal: str, steps: int = 4) -> dict[str, Any]:
+        return self._brain.preplay(goal, steps)
+
     def status(self) -> dict[str, Any]:
         return self._brain.status()
+
+    def stage_report(self) -> dict[str, Any]:
+        return self._brain.stage_report()
 
     def verified_context(self, limit: int = 12) -> dict[str, Any]:
         return self._brain.verified_context(limit)
 
     def has_sidecar_index(self) -> bool:
         return bool(self._brain.has_sidecar_index())
+
+    def checkpoint(self) -> None:
+        if self.readonly:
+            raise RuntimeError("brain opened readonly")
+        self._brain.checkpoint()
 
 
 class FluctlightWorker:
@@ -118,7 +159,8 @@ class FluctlightWorker:
         with self._lock:
             if self._proc and self._proc.poll() is None:
                 try:
-                    self._call("shutdown")
+                    self._proc.stdin.write('{"op":"shutdown"}\n')
+                    self._proc.stdin.flush()
                 except Exception:
                     pass
                 self._proc.terminate()
@@ -128,24 +170,18 @@ class FluctlightWorker:
         with self._lock:
             if self._proc is None or self._proc.poll() is not None:
                 self._start()
-            assert self._proc is not None
-            assert self._proc.stdin is not None
-            assert self._proc.stdout is not None
+            assert self._proc and self._proc.stdin and self._proc.stdout
             self._id += 1
-            req = {"op": op, "id": self._id, **kwargs}
+            req = {"id": self._id, "op": op, **kwargs}
             self._proc.stdin.write(json.dumps(req) + "\n")
             self._proc.stdin.flush()
             line = self._proc.stdout.readline()
             if not line:
-                err = (self._proc.stderr.read() if self._proc.stderr else "")[:300]
-                raise RuntimeError(f"worker closed: {err}")
+                raise RuntimeError("worker closed stdout")
             resp = json.loads(line)
-            if not resp.get("ok"):
-                raise RuntimeError(resp.get("error") or "worker error")
-            return resp
-
-    def ping(self) -> bool:
-        return bool(self._call("ping").get("pong"))
+            if "error" in resp:
+                raise RuntimeError(resp["error"])
+            return resp.get("result", resp)
 
     def activate(
         self,
@@ -161,21 +197,17 @@ class FluctlightWorker:
             payload["agent_id"] = agent_id
         if limit is not None:
             payload["limit"] = limit
-        return self._call("activate", **payload)["result"]
+        return self._call("activate", **payload)
 
     def activate_batch(
         self,
         items: list[dict[str, Any]],
         limit: Optional[int] = None,
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {"batch": items}
-        if limit is not None:
-            payload["limit"] = limit
-        resp = self._call("activate_batch", **payload)
-        return {"results": resp.get("results") or [], "count": resp.get("count", 0)}
+        return self._call("activate_batch", batch=items, limit=limit)
 
     def status(self) -> dict[str, Any]:
-        return self._call("status")["status"]
+        return self._call("status")
 
     def verified_context(self, limit: int = 12) -> dict[str, Any]:
         return self._call("verified_context", limit=limit)["context"]
@@ -192,6 +224,8 @@ _client_lock = threading.Lock()
 def get_recall_client(
     brain_path: Optional[str] = None,
     bin_path: Optional[str] = None,
+    *,
+    readonly: bool = True,
 ) -> RecallClient:
     """Best available in-process recall: native library > worker subprocess."""
     global _native_singleton, _worker_singleton
@@ -210,7 +244,7 @@ def get_recall_client(
     with _client_lock:
         if prefer_native and _native_singleton is None:
             try:
-                _native_singleton = FluctlightNative(path, readonly=True)
+                _native_singleton = FluctlightNative(path, readonly=readonly)
                 return _native_singleton
             except ImportError:
                 pass
@@ -227,7 +261,7 @@ def get_worker(
     brain_path: Optional[str] = None,
     bin_path: Optional[str] = None,
 ) -> FluctlightWorker:
-    client = get_recall_client(brain_path=brain_path, bin_path=bin_path)
+    client = get_recall_client(brain_path=brain_path, bin_path=bin_path, readonly=True)
     if isinstance(client, FluctlightWorker):
         return client
     raise TypeError("native client active — use get_recall_client() instead")

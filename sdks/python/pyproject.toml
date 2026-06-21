@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluctlightdb"
-version = "0.4.2"
+version = "0.4.3"
 description = "Python client for FluctlightDB — brain-native memory for AI agents"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -32,7 +32,7 @@ Repository = "https://github.com/voxmastery/FluctlightDB"
 Issues = "https://github.com/voxmastery/FluctlightDB/issues"
 
 [project.optional-dependencies]
-native = ["fluctlightdb-native>=0.4.2"]
+native = ["fluctlightdb-native>=0.4.3"]
 
 [tool.setuptools.packages.find]
 where = ["."]
