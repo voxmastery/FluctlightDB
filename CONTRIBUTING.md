@@ -2,78 +2,165 @@
 
 Thanks for your interest in contributing. FluctlightDB is an open-source brain-native memory store for AI agents (MIT licensed).
 
-## Two audiences
+The **core database is Rust**. The **Python package on PyPI** is the client most agent developers use. Both are in this repo — different roles, different setup.
 
-### Python agent developers
+---
 
-Use PyPI — **no clone or Rust required**:
+## Who contributes what?
+
+| Goal | Toolchain | Where to work |
+|------|-----------|---------------|
+| **Use Fluctlight in an agent app** | Python only | `pip install fluctlightdb` — no clone needed |
+| **Python SDK** (HTTP client, helpers) | Python 3.9+ | `sdks/python/` |
+| **Rust core** (recall, storage, brain logic) | Rust stable | `crates/fluctlightdb/` |
+| **CLI + HTTP server + REPL** | Rust stable | `crates/fluctlight-cli/` |
+| **Native Python bindings** (in-process recall) | Rust + maturin | `crates/fluctlight-py/` |
+| **Docs, runbooks, examples** | Markdown | `docs/`, `README.md` |
+
+You do **not** need Rust to improve docs or the pure-Python SDK. You **do** need Rust for anything in `crates/`.
+
+---
+
+## Rust setup (core / CLI contributors)
+
+One-time install ([rustup](https://rustup.rs)):
 
 ```bash
-pip install fluctlightdb
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+rustup default stable
+rustc --version   # should show stable
 ```
 
-Report SDK bugs with your `pip show fluctlightdb` version and Python version.
+Clone and build:
 
-### Rust / core contributors
+```bash
+git clone https://github.com/voxmastery/FluctlightDB.git
+cd FluctlightDB
+./scripts/setup-git-hooks.sh
+cargo build --release
+cargo test --release
+```
 
-1. Fork and clone the repository.
-2. Install Rust (stable) and Python 3.10+.
-3. Enable git hooks (strips automated co-author trailers from commits):
+CI runs the same `cargo test --release` plus `cargo fmt --check` and `cargo clippy`.
 
-   ```bash
-   ./scripts/setup-git-hooks.sh
-   ```
+### Try your build locally
 
-4. Build and test:
+```bash
+# Interactive REPL
+./target/release/fluctlight shell --local --path /tmp/test-brain
 
-   ```bash
-   cargo build --release
-   cargo test --release
-   ```
+# One-shot recall
+./target/release/fluctlight activate --path /tmp/test-brain "dark mode"
 
-5. Optional — test the Python SDK from source:
+# HTTP server (separate terminal)
+./target/release/fluctlight serve --path /tmp/test-brain
+```
 
-   ```bash
-   pip install -e sdks/python
-   ./scripts/install-native.sh   # local native wheel for recall tests
-   ```
+Integration tests live under `crates/fluctlightdb/tests/` and repo-root `tests/` if present.
+
+---
+
+## Repo layout
+
+```
+crates/fluctlightdb/     # Core library — brain, storage, recall, WAL, indexes
+  src/brain.rs             # Experience, activate, sleep
+  src/serve.rs             # HTTP multi-tenant API
+  src/store.rs             # Persistence, checkpoints
+  src/activation.rs        # Spreading activation recall
+  tests/                   # Integration tests
+
+crates/fluctlight-cli/   # `fluctlight` binary — shell, tenant, export, worker
+
+crates/fluctlight-py/    # PyO3 extension → `fluctlightdb-native` on PyPI
+
+sdks/python/             # Pure Python HTTP client → `fluctlightdb` on PyPI
+```
+
+Good first areas (usually self-contained):
+
+- **Docs / examples** — no Rust required
+- **Python SDK** — `sdks/python/fluctlightdb/`
+- **CLI UX** — `crates/fluctlight-cli/src/shell.rs`
+- **Tests** — add cases in `crates/fluctlightdb/tests/`
+- **HTTP API** — `serve.rs` + `docs/openapi.yaml`
+
+Harder (read surrounding code first):
+
+- HNSW / sidecar index — `src/index/`
+- WAL / replication — `src/wal.rs`, `src/replicate.rs`
+
+---
+
+## Python SDK contributors
+
+Users install from PyPI. To hack on the SDK:
+
+```bash
+pip install -e sdks/python
+python -c "from fluctlightdb import FluctlightClient; print('ok')"
+```
+
+To test against a local server, build the CLI once (`cargo build --release`) and run `fluctlight serve`.
+
+Optional native bindings:
+
+```bash
+./scripts/install-native.sh
+pip install -e sdks/python
+```
+
+---
 
 ## Development workflow
 
-- Create a feature branch from `main`.
-- Keep changes focused; prefer small, reviewable PRs.
-- This repo uses `.githooks/` (run `./scripts/setup-git-hooks.sh` once) to strip automated co-author trailers from commits.
+1. Fork and create a branch from `main`.
+2. Make focused changes; one concern per PR when possible.
+3. Before opening a PR (Rust changes):
 
-- Run `cargo fmt` and `cargo clippy` before opening a PR (Rust changes).
-- Add or update tests when behavior changes.
-- Update docs (`README.md`, `docs/`) when user-facing behavior changes.
-- Do not tell agent developers to run `cargo` unless they are contributing to the Rust core.
+   ```bash
+   cargo fmt --all
+   cargo clippy --release --all-targets
+   cargo test --release
+   ```
+
+4. Update docs if behavior or public API changed.
+5. Open a PR — template checklist is in `.github/pull_request_template.md`.
+
+Do not commit secrets, production brain paths, or personal hostnames.
+
+---
 
 ## Pull requests
 
 - Describe **what** changed and **why**.
 - Link related issues when applicable.
-- Ensure CI passes (`cargo test --release`).
-- Do not commit secrets, production brain paths, or personal hostnames.
+- Ensure CI passes (GitHub Actions on every push to `main`).
+
+---
 
 ## Publishing (maintainers)
 
 See [docs/PUBLISHING.md](docs/PUBLISHING.md) for PyPI release steps.
 
+---
+
 ## Reporting issues
 
-Use GitHub Issues with:
+| Bug in… | Include |
+|---------|---------|
+| Rust core / CLI | `rustc --version`, OS, steps, `cargo test` output if relevant |
+| Python SDK | `pip show fluctlightdb`, Python version, minimal repro |
 
-- Steps to reproduce
-- Expected vs actual behavior
-- Rust version (`rustc --version`) and OS — for core bugs
-- `pip show fluctlightdb` — for SDK bugs
+For security vulnerabilities, see [SECURITY.md](SECURITY.md) — do not open public issues for sensitive reports.
 
-For security vulnerabilities, see [SECURITY.md](SECURITY.md) — please do not open public issues for sensitive reports.
+---
 
 ## Code of conduct
 
-This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). Be respectful and constructive in all project spaces.
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
+
+---
 
 ## License
 
