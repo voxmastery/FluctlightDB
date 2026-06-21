@@ -11,18 +11,35 @@ Give your agent a **mind it can grow** — episodic memory, verified facts, and 
 
 ## Install (Python agents — recommended)
 
-Like **`pip install qdrant-client`** — no Rust toolchain required. Use a **venv** on Debian/Ubuntu/Fedora (PEP 668 blocks global pip):
+Use a **venv** on Debian/Ubuntu/Fedora (PEP 668 blocks global pip):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install fluctlightdb
+pip install "fluctlightdb[native]==0.4.3"
 ```
 
-Optional in-process recall (prebuilt wheels when available for your OS):
+### Embedded brain — direct library call (like `sqlite3`)
+
+No server, no HTTP, no `fluctlight` binary. The Rust core runs **in your Python process**:
+
+```python
+from fluctlightdb import connect
+
+brain = connect("/tmp/my-agent-brain")          # open brain folder on disk
+brain.experience("user prefers dark mode", context="settings", salience=0.8)
+print(brain.activate("dark mode"))              # direct Rust call, not network
+brain.checkpoint()
+```
+
+This is the same pattern as `import sqlite3` — **library call, not client/server**.
+
+### HTTP client — when you need a remote or shared server
+
+Like `psycopg2` → Postgres. Install the pure-Python client and point at Docker or a [release binary](https://github.com/voxmastery/FluctlightDB/releases):
 
 ```bash
-pip install "fluctlightdb[native]"
+pip install fluctlightdb
 ```
 
 ```python
@@ -33,8 +50,6 @@ client.experience("user prefers dark mode", context="settings")
 print(client.activate_lite("theme preference"))
 ```
 
-Point at a running FluctlightDB server — **Docker**, a [release binary](https://github.com/voxmastery/FluctlightDB/releases), or your own deployment ([DEPLOYMENT.md](docs/DEPLOYMENT.md)). **Agent code never needs `cargo`.**
-
 ```bash
 docker pull ghcr.io/voxmastery/fluctlightdb:latest
 docker run -p 8792:8792 \
@@ -43,13 +58,37 @@ docker run -p 8792:8792 \
   ghcr.io/voxmastery/fluctlightdb:latest
 ```
 
-### Optional: in-process recall
+**Agent code never needs `cargo`.** See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for ops/HA.
 
-```python
-from fluctlightdb import get_recall_client
+---
 
-brain = get_recall_client("~/.fluctlight/tenants/default/brain")
-print(brain.activate("dark mode"))  # sub-ms when fluctlightdb-native is installed
+## Performance (measured)
+
+Numbers below are from this repo’s release benchmarks on Linux x86_64 — re-run anytime to verify on your machine.
+
+| Path | Typical hot-path latency | What it is |
+|------|--------------------------|------------|
+| **Embedded native** (`connect`) | **~0.002 ms / `activate`** | Direct Rust library call in-process ([`prod_bench`](crates/fluctlightdb/tests/prod_bench.rs)) |
+| **HTTP** (`FluctlightClient`, keep-alive) | ~1–5 ms / request | Client/server over localhost |
+| **Vector DB ANN** (typical) | ~2–5 ms / query | Industry ballpark for remote similarity search |
+
+**Recall quality** (same `prod_bench` fixture, 1000 queries):
+
+| Method | Hits / 1000 |
+|--------|-------------|
+| Fluctlight activation | **1000 / 1000** |
+| Lexical substring scan | 800 / 1000 |
+| Brute cosine vector (≥ 0.75) | 1000 / 1000 |
+
+**Truth / provenance:** on cue `wallet balance`, verified ledger (`$0.00`) ranks above unverified chat claims — checked in `prod_bench` and [`manifesto_audit`](crates/fluctlightdb/tests/manifesto_audit.rs).
+
+**Server observability** (Docker / `fluctlight serve`): Prometheus metrics at `GET /metrics` — `fluctlight_activate_ms_avg`, `fluctlight_experience_ms_avg`, `fluctlight_synapse_count`, per-tenant counters.
+
+Reproduce locally:
+
+```bash
+cargo test --release -p fluctlightdb --test prod_bench -- --nocapture
+./scripts/manifesto-audit.sh
 ```
 
 ---
@@ -72,8 +111,9 @@ Legacy single-file `.flct` still loads; new installs use the v4 directory layout
 
 | | **SQLite** | **Qdrant / Pinecone** | **FluctlightDB** |
 |---|------------|----------------------|------------------|
-| **README leads with** | `sqlite3`, any language | `pip install`, Docker, REST | **`pip install fluctlightdb`** + Docker |
-| **First line of code** | `import sqlite3` | `from qdrant_client import …` | `from fluctlightdb import FluctlightClient` |
+| **Agent hot path** | `import sqlite3` (in-process) | HTTP/gRPC client | **`connect()` native** (in-process) or HTTP client |
+| **README leads with** | `sqlite3`, any language | `pip install`, Docker, REST | **`pip install fluctlightdb[native]`** + optional Docker |
+| **First line of code** | `import sqlite3` | `from qdrant_client import …` | `from fluctlightdb import connect` |
 | **Query** | SQL strings | vector + filter | **`activate(cue)`** |
 | **Explore data** | `sqlite3`, DBeaver | Web UI / scroll API | **`fluctlight shell`** (server binary) |
 | **Build from source** | optional | optional | **optional** — Rust only for [contributors](#contributing) |
@@ -82,15 +122,23 @@ Legacy single-file `.flct` still loads; new installs use the v4 directory layout
 
 ## Quick start (5 minutes)
 
-### 1. Install the Python SDK
+### 1. Install the Python SDK (embedded — recommended)
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install fluctlightdb
+pip install "fluctlightdb[native]==0.4.3"
 ```
 
-### 2. Run a server (operators)
+```python
+from fluctlightdb import connect
+
+brain = connect("/tmp/my-agent-brain")
+brain.experience("user prefers dark mode", context="settings")
+print(brain.activate("dark mode"))
+```
+
+### 2. Run a server (optional — multi-agent / remote)
 
 **Docker (recommended):**
 
