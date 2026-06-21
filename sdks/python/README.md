@@ -1,83 +1,53 @@
 # fluctlightdb
 
-Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) — a brain-native memory store for AI agents.
+Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) — episodic memory for AI agents (not a vector DB, not SQL).
 
 ## Install
 
-On **Debian/Ubuntu 23.04+**, **Debian 12+**, and **Fedora 38+**, system Python is [PEP 668](https://peps.python.org/pep-0668/) *externally managed* — bare `pip install` fails with `externally-managed-environment`. Use a **virtual environment** (same as any other PyPI library):
+On **Debian/Ubuntu 23.04+**, **Debian 12+**, and **Fedora 38+**, use a **virtual environment** ([PEP 668](https://peps.python.org/pep-0668/)):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install "fluctlightdb[native]"
+```
+
+From a clone: `./scripts/install-python-client.sh` (HTTP client only; add `[native]` for embedded).
+
+HTTP-only client (no Rust extension):
+
+```bash
 pip install fluctlightdb
 ```
 
-From a clone of this repo you can also run:
+## Quick start — embedded (recommended)
 
-```bash
-./scripts/install-python-client.sh
-```
-
-Optional in-process recall (Rust extension, when wheels are available for your platform):
-
-```bash
-pip install "fluctlightdb[native]"
-# or: pip install fluctlightdb-native
-```
-
-No `cargo` or Rust toolchain required for the HTTP client.
-
-## Quick start (HTTP — like `qdrant-client`)
-
-Run a FluctlightDB server (download a [release binary](https://github.com/voxmastery/FluctlightDB/releases) or use your own deployment), then:
-
-```python
-from fluctlightdb import FluctlightClient
-
-client = FluctlightClient(
-    base_url="http://127.0.0.1:8792",
-    api_key="your-key",
-)
-
-client.experience("user prefers dark mode", context="settings")
-print(client.activate_lite("theme preference"))
-```
-
-Or use environment variables:
-
-```bash
-export FLUCTLIGHT_SERVE_URL=http://127.0.0.1:8792
-export FLUCTLIGHT_API_KEY=your-key
-```
-
-```python
-from fluctlightdb import FluctlightClient
-
-client = FluctlightClient.from_env()
-print(client.activate("dark mode"))
-```
-
-## In-process brain (like `sqlite3`)
-
-When `fluctlightdb-native` is installed:
+Like `sqlite3` — no server:
 
 ```python
 from fluctlightdb import connect
 
 brain = connect("/tmp/my-agent-brain")
-brain.experience("user prefers dark mode", context="settings")
+brain.experience("User prefers dark mode", context="settings")
 print(brain.activate("dark mode"))
+brain.checkpoint()
 ```
 
-Read-only recall path: `get_recall_client(path)`.
+Read-only recall: `get_recall_client(path)`.
 
-## In-process recall (read-only helper)
+## Quick start — HTTP (shared / remote server)
+
+Run a [release binary](https://github.com/voxmastery/FluctlightDB/releases) or Docker image, then:
+
+```python
+from fluctlightdb import FluctlightClient
+
+client = FluctlightClient.from_env()  # FLUCTLIGHT_SERVE_URL + FLUCTLIGHT_API_KEY
+client.experience("User prefers dark mode", context="settings")
+print(client.activate("dark mode"))
+```
 
 ## Docs
 
 - [Getting started](https://github.com/voxmastery/FluctlightDB/blob/main/docs/GETTING_STARTED.md)
 - [HTTP API (OpenAPI)](https://github.com/voxmastery/FluctlightDB/blob/main/docs/openapi.yaml)
-
-## License
-
-MIT — see [LICENSE](LICENSE).

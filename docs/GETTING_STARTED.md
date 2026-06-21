@@ -1,61 +1,68 @@
 # Getting started with FluctlightDB
 
-New here? This page compares **how it feels** to use Fluctlight vs SQL vs vector DBs, and gives a 5-minute path to a working agent memory.
+Read the [README](../README.md) first for the one-screen overview. This page goes deeper: comparisons, optional paths, storage, and FAQ.
 
-## UX comparison: SQL vs Vector vs Fluctlight
+## Which path should I use?
 
-### Mental model
+```
+┌─────────────────────────────────────────────────────────┐
+│  One brain folder per agent                           │
+│  e.g. /tmp/my-agent-brain or                          │
+│       ~/.fluctlight/tenants/<agent_id>/brain/         │
+├─────────────────────────────────────────────────────────┤
+│  Default — in-process (like sqlite3)                  │
+│  pip install "fluctlightdb[native]"                   │
+│  from fluctlightdb import connect                     │
+├─────────────────────────────────────────────────────────┤
+│  Shared / remote / multi-agent                        │
+│  pip install fluctlightdb + FluctlightClient (HTTP)   │
+│  + Docker or release binary (fluctlight serve)        │
+├─────────────────────────────────────────────────────────┤
+│  Explore at the terminal                              │
+│  fluctlight shell (needs binary from Releases)        │
+└─────────────────────────────────────────────────────────┘
+```
 
-| | **SQL** (Postgres, SQLite) | **Vector DB** (Qdrant, Pinecone) | **FluctlightDB** |
-|---|---------------------------|----------------------------------|------------------|
-| **Unit of storage** | Row in a table | Point + embedding | **Engram** (lived episode) |
-| **Query metaphor** | `SELECT … WHERE` | `search(vector)` | **`recall(cue)`** — spreading activation |
-| **Truth** | You add columns | Payload metadata | **Provenance** (ledger vs chat) |
-| **Growth** | Schema migrations | Re-index | **Sleep, maturation, stages** |
+Provision per-agent brain + API key on a server:
 
-### Operator UX (human at a terminal)
+```bash
+fluctlight tenant create agent-42
+fluctlight tenant provision agent-42 --role admin
+# brain: ~/.fluctlight/tenants/agent-42/brain/
+```
 
-| Task | SQL | Vector DB | Fluctlight |
-|------|-----|-----------|------------|
-| Connect | `psql`, `sqlite3` | `curl` / SDK / web UI | `fluctlight shell` |
-| Browse rows | `SELECT * LIMIT 10` | `scroll --limit 10` | `list 10` |
-| Search | `WHERE col LIKE '%x%'` | similarity search | `recall wallet balance` |
-| Inspect one | `WHERE id = ?` | get point by id | `get <uuid>` |
-| Ground truth | manual `is_verified` column | payload flag | `verified` / `warnings` |
-| Scripting | `--json` / CSV | JSON API | `\json on` or Python SDK |
-| Dump | `pg_dump` | export collection | `export raw` |
+---
 
-**Fluctlight is closest to `psql` + Qdrant scroll**, but verbs are **brain-native** (`recall`, `experience`, `sleep`) — not SQL syntax. See [CLI.md](CLI.md).
+## Quick start
 
-### Developer UX (from your agent code)
+### 1. Embedded brain (recommended)
 
-| | SQL | Vector | Fluctlight |
-|---|-----|--------|------------|
-| **Install** | built-in / pip | `pip install qdrant-client` | **`pip install fluctlightdb`** |
-| **Client/server** | TCP to Postgres | HTTP/gRPC | `fluctlight serve` (HTTP) |
-| **In-process (fast)** | `sqlite3` | rare | optional **`fluctlightdb-native`** |
-| **Hot-path latency** | ~0.1 ms | ~2–5 ms (ANN) | **~0.02 ms native**, ~1–5 ms HTTP keep-alive |
-| **Best for** | Structured ops data | Similarity search | **Episodic agent memory + truth** |
+No server. Rust core runs inside your Python process.
 
-## 5-minute quick start
-
-### 1. Install the Python SDK (no Rust required)
-
-On modern Linux (Debian 12+, Ubuntu 23.04+), system Python blocks global `pip install` ([PEP 668](https://peps.python.org/pep-0668/)). Use a venv in your agent project — not `sudo pip` or `--break-system-packages`:
+On modern Linux (Debian 12+, Ubuntu 23.04+), use a venv — not `sudo pip` ([PEP 668](https://peps.python.org/pep-0668/)):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install fluctlightdb
+pip install "fluctlightdb[native]"
 ```
 
-Or from this repo: `./scripts/install-python-client.sh`
+```python
+from fluctlightdb import connect
 
-Same idea as `pip install qdrant-client` inside your project venv — your agent only needs Python + a venv.
+brain = connect("/tmp/my-agent-brain")
+brain.experience("User prefers dark mode", context="settings", salience=0.7)
+print(brain.activate("dark mode"))
+brain.checkpoint()
+```
 
-### 2. Start a FluctlightDB server
+Read-only hot recall: `get_recall_client(path)`.
 
-Like Qdrant: **Docker** or a **release binary** — no Rust required.
+Or from this repo: `./scripts/install-python-client.sh` (HTTP client); add `[native]` for embedded.
+
+### 2. HTTP client + server (optional)
+
+Use when several processes share one brain or ops runs the database.
 
 **Docker:**
 
@@ -79,7 +86,7 @@ export FLUCTLIGHT_API_KEYS=default:your-secret-key:write
 
 > Building from source with `cargo` is for [contributors](../CONTRIBUTING.md) only.
 
-### 3. Python agent (recommended)
+**Python:**
 
 ```python
 import os
@@ -90,41 +97,61 @@ os.environ["FLUCTLIGHT_API_KEY"] = "your-key"
 from fluctlightdb import FluctlightClient
 
 client = FluctlightClient.from_env()
-client.experience("agent learned user prefers dark mode", context="settings")
+client.experience("User prefers dark mode", context="settings")
 print(client.activate("dark mode"))
 ```
 
-### 4. Optional — in-process brain (like `sqlite3`, fastest)
-
-When `fluctlightdb-native` is installed:
-
-```bash
-pip install "fluctlightdb[native]"
-```
-
-```python
-from fluctlightdb import connect
-
-brain = connect("/tmp/my-agent-brain")  # or connect(path, readonly=True)
-brain.experience("user prefers dark mode", context="settings", salience=0.7)
-print(brain.activate("dark mode"))
-brain.checkpoint()  # persist when using a path-backed brain
-```
-
-Read-only hot recall: `get_recall_client(path)` (same native library, recall-only default).
-
-### 5. Try the REPL (needs server binary)
+### 3. REPL (optional — needs server binary)
 
 ```bash
 fluctlight shell --local --path /tmp/demo-brain
 ```
 
 ```
-fluctlight> experience agent learned user prefers dark mode
+fluctlight> experience user prefers dark mode
 fluctlight> recall dark mode
 fluctlight> list 5
 fluctlight> quit
 ```
+
+---
+
+## UX comparison: SQL vs Vector vs Fluctlight
+
+### Mental model
+
+| | **SQL** (Postgres, SQLite) | **Vector DB** (Qdrant, Pinecone) | **FluctlightDB** |
+|---|---------------------------|----------------------------------|------------------|
+| **Unit of storage** | Row in a table | Point + embedding | **Engram** (lived episode) |
+| **Query metaphor** | `SELECT … WHERE` | `search(vector)` | **`activate(cue)`** — spreading activation |
+| **Truth** | You add columns | Payload metadata | **Provenance** (ledger vs chat) |
+| **Growth** | Schema migrations | Re-index | **Sleep, maturation, stages** |
+
+### Developer UX (from your agent code)
+
+| | SQL | Vector | Fluctlight |
+|---|-----|--------|------------|
+| **Install** | built-in / pip | `pip install qdrant-client` | **`pip install "fluctlightdb[native]"`** (embedded) or `fluctlightdb` (HTTP) |
+| **In-process** | `sqlite3` | rare | **`connect()`** with `[native]` |
+| **Client/server** | TCP to Postgres | HTTP/gRPC | optional `fluctlight serve` (HTTP) |
+| **Hot-path latency** | ~0.1 ms | ~2–5 ms (ANN) | **~0.002 ms** embedded, ~1–5 ms HTTP (localhost) |
+| **Best for** | Structured ops data | Similarity search | **Episodic agent memory + truth** |
+
+### Operator UX (human at a terminal)
+
+| Task | SQL | Vector DB | Fluctlight |
+|------|-----|-----------|------------|
+| Connect | `psql`, `sqlite3` | curl / SDK / web UI | `fluctlight shell` |
+| Browse rows | `SELECT * LIMIT 10` | `scroll --limit 10` | `list 10` |
+| Search | `WHERE col LIKE '%x%'` | similarity search | `recall wallet balance` |
+| Inspect one | `WHERE id = ?` | get point by id | `get <uuid>` |
+| Ground truth | manual `is_verified` column | payload flag | `verified` / `warnings` |
+| Scripting | `--json` / CSV | JSON API | `\json on` or Python SDK |
+| Dump | `pg_dump` | export collection | `export raw` |
+
+**Fluctlight is closest to `psql` + Qdrant scroll**, but verbs are **brain-native** (`recall`, `experience`, `sleep`) — not SQL syntax. See [CLI.md](CLI.md).
+
+---
 
 ## One brain per agent — is one file OK?
 
@@ -134,35 +161,11 @@ fluctlight> quit
 |-------|----------------|
 | SQLite | `agent.db` (single file) |
 | Qdrant local | `./storage/collections/my_agent/` (folder) |
-| Fluctlight v4 | `~/.fluctlight/tenants/default/brain/` (folder + sidecar index) |
+| Fluctlight v4 | `brain/` folder + sidecar index (e.g. `~/.fluctlight/tenants/default/brain/`) |
 
-You **copy/back up that path** like you would `agent.db` or a Qdrant storage dir. See [DEPLOYMENT.md](DEPLOYMENT.md) for backup scripts.
+You **copy/back up that path** like you would `agent.db` or a Qdrant storage dir. Legacy single-file `.flct` still loads; new installs use the v4 folder layout. See [DEPLOYMENT.md](DEPLOYMENT.md) for backup scripts.
 
-## Which path should I use?
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  One brain directory per agent                          │
-│  ~/.fluctlight/tenants/<agent_id>/brain/                │
-├─────────────────────────────────────────────────────────┤
-│  Agent code (pip install fluctlightdb)                  │
-│  → FluctlightClient (HTTP) — works everywhere           │
-├─────────────────────────────────────────────────────────┤
-│  Optional hot recall                                    │
-│  → pip install fluctlightdb-native                      │
-├─────────────────────────────────────────────────────────┤
-│  Writes + multi-tenant                                  │
-│  → fluctlight serve (release binary or your deployment) │
-└─────────────────────────────────────────────────────────┘
-```
-
-Provision per-agent brain + API key:
-
-```bash
-fluctlight tenant create agent-42
-fluctlight tenant provision agent-42 --role admin
-# brain: ~/.fluctlight/tenants/agent-42/brain/
-```
+---
 
 ## Next steps
 
@@ -171,19 +174,21 @@ fluctlight tenant provision agent-42 --role admin
 - [Manifesto.md](Manifesto.md) — why brain-native, not SQL  
 - [openapi.yaml](openapi.yaml) — HTTP contract  
 
+---
+
 ## FAQ for newcomers
 
 **Is this a vector database?**  
 No. Vectors are optional *input*; recall is graph activation + provenance, not pure cosine similarity.
 
 **Do I need Rust or cargo?**  
-No — for agent apps, `pip install fluctlightdb` inside a venv is enough. Rust is only for contributors and optional server builds.
+No — for agent apps, `pip install fluctlightdb` (or `[native]`) inside a venv is enough. Rust is only for contributors and optional server builds.
 
 **Why does `pip install fluctlightdb` say `externally-managed-environment`?**  
 Your OS Python is reserved for system packages (PEP 668). Create a venv (`python3 -m venv .venv && source .venv/bin/activate`) then run `pip install` again. Do not use `--break-system-packages` unless you fully accept the risk to system Python.
 
 **Do I write SQL?**  
-No. Use `recall`, `experience`, `list`, or the REPL. SQL mental model maps in [CLI.md](CLI.md).
+No. Use `experience`, `activate`, `list`, or the REPL. SQL mental model maps in [CLI.md](CLI.md).
 
 **Can I replace Postgres?**  
 Not for relational ops. Use Fluctlight for **what the agent lived and remembers**.
