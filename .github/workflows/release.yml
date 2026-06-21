@@ -92,7 +92,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: "*"
           merge-multiple: true
 
       - run: ls -la dist/
