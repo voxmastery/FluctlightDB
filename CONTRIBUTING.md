@@ -21,6 +21,21 @@ You do **not** need Rust to improve docs or the pure-Python SDK. You **do** need
 
 ---
 
+## Git commit identity (maintainers)
+
+Use **one** GitHub-linked identity so the repo shows a single contributor graph:
+
+```bash
+git config user.name "Voxmastery"
+git config user.email "voxmastery@roppashreeganesh.com"
+# or GitHub noreply: 118175632+voxmastery@users.noreply.github.com
+./scripts/setup-git-hooks.sh
+```
+
+Do not commit with host-specific emails (e.g. server `@hstgr.cloud` addresses) — GitHub counts those as separate contributors.
+
+---
+
 ## Rust setup (core / CLI contributors)
 
 One-time install ([rustup](https://rustup.rs)):
