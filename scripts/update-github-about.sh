@@ -7,7 +7,7 @@ set -euo pipefail
 OWNER="${GITHUB_OWNER:-voxmastery}"
 REPO="${GITHUB_REPO:-FluctlightDB}"
 
-DESCRIPTION="Brain-native database for AI agents — engrams, activation, provenance. Not vector DB, SQL, or mem0-style layers."
+DESCRIPTION="Database engine for AI agents — write memory, recall by cue, trust sources over chat. Not SQL, vector DB, or mem0."
 HOMEPAGE="https://pypi.org/project/fluctlightdb/"
 TOPICS='agent-memory ai-agents brain-native database docker episodic-memory llm memory pypi python rust'
 
