@@ -1,6 +1,6 @@
 # Getting started with FluctlightDB
 
-Read the [README](../README.md) first for the one-screen overview. This page goes deeper: comparisons, optional paths, storage, and FAQ.
+**FluctlightDB is a brain-native database for AI agents** — not a vector DB, not SQL, and not a mem0-style memory layer (extract → embed → top-k). Read the [README](../README.md) first; this page goes deeper: paths, comparisons, storage, and FAQ.
 
 ## Which path should I use?
 
@@ -180,6 +180,9 @@ You **copy/back up that path** like you would `agent.db` or a Qdrant storage dir
 
 **Is this a vector database?**  
 No. Vectors are optional *input*; recall is graph activation + provenance, not pure cosine similarity.
+
+**How is this different from mem0 / Zep / LangMem?**  
+Those are **memory layers** — usually LLM extraction + embedding + vector search over messages or facts. FluctlightDB is a **brain-native database**: engrams, spreading activation, sleep/plasticity, and provenance (ledger beats chat) are the storage model, not bolt-on metadata on a vector index.
 
 **Do I need Rust or cargo?**  
 No — for agent apps, `pip install fluctlightdb` (or `[native]`) inside a venv is enough. Rust is only for contributors and optional server builds.
