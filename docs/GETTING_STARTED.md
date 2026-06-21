@@ -1,6 +1,6 @@
 # Getting started with FluctlightDB
 
-**FluctlightDB is a brain-native database for AI agents** — not a vector DB, not SQL, and not a mem0-style memory layer (extract → embed → top-k). Read the [README](../README.md) first; this page goes deeper: paths, comparisons, storage, and FAQ.
+**FluctlightDB is a database engine for AI agents** — persistent memory with write/recall APIs, not SQL tables and not “embed everything and search.” Read the [README](../README.md) first; this page covers install paths, comparisons, storage, and FAQ.
 
 ## Which path should I use?
 
@@ -122,10 +122,10 @@ fluctlight> quit
 
 | | **SQL** (Postgres, SQLite) | **Vector DB** (Qdrant, Pinecone) | **FluctlightDB** |
 |---|---------------------------|----------------------------------|------------------|
-| **Unit of storage** | Row in a table | Point + embedding | **Engram** (lived episode) |
-| **Query metaphor** | `SELECT … WHERE` | `search(vector)` | **`activate(cue)`** — spreading activation |
-| **Truth** | You add columns | Payload metadata | **Provenance** (ledger vs chat) |
-| **Growth** | Schema migrations | Re-index | **Sleep, maturation, stages** |
+| **What you store** | Rows in tables | Vectors + JSON | **Memories** (events with context) |
+| **How you query** | `SELECT … WHERE` | similar vectors | **`activate(cue)`** — recall by meaning |
+| **Trusted vs guessed** | Your schema | Your payload fields | **Built-in** (file/ledger beats chat) |
+| **Over time** | Migrations | Re-index | **Consolidation & growth** (see Manifesto) |
 
 ### Developer UX (from your agent code)
 
@@ -135,7 +135,7 @@ fluctlight> quit
 | **In-process** | `sqlite3` | rare | **`connect()`** with `[native]` |
 | **Client/server** | TCP to Postgres | HTTP/gRPC | optional `fluctlight serve` (HTTP) |
 | **Hot-path latency** | ~0.1 ms | ~2–5 ms (ANN) | **~0.002 ms** embedded, ~1–5 ms HTTP (localhost) |
-| **Best for** | Structured ops data | Similarity search | **Episodic agent memory + truth** |
+| **Best for** | Structured business data | Document similarity | **Agent memory across sessions** |
 
 ### Operator UX (human at a terminal)
 
@@ -178,11 +178,14 @@ You **copy/back up that path** like you would `agent.db` or a Qdrant storage dir
 
 ## FAQ for newcomers
 
+**What is FluctlightDB in one sentence?**  
+A **database engine for AI agents**: save past interactions, recall them from a cue, and rank trusted sources above chat guesses.
+
 **Is this a vector database?**  
-No. Vectors are optional *input*; recall is graph activation + provenance, not pure cosine similarity.
+No. You can optionally attach vectors, but recall is driven by the engine’s memory graph and source trust — not “nearest embedding wins.”
 
 **How is this different from mem0 / Zep / LangMem?**  
-Those are **memory layers** — usually LLM extraction + embedding + vector search over messages or facts. FluctlightDB is a **brain-native database**: engrams, spreading activation, sleep/plasticity, and provenance (ledger beats chat) are the storage model, not bolt-on metadata on a vector index.
+Those are usually **SDKs + pipelines**: extract facts from chat, embed them, search a vector store. FluctlightDB is a **database engine** with its own storage and query model (`experience`, `activate`). Good when you want memory to be infrastructure, not a prompt-stuffing layer.
 
 **Do I need Rust or cargo?**  
 No — for agent apps, `pip install fluctlightdb` (or `[native]`) inside a venv is enough. Rust is only for contributors and optional server builds.
@@ -191,10 +194,10 @@ No — for agent apps, `pip install fluctlightdb` (or `[native]`) inside a venv 
 Your OS Python is reserved for system packages (PEP 668). Create a venv (`python3 -m venv .venv && source .venv/bin/activate`) then run `pip install` again. Do not use `--break-system-packages` unless you fully accept the risk to system Python.
 
 **Do I write SQL?**  
-No. Use `experience`, `activate`, `list`, or the REPL. SQL mental model maps in [CLI.md](CLI.md).
+No. Use `experience`, `activate`, `list`, or the REPL. SQL habits map in [CLI.md](CLI.md).
 
 **Can I replace Postgres?**  
-Not for relational ops. Use Fluctlight for **what the agent lived and remembers**.
+Not for billing, inventory, or reports. Use Fluctlight for **what the agent should remember between runs**.
 
 **How do I know what's true?**  
-`verified` / `warnings` in the shell, or `verified_context` in the API — ledger/file beats chat.
+Use `verified` / `warnings` in the shell, or `verified_context` in the API — data from files and ledgers ranks above unverified chat.
