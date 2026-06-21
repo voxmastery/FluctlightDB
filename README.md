@@ -1,43 +1,59 @@
 # FluctlightDB
 
-**A brain-native database for AI agents.** Not a vector database. Not SQL. Not a memory layer like mem0.
+**A database engine built for AI agents.**
 
-Store what your agent **experienced**, recall by **spreading activation** (not just cosine similarity), and separate **verified facts from chat guesses**.
+Give each agent its own persistent store: **write** what happened, **recall** it later from a short cue, and **prefer trusted sources** (logs, ledgers, files) over things the model said in chat.
 
 [![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB)
+
+**Not** Postgres or SQLite for your product data. **Not** Qdrant or Pinecone for document search. **Not** a thin memory SDK like mem0 on top of vectors.
+
+**Brain-native** *(optional deep dive)* — the storage model is inspired by how minds remember (linked memories, reinforcement over time), not by rows or cosine similarity alone. See [Manifesto](docs/Manifesto.md) if you want the full design story.
 
 ---
 
 ## What is this?
 
-**FluctlightDB is a database** — a store you install (`pip install fluctlightdb`), open per agent (`connect(path)`), and query with brain-native verbs (`experience`, `activate`). It is shaped like **biological memory** (engrams, synapses, activation), not like a document index with an LLM wrapper on top.
+FluctlightDB is a **database engine** you run per agent — like SQLite for an app, but the schema and queries are designed for **agent memory**:
 
-If you build agents (coding assistants, workers, NPCs, companions), they need memory beyond the current chat window.
+| You need to… | Fluctlight API | Plain English |
+|--------------|----------------|---------------|
+| Save something the agent should remember | `experience(...)` | “User prefers dark mode after yesterday’s session” |
+| Find relevant past context from a hint | `activate(cue)` | “What do we know about theme / dark mode?” |
+| Know if a memory is trusted vs guessed | provenance on each record | Official balance from a file beats a chat claim |
+| Save to disk | `checkpoint()` | Persist like committing a transaction |
 
-| | **Memory layers** (mem0, etc.) | **Vector DB** (Qdrant, Pinecone) | **FluctlightDB** |
-|---|-------------------------------|----------------------------------|------------------|
-| **What it is** | SDK + extraction pipeline over a vector store | Similarity search engine | **Brain-native database** |
-| **Unit stored** | facts / messages (often summarized) | embedding + payload | **engram** (lived episode) |
-| **Recall** | embed query → top-k similar | nearest neighbor | **spreading activation** from a cue |
-| **Truth** | LLM or metadata flags | payload fields | **provenance** (ledger beats chat) |
-| **Growth** | re-ingest / re-summarize | re-index | **sleep, plasticity, maturation** |
+**One agent → one data directory on disk** (same idea as one SQLite file or one Qdrant collection). Install with pip, embed in your process, or run as a server for teams.
 
-**Mental model:** one **brain folder per agent** on disk — like one SQLite file or one Qdrant collection path. Your agent **lives** in that brain; memory is not a sidecar RAG index you bolt on each turn.
+---
 
-| Goal | API |
-|------|-----|
-| Remember something that happened | `experience(...)` |
-| Recall by cue / meaning | `activate(cue)` |
-| Know what's verified vs guessed | provenance on each engram |
-| Persist | `checkpoint()` (embedded) or server writes to disk |
+## Who is this for?
+
+- **Developers** building coding agents, support bots, research assistants, game NPCs  
+- **Teams** that need memory to survive restarts, not just the current LLM context window  
+- **Enterprises** that need **source-of-truth ranking** (audit logs, CRM, ledger) vs model hallucination  
+
+If you only need “stuff the user said last week” in a vector index, mem0 or a vector DB may be enough. If you need a **first-class database for how agents remember and grow**, use FluctlightDB.
+
+---
+
+## How it compares
+
+| | **Postgres / SQLite** | **Vector DB** (Qdrant, Pinecone) | **Memory SDK** (mem0, etc.) | **FluctlightDB** |
+|---|----------------------|----------------------------------|----------------------------|------------------|
+| **Category** | General-purpose SQL | Similarity search | Chat → extract → embed → search | **Agent memory engine** |
+| **Stores** | Tables and rows | Vectors + JSON payload | Facts / message summaries | **Linked memories** with context |
+| **Query style** | SQL | nearest neighbor | embed query, top-k | **cue → recall** (meaning, not just match score) |
+| **Trusted vs chat** | You design it | You design it | Often LLM-labeled | **Built in** (verified sources rank higher) |
+| **Typical install** | driver + server | client + server | pip SDK + vector backend | **`pip install fluctlightdb`** |
 
 ---
 
 ## Quick start (~2 minutes)
 
-**Recommended:** in-process Python, like `sqlite3` — no server, no Docker, no Rust.
+**Recommended:** run inside your Python app — no separate server, like `sqlite3`.
 
-On Debian/Ubuntu/Fedora, use a venv ([PEP 668](https://peps.python.org/pep-0668/) blocks global `pip`):
+On Debian/Ubuntu/Fedora, use a venv ([PEP 668](https://peps.python.org/pep-0668/) blocks global pip):
 
 ```bash
 python3 -m venv .venv
@@ -54,32 +70,29 @@ print(brain.activate("theme preference"))
 brain.checkpoint()
 ```
 
-That's it. Open the folder, write experiences, recall by cue.
-
 ---
 
 ## Choose your path
 
 ```
-Solo agent, lowest latency (most people start here)
+One agent in one process (fastest — start here)
   pip install "fluctlightdb[native]"
-  from fluctlightdb import connect
-  brain = connect("/path/to/brain")
+  brain = connect("/path/to/agent-data")
 
-Several agents / remote server / ops runs the DB
+Several agents or a shared server (platform / ops team)
   pip install fluctlightdb
   Docker or release binary → FluctlightClient over HTTP
 
-Terminal exploration
-  fluctlight shell  (needs server binary from Releases)
+Explore data at the terminal
+  fluctlight shell  (binary from GitHub Releases)
 
-Change the Rust core or CLI
+Work on the Rust engine or CLI
   clone + cargo — see CONTRIBUTING.md
 ```
 
 ### Optional: HTTP client + server
 
-When you need a shared or remote brain (like `qdrant-client` + Qdrant server):
+When many services share one agent store (like `qdrant-client` + Qdrant):
 
 ```bash
 docker pull ghcr.io/voxmastery/fluctlightdb:latest
@@ -102,32 +115,7 @@ client.experience("Deploy succeeded", context="ci")
 print(client.activate("last deployment"))
 ```
 
-Release binaries (no `cargo`): [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases). Production layout: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md).
-
----
-
-## Brain-native vs mem0-style memory layers
-
-Tools like **mem0**, Zep, or LangMem are **memory layers**: they extract or summarize chat, embed it, and search a vector store. FluctlightDB is a **database whose model is a brain**:
-
-- **mem0-style:** “remember this fact about the user” → embed → retrieve similar chunks next turn  
-- **FluctlightDB:** `experience(...)` writes an engram → `activate(cue)` spreads activation through a graph → verified ledger outranks unverified chat  
-
-You can use both in one stack (mem0 for quick facts, Fluctlight for durable episodic brain state), but they solve different problems. Fluctlight is for agents that need a **persistent mind**, not just a better prompt prefix.
-
-Philosophy and automated checks: [Manifesto.md](docs/Manifesto.md) · `./scripts/manifesto-audit.sh`
-
----
-
-## How is this different from SQL?
-
-| | SQL | Vector DB | FluctlightDB |
-|---|-----|-----------|--------------|
-| **Query** | `SELECT … WHERE` | nearest neighbor | **`activate(cue)`** |
-| **Best for** | billing, inventory, reports | similarity search | **episodic agent memory + truth** |
-| **Install** | driver + server | pip client + server | **`pip install fluctlightdb`** |
-
-Deeper comparisons (REPL, CLI mapping, FAQ): **[Getting started](docs/GETTING_STARTED.md)**
+Release binaries: [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases). Production: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md).
 
 ---
 
@@ -137,10 +125,10 @@ Linux x86_64, in-process [`prod_bench`](crates/fluctlightdb/tests/prod_bench.rs)
 
 | Path | Latency |
 |------|---------|
-| **Embedded** (`connect`) | ~**0.002 ms** / `activate` |
+| **Embedded** (`connect`) | ~**0.002 ms** / recall |
 | **HTTP** (`FluctlightClient`, keep-alive) | ~1–5 ms / request on localhost |
 
-On `"wallet balance"`, verified ledger (`$0.00`) ranks above unverified chat claims. Reproduce: `./scripts/manifesto-audit.sh`.
+On `"wallet balance"`, a verified ledger value ranks above an unverified chat claim. Reproduce: `./scripts/manifesto-audit.sh`.
 
 ---
 
@@ -148,13 +136,13 @@ On `"wallet balance"`, verified ledger (`$0.00`) ranks above unverified chat cla
 
 | Doc | Who it's for |
 |-----|----------------|
-| **[Getting started](docs/GETTING_STARTED.md)** | First visit — paths, storage, FAQ |
-| [CLI.md](docs/CLI.md) | `fluctlight shell`, SQL/vector habit mapping |
-| [DOCKER.md](docs/DOCKER.md) | Container image |
+| **[Getting started](docs/GETTING_STARTED.md)** | Paths, storage, FAQ |
+| [CLI.md](docs/CLI.md) | Terminal commands (`fluctlight shell`) |
+| [DOCKER.md](docs/DOCKER.md) | Container deploy |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Backup, replica, multi-tenant |
-| [Manifesto.md](docs/Manifesto.md) | Why brain-native memory |
-| [openapi.yaml](docs/openapi.yaml) | HTTP API contract |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Rust / core development |
+| [Manifesto.md](docs/Manifesto.md) | Brain-native design (technical) |
+| [openapi.yaml](docs/openapi.yaml) | HTTP API |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Engine development |
 
 ---
 
@@ -162,7 +150,7 @@ On `"wallet balance"`, verified ledger (`$0.00`) ranks above unverified chat cla
 
 **Using Fluctlight in an agent?** `pip install fluctlightdb` — no Rust required.
 
-**Changing the database, CLI, or server?** See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues via [SECURITY.md](SECURITY.md).
+**Changing the engine, CLI, or server?** See [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md).
 
 ## License
 

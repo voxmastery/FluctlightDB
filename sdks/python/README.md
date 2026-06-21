@@ -1,6 +1,6 @@
 # fluctlightdb
 
-Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) — a **brain-native database** for AI agents (not a vector DB, not SQL, not a mem0-style memory layer).
+Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) — a **database engine for AI agents** (persistent memory: write, recall, trusted sources — not SQL, not a vector DB, not mem0-style chat extraction).
 
 ## Install
 
