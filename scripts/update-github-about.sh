@@ -7,7 +7,7 @@ set -euo pipefail
 OWNER="${GITHUB_OWNER:-voxmastery}"
 REPO="${GITHUB_REPO:-FluctlightDB}"
 
-DESCRIPTION="Embedded memory engine for AI agents: third data model (not SQL/vectors). experience()+activate(), provenance, benchmarks. Goal: SQLite for agent memory."
+DESCRIPTION="Database engine for AI agents — write memory, recall by cue, trust sources over chat. Not SQL, vector DB, or mem0."
 HOMEPAGE="https://search.ambugo.help/paper/"
 TOPICS='agent-memory ai-agents brain-native database docker episodic-memory llm memory pypi python rust'
 
