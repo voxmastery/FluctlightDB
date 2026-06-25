@@ -16,7 +16,7 @@ While arXiv cs.DB endorsement is pending, keep messaging aligned everywhere.
 | Platform | URL | Status | Action |
 |----------|-----|--------|--------|
 | **GitHub** | https://github.com/voxmastery/FluctlightDB | Live | `GITHUB_TOKEN=… ./scripts/update-github-about.sh` after each positioning change |
-| **PyPI** `fluctlightdb` | https://pypi.org/project/fluctlightdb/ | Live (0.4.5) | Bump `sdks/python/pyproject.toml` → tag or `workflow_dispatch` **Publish to PyPI** |
+| **PyPI** `fluctlightdb` | https://pypi.org/project/fluctlightdb/ | Live (0.5.0) | Bump `sdks/python/pyproject.toml` → tag or `workflow_dispatch` **Publish to PyPI** |
 | **PyPI** `fluctlightdb-native` | https://pypi.org/project/fluctlightdb-native/ | Live | Same release workflow (native wheels) |
 | **GHCR Docker** | `ghcr.io/voxmastery/fluctlightdb` | Live | Image labels in `Dockerfile`; new image on **Release** workflow |
 | **Paper (LaTeX)** | `papers/arxiv-v1/` in repo | Draft | arXiv when ready — no public viewer URL in README |

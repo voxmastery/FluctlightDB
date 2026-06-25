@@ -213,6 +213,7 @@ Production: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md)
 | **[BENCHMARKS.md](docs/BENCHMARKS.md)** | Paper-ready eval + citations |
 | **[PLATFORMS.md](docs/PLATFORMS.md)** | GitHub, PyPI, Docker, HF, arXiv checklist |
 | **[MULTI_AGENT.md](docs/MULTI_AGENT.md)** | Hub + spoke brains, MCP, hooks, handoffs |
+| **[PLATFORM_COMPAT.md](docs/PLATFORM_COMPAT.md)** | Windows / macOS / Linux matrix |
 | **[RESEARCH.md](docs/RESEARCH.md)** | Submission checklist |
 | [CLI.md](docs/CLI.md) | `fluctlight shell` |
 | [Manifesto.md](docs/Manifesto.md) | Brain-native design |

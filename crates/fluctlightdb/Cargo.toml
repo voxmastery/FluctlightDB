@@ -16,6 +16,7 @@ bincode = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 fast-hnsw = "1.0.1"
 sha2 = "0.10"
+fs2 = "0.4"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
