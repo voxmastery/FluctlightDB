@@ -1,70 +1,19 @@
 # FluctlightDB
 
-**A database engine built for AI agents.**
+**The memory engine for AI agents** — not a vector database with an agent SDK bolted on.
 
-Give each agent its own persistent store: **write** what happened, **recall** it later from a short cue, and **prefer trusted sources** (logs, ledgers, files) over things the model said in chat.
+Your agent gets a **persistent brain on disk**: it **writes experiences**, **recalls them from a cue**, and **ranks trusted sources** (files, ledgers, tools) above chat guesses. One install, one data folder per agent, survives restarts.
 
 [![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB)
 
-**Not** Postgres or SQLite for your product data. **Not** Qdrant or Pinecone for document search. **Not** a thin memory SDK like mem0 on top of vectors.
-
-**Brain-native** *(optional deep dive)* — the storage model is inspired by how minds remember (linked memories, reinforcement over time), not by rows or cosine similarity alone. See [Manifesto](docs/Manifesto.md) if you want the full design story.
-
----
-
-## What is this?
-
-FluctlightDB is a **database engine** you run per agent — like SQLite for an app, but the schema and queries are designed for **agent memory**:
-
-| You need to… | Fluctlight API | Plain English |
-|--------------|----------------|---------------|
-| Save something the agent should remember | `experience(...)` | “User prefers dark mode after yesterday’s session” |
-| Find relevant past context from a hint | `activate(cue)` | “What do we know about theme / dark mode?” |
-| Know if a memory is trusted vs guessed | provenance on each record | Official balance from a file beats a chat claim |
-| Save to disk | `checkpoint()` | Persist like committing a transaction |
-
-**One agent → one data directory on disk** (same idea as one SQLite file or one Qdrant collection). Install with pip, embed in your process, or run as a server for teams.
-
----
-
-## Who is this for?
-
-- **Developers** building coding agents, support bots, research assistants, game NPCs  
-- **Teams** that need memory to survive restarts, not just the current LLM context window  
-- **Enterprises** that need **source-of-truth ranking** (audit logs, CRM, ledger) vs model hallucination  
-
-If you only need “stuff the user said last week” in a vector index, mem0 or a vector DB may be enough. If you need a **first-class database for how agents remember and grow**, use FluctlightDB.
-
----
-
-## How it compares
-
-| | **Postgres / SQLite** | **Vector DB** (Qdrant, Pinecone) | **Memory SDK** (mem0, etc.) | **FluctlightDB** |
-|---|----------------------|----------------------------------|----------------------------|------------------|
-| **Category** | General-purpose SQL | Similarity search | Chat → extract → embed → search | **Agent memory engine** |
-| **Stores** | Tables and rows | Vectors + JSON payload | Facts / message summaries | **Linked memories** with context |
-| **Query style** | SQL | nearest neighbor | embed query, top-k | **cue → recall** (meaning, not just match score) |
-| **Trusted vs chat** | You design it | You design it | Often LLM-labeled | **Built in** (verified sources rank higher) |
-| **Typical install** | driver + server | client + server | pip SDK + vector backend | **`pip install fluctlightdb`** |
-
----
-
-## Quick start (~2 minutes)
-
-**Recommended:** run inside your Python app — no separate server, like `sqlite3`.
-
-On Debian/Ubuntu/Fedora, use a venv ([PEP 668](https://peps.python.org/pep-0668/) blocks global pip):
-
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install "fluctlightdb[native]"
 ```
 
 ```python
 from fluctlightdb import connect
 
-brain = connect("/tmp/my-agent-brain")   # creates a folder on disk
+brain = connect("/tmp/my-agent-brain")
 brain.experience("User prefers dark mode", context="settings", salience=0.8)
 print(brain.activate("theme preference"))
 brain.checkpoint()
@@ -72,27 +21,146 @@ brain.checkpoint()
 
 ---
 
+## Why this exists
+
+**Postgres** stores rows. **Chroma/Qdrant** stores vectors and returns nearest neighbors. **mem0** extracts facts from chat and embeds them. None of them were built to answer:
+
+> *“What does this agent remember, from everything it has lived through — and what can it actually trust?”*
+
+That requires **memory semantics**, not just storage:
+
+| Problem | What others make you build | What FluctlightDB gives you |
+|---------|---------------------------|----------------------------|
+| Agent restarts and forgets | Custom session DB + vector sync | `experience()` + `checkpoint()` — one folder per agent |
+| User asks differently than you stored | Hope embeddings match | **Cue activation** — lexical + semantic + linked memories (paraphrase recall) |
+| Chat claim vs ledger truth | App-layer ranking hacks | **Provenance built in** — verified sources rank above unverified chat |
+| Duplicate / noisy writes | Your dedup logic | **Separation gate** — near-duplicates filtered at write time |
+| “Just search my docs” | Use a vector DB | `connect_index()` — same engine, bulk IR mode when you need speed |
+
+FluctlightDB is a **Rust memory engine** with agent-native **write** and **recall** APIs. It is **not** a replacement for Postgres (product data) or a generic doc search index — it is the **long-lived memory layer** your agent runs on.
+
+---
+
+## What makes it different
+
+These are native to the engine, not optional plugins:
+
+1. **`experience()` / `activate()`** — write and recall in agent terms, not `INSERT` / `vector_search()`.
+2. **Spreading activation** — memories link in a graph; recall follows associations, not only cosine similarity.
+3. **Provenance & trust** — tag memories as verified (ledger, file, tool); they outrank chat assertions at recall time.
+4. **Pattern separation** — dentate-style encoding reduces confusion when similar events pile up.
+5. **Consolidation & sleep** — offline replay/compaction (like memory consolidation), not just append-only logs.
+6. **Two explicit modes** — `connect()` for live agents; `connect_index()` for bulk semantic ingest (RAG backfills, benchmarks).
+
+Deep design: [Manifesto](docs/Manifesto.md). Brain-native internals are optional reading — you can use it like SQLite for agents without learning neuroscience.
+
+---
+
+## Where it is going
+
+- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo evidence recall** (full 10-conversation set), BEIR SciFact parity, FAMB 97–98%.
+- **Next:** full LongMemEval-S retrieval run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories.
+- **Goal:** the default **memory substrate** for agents — the way SQLite became the default embedded DB for apps.
+
+---
+
+## Benchmarks
+
+Frozen results: [`benchmarks/results/2025-06-22.json`](benchmarks/results/2025-06-22.json) · live paper viewer: [search.ambugo.help/paper](https://search.ambugo.help/paper/)
+
+### Latest measured results (June 2025)
+
+| Benchmark | Metric | FluctlightDB | Baseline / note |
+|-----------|--------|--------------|-----------------|
+| **LoCoMo** (10 conv, 1,982 gold spans) | Mean **evidence recall** @ k=150 | **98.1%** (1925/1982) | Warm and cold-start identical |
+| | All evidence in context | 97.1% | Hybrid vector + BM25, index mode |
+| | Wall time | 271s warm / 335s cold | 2 CPU threads, MiniLM ONNX |
+| **BEIR SciFact** | nDCG@10 (index mode) | **0.645** | Chroma + same MiniLM: 0.645 (tie) |
+| | Recall@100 (agent mode) | **0.941** | Chroma: 0.925 |
+| | Query latency (index) | **4–7 ms** | Chroma: 4–7 ms |
+| **FAMB** (agent-specific) | Macro (index mode) | **98%** | Paraphrase 92%, provenance/persistence 100% |
+| | Macro (agent mode) | **97%** | Paraphrase 83%, other suites 100% |
+| **LongMemEval-S** | Answer-in-recall@8 | **70%** pilot (n=20) | Full 500-Q run deferred (CPU ingest) |
+
+> **Metric note:** LoCoMo **evidence recall** measures whether gold dialogue evidence appears in retrieved context (official RAG metric). Mem0/Zep often report **LLM-as-judge end-to-end QA** on LoCoMo — a harder, different number. Do not compare 98.1% recall to ~92% QA without a table that names the metric.
+
+### Reproduce
+
+Clone the repo, install deps, run from repo root:
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install chromadb pytrec-eval-terrier "fluctlightdb[native]"
+# or dev: pip install -e sdks/python && ./scripts/install-native.sh
+
+# Agent memory (paraphrase, provenance, persistence) — ~4 min
+PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode agent
+PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode index
+
+# BEIR SciFact (download once)
+mkdir -p /tmp/beir && cd /tmp/beir
+curl -sL https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip -o scifact.zip
+unzip -o scifact.zip && cd -
+
+BEIR_DATA=/tmp/beir BEIR_DS=scifact MODE=index PYTHONPATH=sdks/python python benchmarks/beir_bench.py
+
+# LoCoMo full eval (needs dataset — see benchmarks/README.md)
+PYTHONPATH=sdks/python python benchmarks/locomo_eval.py --mode index --rag-mode all --top-k 150
+
+# LongMemEval (pilot / full — CPU-heavy ingest)
+PYTHONPATH=sdks/python python benchmarks/longmemeval_bench.py --mode index
+```
+
+Full citations and paper protocol: **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)** · **[benchmarks/README.md](benchmarks/README.md)**
+
+## Quick start
+
+On Debian/Ubuntu/Fedora, use a venv ([PEP 668](https://peps.python.org/pep-0668/)):
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install "fluctlightdb[native]"
+```
+
+```python
+from fluctlightdb import connect, connect_index
+
+# Live agent — full memory path (provenance, separation, graph)
+brain = connect("/data/my-agent")
+
+# Bulk semantic index — RAG backfill or IR benchmarks
+index = connect_index("/data/rag-index")
+```
+
+| You need to… | API | Example |
+|--------------|-----|---------|
+| Save a memory | `experience(...)` | User preference, tool result, observation |
+| Recall from a hint | `activate(cue)` | “What do we know about billing?” |
+| Mark ground truth | `verified=True`, provenance | Ledger/file-backed facts |
+| Persist to disk | `checkpoint()` | Survive process restart |
+
+---
+
 ## Choose your path
 
 ```
-One agent in one process (fastest — start here)
+One agent in one process (start here)
   pip install "fluctlightdb[native]"
   brain = connect("/path/to/agent-data")
 
-Several agents or a shared server (platform / ops team)
+Several agents / shared server
   pip install fluctlightdb
-  Docker or release binary → FluctlightClient over HTTP
+  Docker → FluctlightClient over HTTP
 
-Explore data at the terminal
-  fluctlight shell  (binary from GitHub Releases)
+Terminal exploration
+  fluctlight shell  (GitHub Releases binary)
 
-Work on the Rust engine or CLI
-  clone + cargo — see CONTRIBUTING.md
+Engine / CLI development
+  clone + cargo — CONTRIBUTING.md
 ```
 
-### Optional: HTTP client + server
-
-When many services share one agent store (like `qdrant-client` + Qdrant):
+### HTTP server (optional)
 
 ```bash
 docker pull ghcr.io/voxmastery/fluctlightdb:latest
@@ -102,47 +170,20 @@ docker run -p 8792:8792 \
   ghcr.io/voxmastery/fluctlightdb:latest
 ```
 
-```python
-import os
-
-os.environ["FLUCTLIGHT_SERVE_URL"] = "http://127.0.0.1:8792"
-os.environ["FLUCTLIGHT_API_KEY"] = "your-secret"
-
-from fluctlightdb import FluctlightClient
-
-client = FluctlightClient.from_env()
-client.experience("Deploy succeeded", context="ci")
-print(client.activate("last deployment"))
-```
-
-Release binaries: [GitHub Releases](https://github.com/voxmastery/FluctlightDB/releases). Production: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md).
-
----
-
-## Performance (measured)
-
-Linux x86_64, in-process [`prod_bench`](crates/fluctlightdb/tests/prod_bench.rs):
-
-| Path | Latency |
-|------|---------|
-| **Embedded** (`connect`) | ~**0.002 ms** / recall |
-| **HTTP** (`FluctlightClient`, keep-alive) | ~1–5 ms / request on localhost |
-
-On `"wallet balance"`, a verified ledger value ranks above an unverified chat claim. Reproduce: `./scripts/manifesto-audit.sh`.
+Production: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md)
 
 ---
 
 ## Documentation
 
-| Doc | Who it's for |
-|-----|----------------|
+| Doc | For |
+|-----|-----|
 | **[Getting started](docs/GETTING_STARTED.md)** | Paths, storage, FAQ |
-| [CLI.md](docs/CLI.md) | Terminal commands (`fluctlight shell`) |
-| [DOCKER.md](docs/DOCKER.md) | Container deploy |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Backup, replica, multi-tenant |
-| [Manifesto.md](docs/Manifesto.md) | Brain-native design (technical) |
-| [openapi.yaml](docs/openapi.yaml) | HTTP API |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Engine development |
+| **[BENCHMARKS.md](docs/BENCHMARKS.md)** | Paper-ready eval + citations |
+| **[RESEARCH.md](docs/RESEARCH.md)** | Submission checklist |
+| [CLI.md](docs/CLI.md) | `fluctlight shell` |
+| [Manifesto.md](docs/Manifesto.md) | Brain-native design |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Rust/Python contributors |
 
 ---
 
@@ -150,7 +191,7 @@ On `"wallet balance"`, a verified ledger value ranks above an unverified chat cl
 
 **Using Fluctlight in an agent?** `pip install fluctlightdb` — no Rust required.
 
-**Changing the engine, CLI, or server?** See [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md).
+**Changing the engine?** [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md)
 
 ## License
 
