@@ -46,5 +46,6 @@ Frozen JSON: [benchmarks/results/2025-06-22.json](https://github.com/voxmastery/
 ## Docs
 
 - [Getting started](https://github.com/voxmastery/FluctlightDB/blob/main/docs/GETTING_STARTED.md)
+- [Multi-agent monorepos](https://github.com/voxmastery/FluctlightDB/blob/main/docs/MULTI_AGENT.md) — `fluctlight-project init`, MCP, hooks, handoffs
 - [Full README & reproduction](https://github.com/voxmastery/FluctlightDB)
 - [Platform checklist](https://github.com/voxmastery/FluctlightDB/blob/main/docs/PLATFORMS.md)
