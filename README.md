@@ -89,7 +89,7 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 ## Where it is going
 
-- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo evidence recall** (full 10-conversation set), BEIR SciFact parity, FAMB 97–98%.
+- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo evidence recall** (full 10-conversation set), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
 - **Next:** full LongMemEval-S retrieval run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories.
 - **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
 
@@ -173,6 +173,37 @@ index = connect_index("/data/rag-index")
 
 ---
 
+## Multi-agent monorepos (Cursor + Claude + Codex)
+
+**One repo, many AI tools, one shared project brain.** FluctlightDB v0.5+ scaffolds hub-and-spoke memory for monorepos where Cursor, Claude Code, and Codex work on the same codebase:
+
+```
+.fluctlight/
+  project/          ← shared decisions, conventions, handoffs
+  agents/cursor|claude|codex/   ← per-tool session notes
+  handoffs.jsonl    ← deterministic handoff inbox
+```
+
+```bash
+pip install "fluctlightdb[native,mcp]"
+fluctlight-project init
+fluctlight-project doctor
+```
+
+```python
+from fluctlightdb import connect_project
+
+pb = connect_project()  # auto-detects Cursor / Claude / Codex
+pb.handoff("Paused auth work", next_steps=["Add tests"], files=["src/auth.py"])
+print(pb.list_handoffs())
+```
+
+**Includes:** MCP tools, Cursor hooks (session context + git-aware handoffs), Claude skill + MCP settings, Codex MCP template. **Windows, macOS, Linux.**
+
+Full guide: **[MULTI_AGENT.md](docs/MULTI_AGENT.md)** · compatibility: **[PLATFORM_COMPAT.md](docs/PLATFORM_COMPAT.md)**
+
+---
+
 ## Choose your path
 
 ```
@@ -180,7 +211,11 @@ One agent in one process (start here)
   pip install "fluctlightdb[native]"
   brain = connect("/path/to/agent-data")
 
-Several agents / shared server
+Several agents / one monorepo (Cursor, Claude, Codex)
+  pip install "fluctlightdb[native,mcp]"
+  fluctlight-project init  →  connect_project()
+
+Several agents / shared HTTP server
   pip install fluctlightdb
   Docker → FluctlightClient over HTTP
 
