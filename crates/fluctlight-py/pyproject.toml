@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "fluctlightdb-native"
-version = "0.4.3"
-description = "In-process FluctlightDB for Python agents (library call, like sqlite3)"
+version = "0.4.4"
+description = "In-process FluctlightDB — embedded memory engine for AI agents (like sqlite3 for agent memory)"
 license = "MIT OR Apache-2.0"
 requires-python = ">=3.9"
 
