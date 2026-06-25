@@ -1,53 +1,48 @@
-# fluctlightdb
+# FluctlightDB
 
-Python client for [FluctlightDB](https://github.com/voxmastery/FluctlightDB) — a **database engine for AI agents** (persistent memory: write, recall, trusted sources — not SQL, not a vector DB, not mem0-style chat extraction).
+**The memory engine for AI agents** — not a vector database with an agent SDK bolted on.
+
+[![PyPI](https://pypi.org/project/fluctlightdb/)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB) · [Paper](https://search.ambugo.help/paper/)
+
+## Mission
+
+**Goal:** become the default **embedded memory substrate** for AI agents — the way SQLite became the default embedded DB for apps.
+
+Long-term agent memory is a **third data model** (alongside relational facts and vector similarity). FluctlightDB defines engine-level `experience()` / `activate()` semantics — episodes, cue-driven recall, provenance, consolidation — not app glue on top of Chroma or Mem0.
+
+**Who it's for:** coding agents, ops bots, research assistants, NPCs — any agent that must **remember across sessions** and **trust ledgers/files over chat**.
 
 ## Install
 
-On **Debian/Ubuntu 23.04+**, **Debian 12+**, and **Fedora 38+**, use a **virtual environment** ([PEP 668](https://peps.python.org/pep-0668/)):
-
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install "fluctlightdb[native]"
 ```
-
-From a clone: `./scripts/install-python-client.sh` (HTTP client only; add `[native]` for embedded).
-
-HTTP-only client (no Rust extension):
-
-```bash
-pip install fluctlightdb
-```
-
-## Quick start — embedded (recommended)
-
-Like `sqlite3` — no server:
 
 ```python
 from fluctlightdb import connect
 
 brain = connect("/tmp/my-agent-brain")
-brain.experience("User prefers dark mode", context="settings")
-print(brain.activate("dark mode"))
+brain.experience("User prefers dark mode", context="settings", salience=0.8)
+print(brain.activate("theme preference"))
 brain.checkpoint()
 ```
 
-Read-only recall: `get_recall_client(path)`.
+HTTP-only (no Rust extension): `pip install fluctlightdb`
 
-## Quick start — HTTP (shared / remote server)
+## Benchmarks (June 2025)
 
-Run a [release binary](https://github.com/voxmastery/FluctlightDB/releases) or Docker image, then:
+| Benchmark | Metric | Result |
+|-----------|--------|--------|
+| **LoCoMo** (10 conv) | Mean evidence recall @ k=150 | **98.1%** |
+| **BEIR SciFact** | nDCG@10 (index mode) | **0.645** (ties Chroma + MiniLM) |
+| **FAMB** | Macro (index / agent) | **98%** / **97%** |
 
-```python
-from fluctlightdb import FluctlightClient
+Frozen JSON: [benchmarks/results/2025-06-22.json](https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/2025-06-22.json)
 
-client = FluctlightClient.from_env()  # FLUCTLIGHT_SERVE_URL + FLUCTLIGHT_API_KEY
-client.experience("User prefers dark mode", context="settings")
-print(client.activate("dark mode"))
-```
+> LoCoMo **evidence recall** ≠ Mem0 **LLM-as-judge QA** — different metrics; compare only when labeled.
 
 ## Docs
 
 - [Getting started](https://github.com/voxmastery/FluctlightDB/blob/main/docs/GETTING_STARTED.md)
-- [HTTP API (OpenAPI)](https://github.com/voxmastery/FluctlightDB/blob/main/docs/openapi.yaml)
+- [Full README & reproduction](https://github.com/voxmastery/FluctlightDB)
+- [Platform checklist](https://github.com/voxmastery/FluctlightDB/blob/main/docs/PLATFORMS.md)

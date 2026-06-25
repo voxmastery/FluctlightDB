@@ -6,6 +6,11 @@ COPY crates ./crates
 RUN cargo build --release -p fluctlight-cli
 
 FROM debian:bookworm-slim AS runtime
+LABEL org.opencontainers.image.title="FluctlightDB" \
+      org.opencontainers.image.description="Embedded memory engine for AI agents — experience/activate, provenance, benchmarks" \
+      org.opencontainers.image.url="https://github.com/voxmastery/FluctlightDB" \
+      org.opencontainers.image.documentation="https://search.ambugo.help/paper/" \
+      org.opencontainers.image.source="https://github.com/voxmastery/FluctlightDB"
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tini \
     && rm -rf /var/lib/apt/lists/*

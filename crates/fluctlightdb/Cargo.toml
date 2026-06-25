@@ -1,6 +1,6 @@
 [package]
 name = "fluctlightdb"
-description = "Brain-native database for AI agents — engrams, plasticity, developmental growth"
+description = "Embedded memory engine for AI agents — third data model: experience(), activate(), provenance, consolidation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,6 +15,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 bincode = "1"
 rusqlite = { version = "0.32", features = ["bundled"] }
 fast-hnsw = "1.0.1"
+sha2 = "0.10"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
