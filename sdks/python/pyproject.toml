@@ -36,11 +36,11 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://search.ambugo.help/paper/"
+Homepage = "https://github.com/voxmastery/FluctlightDB"
 Documentation = "https://github.com/voxmastery/FluctlightDB/blob/main/docs/GETTING_STARTED.md"
 Repository = "https://github.com/voxmastery/FluctlightDB"
 Issues = "https://github.com/voxmastery/FluctlightDB/issues"
-Paper = "https://search.ambugo.help/paper/"
+Paper = "https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1"
 Benchmarks = "https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/2025-06-22.json"
 
 [project.optional-dependencies]

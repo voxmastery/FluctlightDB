@@ -33,6 +33,6 @@ pip install "fluctlightdb[native]"
 ## Links
 
 - [GitHub](https://github.com/voxmastery/FluctlightDB)
-- [Paper draft](https://search.ambugo.help/paper/)
 - [PyPI](https://pypi.org/project/fluctlightdb/)
+- [Paper source (LaTeX)](https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1)
 - [Benchmarks JSON](https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/2025-06-22.json)
