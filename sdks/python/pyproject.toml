@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluctlightdb"
-version = "0.4.4"
+version = "0.4.5"
 description = "Embedded memory engine for AI agents — third data model (experience/activate), provenance, benchmarks. Goal: SQLite for agent memory."
 readme = "README.md"
 requires-python = ">=3.9"
+dependencies = ["PyYAML>=6.0"]
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Ganesh S", email = "voxmastery@ambugo.tech" }]
@@ -44,7 +45,14 @@ Paper = "https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1"
 Benchmarks = "https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/2025-06-22.json"
 
 [project.optional-dependencies]
-native = ["fluctlightdb-native>=0.4.4"]
+native = ["fluctlightdb-native>=0.4.3"]
+mcp = ["mcp>=1.0"]
+
+[project.scripts]
+fluctlight-project = "fluctlightdb.cli:main"
+
+[tool.setuptools.package-data]
+fluctlightdb = ["templates/**/*"]
 
 [tool.setuptools.packages.find]
 where = ["."]
