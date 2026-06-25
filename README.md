@@ -8,7 +8,7 @@ Your agent gets a **persistent brain on disk**: it **writes experiences**, **rec
 
 ## Mission
 
-**Goal:** become the default **embedded memory substrate** for AI agents — the way SQLite became the default embedded DB for apps.
+**Goal:** become the default **database for agent memory** — the way SQLite became the default embedded DB for apps.
 
 We believe long-term agent memory is a **third data model** (alongside relational facts and vector similarity), not a feature bolted onto someone else's store. FluctlightDB exists to:
 
@@ -75,7 +75,7 @@ Deep design: [Manifesto](docs/Manifesto.md). Brain-native internals are optional
 
 - **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo evidence recall** (full 10-conversation set), BEIR SciFact parity, FAMB 97–98%.
 - **Next:** full LongMemEval-S retrieval run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories.
-- **Goal:** the default **memory substrate** for agents — the way SQLite became the default embedded DB for apps.
+- **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
 
 ---
 
