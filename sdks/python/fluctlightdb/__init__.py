@@ -11,7 +11,9 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from .brain import FluctlightBrain, connect
+from .brain import FluctlightBrain, connect, connect_conv, connect_index
+from .handoff import Handoff, detect_agent
+from .project import ProjectBrains, ProjectConfig, connect_project, find_project_root
 from .worker import FluctlightNative, FluctlightWorker, get_recall_client, get_worker
 
 __all__ = [
@@ -19,7 +21,15 @@ __all__ = [
     "FluctlightBrain",
     "FluctlightNative",
     "FluctlightWorker",
+    "Handoff",
+    "ProjectBrains",
+    "ProjectConfig",
     "connect",
+    "connect_conv",
+    "connect_index",
+    "connect_project",
+    "detect_agent",
+    "find_project_root",
     "get_recall_client",
     "get_worker",
 ]
