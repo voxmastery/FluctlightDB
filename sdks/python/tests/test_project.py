@@ -181,6 +181,24 @@ class TestPlatform(unittest.TestCase):
         self.assertTrue(str(p).endswith(".brain.lock"))
 
 
+    def test_build_inbox_html(self) -> None:
+        from fluctlightdb.inbox_ui import build_inbox_html
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(ROOT)
+            subprocess.run(
+                [sys.executable, "-m", "fluctlightdb.cli", "init", str(root), "--name", "ui-test"],
+                env=env,
+                check=True,
+                capture_output=True,
+            )
+            html = build_inbox_html(root)
+            self.assertIn("FluctlightDB project brain", html)
+            self.assertIn("ui-test", html)
+
+
 class TestDoctor(unittest.TestCase):
     def test_doctor_without_project(self) -> None:
         from fluctlightdb.doctor import run_doctor

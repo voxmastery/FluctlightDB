@@ -19,6 +19,12 @@
         "timeout": 20
       }
     ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "{{before_submit_hook}}",
+        "timeout": 12
+      }
+    ],
     "postToolUse": [
       {
         "command": "{{track_files_hook}}",
