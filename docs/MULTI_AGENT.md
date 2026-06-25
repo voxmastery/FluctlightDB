@@ -107,11 +107,18 @@ Use **either** embedded `connect_project()` **or** `fluctlight-serve` on the sam
 
 ```bash
 fluctlight-project init [--name myapp] [--team-sync] [--cursor] [--claude] [--codex] [--force]
+fluctlight-project onboard
 fluctlight-project doctor [--json]
+fluctlight-project ui [--port 8787]
+fluctlight-project sync pull|push|status
+fluctlight-project handoffs [--agent X] [--subdir Y] [--json]
 fluctlight-project status
 fluctlight-project context
-fluctlight-project handoffs [--agent X] [--subdir Y] [--json]
 ```
+
+## VPS + local desktop
+
+See **[VPS_DESKTOP.md](VPS_DESKTOP.md)** — Cursor CLI on VPS and Cursor on your laptop sharing one project brain (git sync or HTTP hub).
 
 ## Team sync
 

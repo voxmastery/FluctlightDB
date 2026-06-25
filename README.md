@@ -198,9 +198,17 @@ pb.handoff("Paused auth work", next_steps=["Add tests"], files=["src/auth.py"])
 print(pb.list_handoffs())
 ```
 
-**Includes:** MCP tools, Cursor hooks (session context + git-aware handoffs), Claude skill + MCP settings, Codex MCP template. **Windows, macOS, Linux.**
+**Includes:** MCP tools, Cursor hooks + **required rules**, Claude skill + MCP, Codex MCP, **handoff web UI**, **git sync**, optional **VPS hub**. **Windows, macOS, Linux.**
 
-Full guide: **[MULTI_AGENT.md](docs/MULTI_AGENT.md)** · compatibility: **[PLATFORM_COMPAT.md](docs/PLATFORM_COMPAT.md)**
+```bash
+fluctlight-project ui       # inbox at http://127.0.0.1:8787
+fluctlight-project sync pull  # VPS ↔ laptop via git
+fluctlight-project onboard    # guided setup
+```
+
+**VPS Cursor CLI + local desktop?** Yes — [VPS_DESKTOP.md](docs/VPS_DESKTOP.md)
+
+Full guide: **[MULTI_AGENT.md](docs/MULTI_AGENT.md)** · onboarding: **[ONBOARDING.md](docs/ONBOARDING.md)** · compatibility: **[PLATFORM_COMPAT.md](docs/PLATFORM_COMPAT.md)**
 
 ---
 
@@ -248,6 +256,8 @@ Production: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md)
 | **[BENCHMARKS.md](docs/BENCHMARKS.md)** | Paper-ready eval + citations |
 | **[PLATFORMS.md](docs/PLATFORMS.md)** | GitHub, PyPI, Docker, HF, arXiv checklist |
 | **[MULTI_AGENT.md](docs/MULTI_AGENT.md)** | Hub + spoke brains, MCP, hooks, handoffs |
+| **[ONBOARDING.md](docs/ONBOARDING.md)** | 5-minute setup · `fluctlight-project onboard` |
+| **[VPS_DESKTOP.md](docs/VPS_DESKTOP.md)** | Cursor CLI on VPS + local desktop |
 | **[PLATFORM_COMPAT.md](docs/PLATFORM_COMPAT.md)** | Windows / macOS / Linux matrix |
 | **[RESEARCH.md](docs/RESEARCH.md)** | Submission checklist |
 | [CLI.md](docs/CLI.md) | `fluctlight shell` |
