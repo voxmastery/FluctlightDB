@@ -10,12 +10,12 @@ Your agent gets a **persistent brain on disk**: it **writes experiences**, **rec
 
 **Goal:** become the default **database for agent memory** — the way SQLite became the default embedded DB for apps.
 
-We believe long-term agent memory is a **third data model** (alongside relational facts and vector similarity), not a feature bolted onto someone else's store. FluctlightDB exists to:
+Long-term agent memory is a **third data model** (alongside relational facts and vector similarity), not a feature bolted onto someone else's store. FluctlightDB exists to:
 
-1. **Define that model** — episodes (engrams), cue-driven recall, provenance, consolidation — as engine-level semantics, not app glue.
-2. **Ship an embedded engine** — `experience()` / `activate()` / `checkpoint()`, one durable store per agent, Rust core, no required cloud.
-3. **Prove it with public benchmarks** — LoCoMo evidence recall, BEIR IR parity, agent-specific FAMB — with frozen, reproducible numbers.
-4. **Stay honest about scope** — long-term **memory for agents** only: not your Postgres app database, not a generic doc-search index, not a hosted Mem0-style cloud service.
+1. **Define that model** — episodes, cue-driven recall, graph activation, separation, provenance, consolidation — as **engine-level** semantics.
+2. **Ship an embedded database** — `experience()` / `activate()` / `checkpoint()`, one store per agent, Rust core, no required cloud.
+3. **Prove it publicly** — LoCoMo, BEIR, FAMB with frozen, reproducible numbers.
+4. **Stay in scope** — agent memory only; not Postgres, not generic doc search, not hosted Mem0-style SaaS.
 
 **Who it's for** — build with FluctlightDB when your agent needs to:
 
@@ -46,36 +46,44 @@ brain.checkpoint()
 
 ## Why this exists
 
-**Postgres** stores rows. **Chroma/Qdrant** stores vectors and returns nearest neighbors. **mem0** extracts facts from chat and embeds them. None of them were built to answer:
+**Postgres** stores rows with a fixed schema. **Chroma/Qdrant** stores vectors and returns nearest neighbors. **Mem0-style layers** extract chat facts and search an index behind an API.
 
-> *“What does this agent remember, from everything it has lived through — and what can it actually trust?”*
+None of them give you a **database engine whose native operations are memory operations**:
 
-That requires **memory semantics**, not just storage:
+| Layer | Native question | Typical API |
+|-------|-----------------|-----------|
+| Relational | Which rows match? | `SELECT` |
+| Vector | What's similar? | `vector_search()` |
+| Memory SDK | What should we extract from chat? | app pipeline + index |
+| **FluctlightDB** | What did the agent learn, and what should recall return for this cue? | `experience()` / `activate()` |
+
+That gap shows up as the same pain in every serious agent:
 
 | Problem | What others make you build | What FluctlightDB gives you |
 |---------|---------------------------|----------------------------|
-| Agent restarts and forgets | Custom session DB + vector sync | `experience()` + `checkpoint()` — one folder per agent |
-| User asks differently than you stored | Hope embeddings match | **Cue activation** — lexical + semantic + linked memories (paraphrase recall) |
-| Chat claim vs verified fact | App-layer ranking hacks | **Provenance built in** — verified sources rank above unverified chat |
-| Duplicate / noisy writes | Your dedup logic | **Separation gate** — near-duplicates filtered at write time |
-| “Just search my docs” | Use a vector DB | `connect_index()` — same engine, bulk IR mode when you need speed |
+| Agent restarts and forgets | Session DB + vector sync + glue code | `experience()` + `checkpoint()` — one folder per agent |
+| User asks differently than you stored | Hope embeddings match | **Cue activation** — lexical + semantic + graph links (paraphrase recall) |
+| Related memories should surface together | Manual chunking / reranking | **Spreading activation** over linked engrams |
+| Noisy or repeated writes | Your dedup logic | **Separation gate** at write time |
+| Chat vs tool/file/API output | Custom ranking in app code | **Provenance** — verified evidence outranks unverified chat |
+| Long-running store gets bloated | Cron jobs and one-off scripts | **Consolidation / sleep** in the engine |
+| “Just bulk-index docs for a benchmark” | A separate vector DB | `connect_index()` — same engine, IR mode |
 
-FluctlightDB is a **Rust memory engine** with agent-native **write** and **recall** APIs. It is **not** a replacement for Postgres (product data) or a generic doc search index — it is the **long-lived memory layer** your agent runs on.
+**In one line:** FluctlightDB is a **database engine for what agents learn** — write episodes, recall from cues, hybrid retrieval, evidence ranking, compaction — **embedded on disk**, not a hosted memory SaaS and not a replacement for Postgres.
+
+**Proof:** **98.1%** LoCoMo evidence recall · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/2025-06-22.json).
 
 ---
 
 ## What makes it different
 
-These are native to the engine, not optional plugins:
+The items above are **engine primitives**, not plugins you wire up yourself:
 
-1. **`experience()` / `activate()`** — write and recall in agent terms, not `INSERT` / `vector_search()`.
-2. **Spreading activation** — memories link in a graph; recall follows associations, not only cosine similarity.
-3. **Provenance & trust** — mark memories as verified (tool output, file, API record); they outrank unverified chat at recall time.
-4. **Pattern separation** — dentate-style encoding reduces confusion when similar events pile up.
-5. **Consolidation & sleep** — offline replay/compaction (like memory consolidation), not just append-only logs.
-6. **Two explicit modes** — `connect()` for live agents; `connect_index()` for bulk semantic ingest (RAG backfills, benchmarks).
+1. **`experience()` / `activate()` / `checkpoint()`** — the database contract (not `INSERT` + `vector_search()` + custom glue).
+2. **Hybrid recall** — vectors, keywords, and graph activation in one `activate(cue)` call.
+3. **Two modes** — `connect()` for live agents; `connect_index()` for bulk ingest and IR benchmarks.
 
-Deep design: [Manifesto](docs/Manifesto.md). Brain-native internals are optional reading — you can use it like SQLite for agents without learning neuroscience.
+Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · use it like SQLite for agents without reading neuroscience.
 
 ---
 
