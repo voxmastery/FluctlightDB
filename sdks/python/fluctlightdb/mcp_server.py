@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Optional
+from typing import Optional
 
 
 def _connect():
@@ -76,6 +76,38 @@ def run() -> None:
             },
             indent=2,
         )
+
+    @mcp.tool()
+    def fluctlight_list_handoffs(
+        agent: Optional[str] = None,
+        subdir: Optional[str] = None,
+        status: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 20,
+    ) -> str:
+        """List handoffs from the deterministic inbox (filter by agent, subdir, status)."""
+        pb = _connect()
+        items = pb.list_handoffs(
+            agent=agent,
+            subdir=subdir,
+            status=status,
+            since=since,
+            limit=limit,
+        )
+        payload = [
+            {
+                "handoff_id": h.handoff_id,
+                "agent": h.agent,
+                "subdir": h.subdir,
+                "status": h.status,
+                "summary": h.summary,
+                "next_steps": h.next_steps,
+                "files": h.files,
+                "created_at": h.created_at,
+            }
+            for h in items
+        ]
+        return json.dumps(payload, indent=2)
 
     @mcp.tool()
     def fluctlight_session_context(limit: int = 10) -> str:
