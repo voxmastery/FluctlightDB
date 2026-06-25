@@ -2,7 +2,7 @@
 
 **The memory engine for AI agents** — not a vector database with an agent SDK bolted on.
 
-Your agent gets a **persistent brain on disk**: it **writes experiences**, **recalls them from a cue**, and **ranks trusted sources** (files, ledgers, tools) above chat guesses. One install, one data folder per agent, survives restarts.
+Your agent gets a **persistent brain on disk**: it **writes experiences**, **recalls them from a cue**, and **ranks trusted sources** (tool results, files, API responses, verified records) above unverified chat. One install, one data folder per agent, survives restarts.
 
 [![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB)
 
@@ -15,9 +15,17 @@ We believe long-term agent memory is a **third data model** (alongside relationa
 1. **Define that model** — episodes (engrams), cue-driven recall, provenance, consolidation — as engine-level semantics, not app glue.
 2. **Ship an embedded engine** — `experience()` / `activate()` / `checkpoint()`, one durable store per agent, Rust core, no required cloud.
 3. **Prove it with public benchmarks** — LoCoMo evidence recall, BEIR IR parity, agent-specific FAMB — with frozen, reproducible numbers.
-4. **Stay honest about scope** — memory for agents, not a replacement for Postgres, not a doc-search index, not a managed Mem0-style SaaS.
+4. **Stay honest about scope** — long-term **memory for agents** only: not your Postgres app database, not a generic doc-search index, not a hosted Mem0-style cloud service.
 
-**Who it's for:** developers building coding agents, ops bots, research assistants, game NPCs, or any system where the agent must **remember across sessions** and **trust ledgers/files over chat**.
+**Who it's for** — build with FluctlightDB when your agent needs to:
+
+- **Remember across sessions** — restarts, days or weeks of work, not just the current context window
+- **Ingest many kinds of input** — user messages, tool/API output, files, logs, codebase reads, observations
+- **Recall from a vague cue** — the user asks differently than how the fact was stored
+- **Prefer evidence over chat** — ground-truth memories (tool results, files, verified data) outrank casual conversation or model guesses at recall time
+- **Run embedded** — one durable brain per agent on disk, no required memory SaaS
+
+Typical fits: coding agents, ops/automation bots, research assistants, game NPCs, personal assistants with real continuity.
 
 Paper & positioning: [search.ambugo.help/paper](https://search.ambugo.help/paper/) · deep design: [Manifesto](docs/Manifesto.md)
 
@@ -48,7 +56,7 @@ That requires **memory semantics**, not just storage:
 |---------|---------------------------|----------------------------|
 | Agent restarts and forgets | Custom session DB + vector sync | `experience()` + `checkpoint()` — one folder per agent |
 | User asks differently than you stored | Hope embeddings match | **Cue activation** — lexical + semantic + linked memories (paraphrase recall) |
-| Chat claim vs ledger truth | App-layer ranking hacks | **Provenance built in** — verified sources rank above unverified chat |
+| Chat claim vs verified fact | App-layer ranking hacks | **Provenance built in** — verified sources rank above unverified chat |
 | Duplicate / noisy writes | Your dedup logic | **Separation gate** — near-duplicates filtered at write time |
 | “Just search my docs” | Use a vector DB | `connect_index()` — same engine, bulk IR mode when you need speed |
 
@@ -62,7 +70,7 @@ These are native to the engine, not optional plugins:
 
 1. **`experience()` / `activate()`** — write and recall in agent terms, not `INSERT` / `vector_search()`.
 2. **Spreading activation** — memories link in a graph; recall follows associations, not only cosine similarity.
-3. **Provenance & trust** — tag memories as verified (ledger, file, tool); they outrank chat assertions at recall time.
+3. **Provenance & trust** — mark memories as verified (tool output, file, API record); they outrank unverified chat at recall time.
 4. **Pattern separation** — dentate-style encoding reduces confusion when similar events pile up.
 5. **Consolidation & sleep** — offline replay/compaction (like memory consolidation), not just append-only logs.
 6. **Two explicit modes** — `connect()` for live agents; `connect_index()` for bulk semantic ingest (RAG backfills, benchmarks).

@@ -10,7 +10,9 @@
 
 Long-term agent memory is a **third data model** (alongside relational facts and vector similarity). FluctlightDB defines engine-level `experience()` / `activate()` semantics — episodes, cue-driven recall, provenance, consolidation — not app glue on top of Chroma or Mem0.
 
-**Who it's for:** coding agents, ops bots, research assistants, NPCs — any agent that must **remember across sessions** and **trust ledgers/files over chat**.
+**Who it's for** — agents that persist across sessions, learn from tools/files/APIs as well as chat, recall under paraphrase, and should prefer **verified evidence** over casual conversation at recall time.
+
+Typical fits: coding agents, ops bots, research assistants, NPCs.
 
 ## Install
 
