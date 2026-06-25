@@ -6,7 +6,7 @@
 
 ## Mission
 
-**Goal:** become the default **embedded memory substrate** for AI agents — the way SQLite became the default embedded DB for apps.
+**Goal:** become the default **database for agent memory** — the way SQLite became the default embedded DB for apps.
 
 Long-term agent memory is a **third data model** (alongside relational facts and vector similarity). FluctlightDB defines engine-level `experience()` / `activate()` semantics — episodes, cue-driven recall, provenance, consolidation — not app glue on top of Chroma or Mem0.
 
