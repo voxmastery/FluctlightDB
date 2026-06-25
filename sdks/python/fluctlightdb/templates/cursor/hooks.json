@@ -3,20 +3,27 @@
   "hooks": {
     "sessionStart": [
       {
-        "command": ".cursor/hooks/session_start.py",
+        "command": "{{session_start_hook}}",
         "timeout": 15
       }
     ],
     "sessionEnd": [
       {
-        "command": ".cursor/hooks/session_end.py",
+        "command": "{{session_end_hook}}",
         "timeout": 15
       }
     ],
     "stop": [
       {
-        "command": ".cursor/hooks/stop_handoff.py",
+        "command": "{{stop_handoff_hook}}",
         "timeout": 20
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "{{track_files_hook}}",
+        "matcher": "Write|Edit",
+        "timeout": 10
       }
     ]
   }

@@ -5,6 +5,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use fs2::FileExt;
+
 pub fn lock_path(brain_path: &Path) -> PathBuf {
     crate::storage::lock_path(brain_path)
 }
@@ -16,6 +18,25 @@ pub struct StoreLock {
 /// Shared (read) lock — multiple readers; writers (`StoreLock`) block until readers release.
 pub struct SharedStoreLock {
     _file: File,
+}
+
+fn open_lock_file(brain_path: &Path) -> io::Result<File> {
+    let path = lock_path(brain_path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .open(&path)
+}
+
+fn lock_contended(err: &io::Error) -> bool {
+    err.kind() == io::ErrorKind::WouldBlock
+        || err.kind() == io::ErrorKind::AlreadyExists
+        || err.to_string().to_lowercase().contains("would block")
+        || err.to_string().to_lowercase().contains("resource temporarily unavailable")
 }
 
 impl StoreLock {
@@ -46,24 +67,8 @@ impl StoreLock {
     }
 
     pub fn try_acquire(brain_path: &Path) -> io::Result<Self> {
-        let path = lock_path(brain_path);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(&path)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::io::AsRawFd;
-            let fd = file.as_raw_fd();
-            let ret = unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) };
-            if ret != 0 {
-                return Err(io::Error::last_os_error());
-            }
-        }
+        let file = open_lock_file(brain_path)?;
+        file.try_lock_exclusive()?;
         Ok(Self { _file: file })
     }
 }
@@ -96,60 +101,74 @@ impl SharedStoreLock {
     }
 
     pub fn try_acquire(brain_path: &Path) -> io::Result<Self> {
-        let path = lock_path(brain_path);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(&path)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::io::AsRawFd;
-            let fd = file.as_raw_fd();
-            let ret = unsafe { libc::flock(fd, libc::LOCK_SH | libc::LOCK_NB) };
-            if ret != 0 {
-                return Err(io::Error::last_os_error());
-            }
-        }
+        let file = open_lock_file(brain_path)?;
+        file.try_lock_shared()?;
         Ok(Self { _file: file })
     }
 }
 
-#[cfg(unix)]
-fn lock_contended(err: &io::Error) -> bool {
-    err.kind() == io::ErrorKind::WouldBlock
-        || err.raw_os_error() == Some(libc::EWOULDBLOCK)
-        || err.raw_os_error() == Some(libc::EAGAIN)
-}
-
-#[cfg(not(unix))]
-fn lock_contended(err: &io::Error) -> bool {
-    err.kind() == io::ErrorKind::WouldBlock
-}
-
 impl Drop for StoreLock {
     fn drop(&mut self) {
-        unlock_file(&self._file);
+        let _ = self._file.unlock();
     }
 }
 
 impl Drop for SharedStoreLock {
     fn drop(&mut self) {
-        unlock_file(&self._file);
+        let _ = self._file.unlock();
     }
 }
 
-#[cfg(unix)]
-fn unlock_file(file: &File) {
-    use std::os::unix::io::AsRawFd;
-    let fd = file.as_raw_fd();
-    unsafe {
-        libc::flock(fd, libc::LOCK_UN);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::mpsc;
+    use std::thread;
+    use tempfile::tempdir;
+
+    #[test]
+    fn exclusive_lock_blocks_second_writer() {
+        let dir = tempdir().unwrap();
+        let brain = dir.path().join("brain");
+        std::fs::create_dir_all(&brain).unwrap();
+
+        let _first = StoreLock::try_acquire(&brain).unwrap();
+        let second = StoreLock::try_acquire(&brain);
+        assert!(second.is_err(), "second exclusive lock should fail");
+    }
+
+    #[test]
+    fn lock_released_after_drop() {
+        let dir = tempdir().unwrap();
+        let brain = dir.path().join("brain");
+        std::fs::create_dir_all(&brain).unwrap();
+
+        {
+            let _lock = StoreLock::try_acquire(&brain).unwrap();
+        }
+        let again = StoreLock::try_acquire(&brain);
+        assert!(again.is_ok(), "lock should be available after drop");
+    }
+
+    #[test]
+    fn lock_contention_from_threads() {
+        let dir = tempdir().unwrap();
+        let brain = dir.path().join("brain");
+        std::fs::create_dir_all(&brain).unwrap();
+        let brain_path = brain.clone();
+        let (tx, rx) = mpsc::channel();
+
+        let holder = thread::spawn(move || {
+            let lock = StoreLock::try_acquire(&brain_path).unwrap();
+            tx.send(()).unwrap();
+            thread::sleep(Duration::from_millis(200));
+            drop(lock);
+        });
+
+        rx.recv().unwrap();
+        thread::sleep(Duration::from_millis(20));
+        assert!(StoreLock::try_acquire(&brain).is_err());
+        holder.join().unwrap();
+        assert!(StoreLock::try_acquire(&brain).is_ok());
     }
 }
-
-#[cfg(not(unix))]
-fn unlock_file(_file: &File) {}

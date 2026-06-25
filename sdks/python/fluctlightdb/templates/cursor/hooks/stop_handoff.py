@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Cursor stop — write a brief handoff when the agent finishes."""
+"""Cursor stop — write a git-aware handoff when the agent finishes."""
 
 from __future__ import annotations
 
 import json
 import os
 import sys
+from pathlib import Path
 
 
 def _summary_from_hook(payload: dict) -> str:
@@ -21,7 +22,7 @@ def _summary_from_hook(payload: dict) -> str:
             text = item.get("text") or item.get("content")
             if isinstance(text, str) and text.strip():
                 return text.strip()[:1200]
-    return "Session ended — see recent edits and open tasks."
+    return ""
 
 
 def main() -> int:
@@ -37,13 +38,16 @@ def main() -> int:
 
     try:
         from fluctlightdb import connect_project
+        from fluctlightdb.handoff_capture import capture_session_summary
 
         pb = connect_project(agent="cursor")
-        summary = _summary_from_hook(payload if isinstance(payload, dict) else {})
+        hook_summary = _summary_from_hook(payload if isinstance(payload, dict) else {})
+        cap = capture_session_summary(Path(pb.config.root), hook_summary=hook_summary)
         pb.handoff(
-            summary,
+            cap.summary,
             status="paused",
-            next_steps=["Continue from handoff context on next agent session."],
+            next_steps=cap.next_steps,
+            files=cap.files,
         )
         pb.checkpoint()
     except Exception:

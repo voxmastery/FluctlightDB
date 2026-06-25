@@ -36,11 +36,13 @@ pb.handoff("Finished auth middleware", next_steps=["Add integration tests"], fil
 
 ## MCP (if configured)
 
-Use tools: `fluctlight_recall`, `fluctlight_remember`, `fluctlight_handoff`, `fluctlight_session_context`, `fluctlight_status`.
+Tools: `fluctlight_recall`, `fluctlight_remember`, `fluctlight_handoff`, `fluctlight_list_handoffs`, `fluctlight_session_context`, `fluctlight_status`.
+
+CLI: `fluctlight-project handoffs`, `fluctlight-project doctor`.
 
 ## Handoff protocol
 
-Handoffs are JSON episodes with context `handoff:<agent>:<subdir>`. Other agents see them via `recall_handoffs()` / `session_context()`.
+Handoffs are stored in the project brain **and** `.fluctlight/handoffs.jsonl` (deterministic inbox). Use `list_handoffs()` or `fluctlight_list_handoffs` — not only fuzzy recall.
 
 ## Rules
 

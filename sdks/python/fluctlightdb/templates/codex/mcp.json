@@ -4,7 +4,7 @@
       "command": "{{python_cmd}}",
       "args": {{python_args}},
       "env": {
-        "FLUCTLIGHT_AGENT": "cursor"
+        "FLUCTLIGHT_AGENT": "codex"
       }
     }
   }

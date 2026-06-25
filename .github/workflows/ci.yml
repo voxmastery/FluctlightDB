@@ -39,3 +39,52 @@ jobs:
 
       - name: Format check
         run: cargo fmt --all -- --check
+
+  python-sdk:
+    name: python-sdk (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install SDK + test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./sdks/python
+
+      - name: Run Python unit tests
+        working-directory: sdks/python
+        run: python -m unittest discover -s tests -v
+
+  python-sdk-native:
+    name: python-sdk-native (ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build native wheel
+        run: |
+          pip install maturin
+          maturin build --release -o dist --manifest-path crates/fluctlight-py/Cargo.toml
+
+      - name: Install SDK + native
+        run: |
+          pip install -e ./sdks/python
+          pip install dist/*.whl
+
+      - name: Run native integration tests
+        working-directory: sdks/python
+        run: python -m unittest tests.test_project.TestProjectInit.test_connect_and_handoff -v

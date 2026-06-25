@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,7 +12,12 @@ from typing import Any, Optional
 import yaml
 
 from .handoff import HANDOFF_PREFIX, Handoff, detect_agent
+from .handoff_index import append_handoff, get_handoff, list_handoffs as index_list_handoffs
 from .lock import brain_write_lock
+from .platform import normalize_subdir
+from .validation import validate_content, warn_serve_embedded_conflict
+
+logger = logging.getLogger(__name__)
 
 CONFIG_FILE = "config.yaml"
 FLUCTLIGHT_DIR = ".fluctlight"
@@ -128,6 +134,9 @@ class ProjectBrains:
         sid = session_id or os.environ.get("FLUCTLIGHT_SESSION_ID", "") or os.environ.get(
             "CURSOR_SESSION_ID", ""
         )[:12]
+        warn = warn_serve_embedded_conflict()
+        if warn:
+            logger.warning(warn)
         project_path = cfg.brain_path("project")
         if agent_name in cfg.agent_names():
             agent_path = cfg.brain_path(agent_name)
@@ -159,6 +168,7 @@ class ProjectBrains:
         source_uri: Optional[str] = None,
         **extra: Any,
     ) -> dict[str, Any]:
+        validate_content(content)
         ctx = context
         if self.subdir and context == "session":
             ctx = f"session:{self.agent}:{self.subdir}"
@@ -234,6 +244,7 @@ class ProjectBrains:
         files: Optional[list[str]] = None,
         to_project: bool = True,
     ) -> Handoff:
+        validate_content(summary, field="summary")
         h = Handoff(
             agent=self.agent,
             subdir=self.subdir,
@@ -249,9 +260,40 @@ class ProjectBrains:
             context=h.context_key(),
             salience=0.92,
         )
+        append_handoff(self.config.fluctlight_root, h)
         return h
 
+    def list_handoffs(
+        self,
+        *,
+        agent: Optional[str] = None,
+        subdir: Optional[str] = None,
+        status: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 20,
+    ) -> list[Handoff]:
+        return index_list_handoffs(
+            self.config.fluctlight_root,
+            agent=agent,
+            subdir=subdir,
+            status=status,
+            since=since,
+            limit=limit,
+        )
+
+    def get_handoff(self, handoff_id: str) -> Optional[Handoff]:
+        return get_handoff(self.config.fluctlight_root, handoff_id)
+
     def recall_handoffs(self, *, subdir: Optional[str] = None, limit: int = 8) -> list[Handoff]:
+        indexed = self.list_handoffs(
+            subdir=subdir if subdir is not None else self.subdir or None,
+            limit=limit,
+        )
+        if indexed:
+            return indexed
+        return self._recall_handoffs_legacy(subdir=subdir, limit=limit)
+
+    def _recall_handoffs_legacy(self, *, subdir: Optional[str] = None, limit: int = 8) -> list[Handoff]:
         cue = "handoff"
         if subdir is not None:
             cue = f"handoff {subdir.strip('/')}"
@@ -282,7 +324,7 @@ class ProjectBrains:
         if handoffs:
             lines.append("## Recent handoffs (other agents)")
             for h in handoffs:
-                lines.append(f"- {h.format_brief()}")
+                lines.append(f"- [{h.handoff_id}] {h.format_brief()}")
             lines.append("")
         cues = [
             f"project conventions {self.config.project_id}",
@@ -314,7 +356,9 @@ class ProjectBrains:
             "subdir": self.subdir,
             "session_id": self.session_id,
             "agents": self.config.agent_names(),
-            "handoffs": [h.format_brief() for h in self.recall_handoffs(limit=6)],
+            "handoffs": [
+                {"id": h.handoff_id, "brief": h.format_brief()} for h in self.recall_handoffs(limit=6)
+            ],
         }
 
     def checkpoint(self) -> None:

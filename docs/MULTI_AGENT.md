@@ -1,6 +1,8 @@
 # Multi-agent project brains
 
-FluctlightDB can act as a **hub-and-spoke project brain** in a monorepo: one shared project memory plus per-tool agent memories (Cursor, Claude Code, Codex), with structured handoffs between them.
+FluctlightDB acts as a **hub-and-spoke project brain** in a monorepo: one shared project memory plus per-tool agent memories (Cursor, Claude Code, Codex), with structured handoffs between them.
+
+**Platforms:** Linux, macOS, Windows — see [PLATFORM_COMPAT.md](PLATFORM_COMPAT.md).
 
 ## Quick start
 
@@ -9,6 +11,7 @@ From your repo root:
 ```bash
 pip install "fluctlightdb[native,mcp]"
 fluctlight-project init
+fluctlight-project doctor
 ```
 
 This creates:
@@ -16,7 +19,8 @@ This creates:
 ```
 .fluctlight/
   config.yaml
-  project/           # shared hub brain
+  handoffs.jsonl      # deterministic handoff inbox
+  project/            # shared hub brain
   agents/
     cursor/
     claude/
@@ -25,11 +29,11 @@ This creates:
 
 Optional scaffolds (default: all):
 
-- **Cursor** — `.cursor/mcp.json`, `.cursor/hooks.json`, hook scripts
-- **Claude Code** — `.claude/skills/fluctlight-memory/SKILL.md`, `CLAUDE.md` snippet
-- **Codex** — `.fluctlight/codex.env.example`
+- **Cursor** — `.cursor/mcp.json`, `.cursor/hooks.json`, hook scripts (`.cmd` on Windows)
+- **Claude Code** — `.claude/settings.json` (MCP), skill, `CLAUDE.md` snippet
+- **Codex** — `.fluctlight/codex.mcp.json`, env example
 
-Brains are appended to `.gitignore` by default (local-first). Commit them if your team wants shared memory in git.
+Brains are gitignored by default (local-first). Use `--team-sync` to commit the shared project hub.
 
 ## Python API
 
@@ -40,12 +44,11 @@ pb = connect_project()  # auto-detects agent; walks up to find .fluctlight/
 pb.remember("Use ruff for linting", scope="project", context="conventions")
 pb.recall("linting conventions", scope="all")
 pb.handoff("Refactored auth module", next_steps=["Add tests"], files=["src/auth/"])
+print(pb.list_handoffs(agent="cursor"))
 print(pb.session_context())
 ```
 
 ### Agent identity
-
-Set explicitly or auto-detect:
 
 | Variable | Purpose |
 |----------|---------|
@@ -55,29 +58,29 @@ Set explicitly or auto-detect:
 
 Subdirectory context is inferred from cwd relative to project root (`session:cursor:apps/api`).
 
-## Handoffs
+## Handoff inbox
 
-`handoff()` stores JSON in the project brain with context `handoff:<agent>:<subdir>`. Other agents see recent handoffs via `recall_handoffs()` and `session_context()`.
+`handoff()` writes to:
+
+1. Project brain (cue-recallable episode)
+2. `.fluctlight/handoffs.jsonl` (deterministic inbox)
+
+```python
+pb.list_handoffs(agent="claude", subdir="apps/api", status="paused", limit=10)
+pb.get_handoff("a4feade2")
+```
+
+CLI:
+
+```bash
+fluctlight-project handoffs --agent cursor --json
+```
 
 ## MCP server
 
-After `fluctlight-project init`, Cursor loads:
+Tools: `fluctlight_recall`, `fluctlight_remember`, `fluctlight_handoff`, `fluctlight_list_handoffs`, `fluctlight_session_context`, `fluctlight_status`.
 
-```json
-{
-  "mcpServers": {
-    "fluctlight": {
-      "command": "python3",
-      "args": ["-m", "fluctlightdb.mcp_server"],
-      "env": { "FLUCTLIGHT_AGENT": "cursor" }
-    }
-  }
-}
-```
-
-Tools: `fluctlight_recall`, `fluctlight_remember`, `fluctlight_handoff`, `fluctlight_session_context`, `fluctlight_status`.
-
-Run manually: `python3 -m fluctlightdb.mcp_server`
+Run manually: `python -m fluctlightdb.mcp_server`
 
 ## Cursor hooks
 
@@ -85,21 +88,43 @@ Run manually: `python3 -m fluctlightdb.mcp_server`
 |-------|----------|
 | `sessionStart` | Inject `session_context()` as `additional_context` |
 | `sessionEnd` | Checkpoint brains |
-| `stop` | Write a brief handoff (disable with `FLUCTLIGHT_SKIP_STOP_HANDOFF=1`) |
+| `stop` | Git-aware handoff (diff stat, files, branch) |
+| `postToolUse` (Write/Edit) | Track edited files in agent brain |
+
+Disable stop handoff: `FLUCTLIGHT_SKIP_STOP_HANDOFF=1`
 
 Hooks fail open if native is not installed.
 
 ## Concurrency
 
-Writes use `fcntl` file locks (`.brain.lock`) per brain directory so MCP, hooks, and multiple processes can share a repo safely.
+Writes use cross-platform file locks (`.brain.lock` per brain, `.handoffs.lock` for inbox). Safe across MCP, hooks, and multiple processes on Linux, macOS, and Windows.
+
+## Serve vs embedded
+
+Use **either** embedded `connect_project()` **or** `fluctlight-serve` on the same brain path — not both. If `FLUCTLIGHT_SERVE_URL` is set, `connect_project()` logs a warning.
 
 ## CLI
 
 ```bash
-fluctlight-project init [--name myapp] [--cursor] [--claude] [--codex] [--force]
+fluctlight-project init [--name myapp] [--team-sync] [--cursor] [--claude] [--codex] [--force]
+fluctlight-project doctor [--json]
 fluctlight-project status
 fluctlight-project context
+fluctlight-project handoffs [--agent X] [--subdir Y] [--json]
 ```
+
+## Team sync
+
+```bash
+fluctlight-project init --team-sync
+```
+
+Commits shared project brain + handoffs; keeps per-agent spokes local. See `.fluctlight/TEAM_SYNC.md`.
+
+## Safety
+
+- Max content size: 8 KB default (`FLUCTLIGHT_MAX_CONTENT`)
+- Secret patterns rejected unless `FLUCTLIGHT_ALLOW_SECRETS=1`
 
 ## Example monorepo
 
@@ -107,5 +132,6 @@ See [examples/multi-agent-monorepo](../examples/multi-agent-monorepo/).
 
 ## Related
 
+- [PLATFORM_COMPAT.md](PLATFORM_COMPAT.md)
 - [GETTING_STARTED.md](GETTING_STARTED.md)
 - [PLATFORMS.md](PLATFORMS.md)
