@@ -14,7 +14,7 @@ license: mit
 
 ## Mission
 
-Become **SQLite for agent memory**: one durable store per agent, cue-driven recall, provenance (ledgers/files beat chat), public benchmarks.
+Become **SQLite for agent memory**: one durable store per agent, cue-driven recall, provenance (verified sources beat chat), public benchmarks.
 
 ## Install
 
