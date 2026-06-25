@@ -380,6 +380,29 @@ def connect_project(
     start: Optional[os.PathLike[str] | str] = None,
     agent: Optional[str] = None,
     session_id: Optional[str] = None,
-) -> ProjectBrains:
-    """Connect hub + spoke brains for the repo containing *start* (or cwd)."""
+    hub_url: Optional[str] = None,
+    remote: Optional[bool] = None,
+) -> Any:
+    """Connect hub + spoke brains for the repo containing *start* (or cwd).
+
+    Uses remote HTTP hub when ``FLUCTLIGHT_HUB_URL`` / ``serve.url`` is set, or
+    when ``remote=True``. Embedded local brains otherwise.
+    """
+    use_remote = remote
+    if use_remote is None:
+        use_remote = bool(hub_url or os.environ.get("FLUCTLIGHT_HUB_URL", "").strip())
+        if not use_remote:
+            try:
+                root = find_project_root(start)
+                cfg = ProjectConfig.load(root)
+                serve = cfg.serve or {}
+                use_remote = bool(serve.get("enabled")) and bool(serve.get("url"))
+            except FileNotFoundError:
+                use_remote = False
+    if use_remote:
+        from .remote_hub import RemoteProjectBrains
+
+        return RemoteProjectBrains.connect(
+            start=start, agent=agent, session_id=session_id, hub_url=hub_url
+        )
     return ProjectBrains.connect(start=start, agent=agent, session_id=session_id)
