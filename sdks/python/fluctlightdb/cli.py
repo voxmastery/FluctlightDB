@@ -154,6 +154,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"  + {rel}")
     print("\nNext: pip install 'fluctlightdb[native,mcp]'")
     print("  fluctlight-project doctor")
+    print("  fluctlight-project ui          # handoff inbox in browser")
+    print("  fluctlight-project onboard     # guided setup")
     return 0
 
 
@@ -181,19 +183,33 @@ def _scaffold_cursor(root: Path, project_id: str, *, mcp_kwargs: dict[str, str],
             "session_end_hook": _hook_command("session_end"),
             "stop_handoff_hook": _hook_command("stop_handoff"),
             "track_files_hook": _hook_command("track_files"),
+            "before_submit_hook": _hook_command("before_submit"),
         }
         text = _render(hooks_src.read_text(encoding="utf-8"), **hook_render)
         if _write(hooks_dest, text, force=force):
             out.append(str(hooks_dest.relative_to(root)))
 
-    for script in ("session_start.py", "session_end.py", "stop_handoff.py", "track_files.py"):
+    for script in ("session_start.py", "session_end.py", "stop_handoff.py", "track_files.py", "before_submit.py"):
         src = _template_path(f"cursor/hooks/{script}")
         dest = root / ".cursor" / "hooks" / script
         if src.is_file() and _copy_executable(src, dest, force=force):
             out.append(str(dest.relative_to(root)))
 
+    rule_src = _template_path("cursor/rules/fluctlight.mdc")
+    rule_dest = root / ".cursor" / "rules" / "fluctlight.mdc"
+    if rule_src.is_file():
+        text = _render(rule_src.read_text(encoding="utf-8"), project_id=project_id)
+        if _write(rule_dest, text, force=force):
+            out.append(str(rule_dest.relative_to(root)))
+
     if is_windows():
-        for script in ("session_start.cmd", "session_end.cmd", "stop_handoff.cmd", "track_files.cmd"):
+        for script in (
+            "session_start.cmd",
+            "session_end.cmd",
+            "stop_handoff.cmd",
+            "track_files.cmd",
+            "before_submit.cmd",
+        ):
             src = _template_path(f"cursor/hooks/{script}")
             dest = root / ".cursor" / "hooks" / script
             if src.is_file() and _write(dest, src.read_text(encoding="utf-8"), force=force):
@@ -333,6 +349,46 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def cmd_sync(args: argparse.Namespace) -> int:
+    from .sync import sync_pull, sync_push, sync_status
+
+    try:
+        if args.action == "status":
+            result = sync_status(args.path)
+        elif args.action == "pull":
+            result = sync_pull(args.path, rebase=args.rebase)
+        else:
+            result = sync_push(args.path, message=args.message, auto_commit=not args.no_commit)
+        if args.json:
+            print(json.dumps({"ok": result.ok, "message": result.message, "stdout": result.stdout}))
+        else:
+            print(result.message)
+            if result.stderr:
+                print(result.stderr, file=sys.stderr)
+        return 0 if result.ok else 1
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+def cmd_ui(args: argparse.Namespace) -> int:
+    from .inbox_ui import serve_inbox
+
+    try:
+        serve_inbox(start=args.path, host=args.host, port=args.port)
+        return 0
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+def cmd_onboard(args: argparse.Namespace) -> int:
+    from .onboard import run_onboard
+
+    path = Path(args.path).resolve() if args.path else None
+    return run_onboard(path=path)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="fluctlight-project",
@@ -379,6 +435,25 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("path", nargs="?", help="Start directory for project discovery")
     doctor.add_argument("--json", action="store_true", help="Output JSON")
     doctor.set_defaults(func=cmd_doctor)
+
+    sync = sub.add_parser("sync", help="Git sync shared project brain + handoffs (team-sync mode)")
+    sync.add_argument("action", choices=["pull", "push", "status"], help="Sync action")
+    sync.add_argument("path", nargs="?", help="Project root")
+    sync.add_argument("--rebase", action="store_true", help="git pull --rebase")
+    sync.add_argument("--message", "-m", default="chore(fluctlight): sync project brain and handoffs")
+    sync.add_argument("--no-commit", action="store_true", help="Push only (skip auto-commit)")
+    sync.add_argument("--json", action="store_true")
+    sync.set_defaults(func=cmd_sync)
+
+    ui = sub.add_parser("ui", help="Local web UI for handoff inbox (http://127.0.0.1:8787)")
+    ui.add_argument("path", nargs="?", help="Project root")
+    ui.add_argument("--host", default="127.0.0.1")
+    ui.add_argument("--port", type=int, default=8787)
+    ui.set_defaults(func=cmd_ui)
+
+    onboard = sub.add_parser("onboard", help="Guided onboarding wizard")
+    onboard.add_argument("path", nargs="?", help="Project root")
+    onboard.set_defaults(func=cmd_onboard)
 
     return parser
 
