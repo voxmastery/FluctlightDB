@@ -2,7 +2,7 @@
 
 **The memory engine for AI agents** — not a vector database with an agent SDK bolted on.
 
-[![PyPI](https://pypi.org/project/fluctlightdb/)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB) · [Paper](https://search.ambugo.help/paper/)
+[![PyPI](https://pypi.org/project/fluctlightdb/)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB)
 
 ## Mission
 

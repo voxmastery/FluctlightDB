@@ -27,7 +27,7 @@ We believe long-term agent memory is a **third data model** (alongside relationa
 
 Typical fits: coding agents, ops/automation bots, research assistants, game NPCs, personal assistants with real continuity.
 
-Paper & positioning: [search.ambugo.help/paper](https://search.ambugo.help/paper/) · deep design: [Manifesto](docs/Manifesto.md)
+Deep design: [Manifesto](docs/Manifesto.md) · paper source: [`papers/arxiv-v1/`](papers/arxiv-v1/)
 
 ```bash
 pip install "fluctlightdb[native]"
@@ -89,7 +89,7 @@ Deep design: [Manifesto](docs/Manifesto.md). Brain-native internals are optional
 
 ## Benchmarks
 
-Frozen results: [`benchmarks/results/2025-06-22.json`](benchmarks/results/2025-06-22.json) · live paper viewer: [search.ambugo.help/paper](https://search.ambugo.help/paper/)
+Frozen results: [`benchmarks/results/2025-06-22.json`](benchmarks/results/2025-06-22.json)
 
 ### Latest measured results (June 2025)
 
