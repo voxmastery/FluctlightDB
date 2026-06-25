@@ -8,7 +8,7 @@ OWNER="${GITHUB_OWNER:-voxmastery}"
 REPO="${GITHUB_REPO:-FluctlightDB}"
 
 DESCRIPTION="Database engine for AI agents — write memory, recall by cue, trust sources over chat. Not SQL, vector DB, or mem0."
-HOMEPAGE="https://search.ambugo.help/paper/"
+HOMEPAGE="https://github.com/voxmastery/FluctlightDB"
 TOPICS='agent-memory ai-agents brain-native database docker episodic-memory llm memory pypi python rust'
 
 auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json")
