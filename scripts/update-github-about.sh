@@ -7,8 +7,8 @@ set -euo pipefail
 OWNER="${GITHUB_OWNER:-voxmastery}"
 REPO="${GITHUB_REPO:-FluctlightDB}"
 
-DESCRIPTION="Database engine for AI agents — write memory, recall by cue, trust sources over chat. Not SQL, vector DB, or mem0."
-HOMEPAGE="https://pypi.org/project/fluctlightdb/"
+DESCRIPTION="Embedded memory engine for AI agents: third data model (not SQL/vectors). experience()+activate(), provenance, benchmarks. Goal: SQLite for agent memory."
+HOMEPAGE="https://search.ambugo.help/paper/"
 TOPICS='agent-memory ai-agents brain-native database docker episodic-memory llm memory pypi python rust'
 
 auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}" -H "Accept: application/vnd.github+json")

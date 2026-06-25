@@ -6,6 +6,21 @@ Your agent gets a **persistent brain on disk**: it **writes experiences**, **rec
 
 [![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB)
 
+## Mission
+
+**Goal:** become the default **embedded memory substrate** for AI agents — the way SQLite became the default embedded DB for apps.
+
+We believe long-term agent memory is a **third data model** (alongside relational facts and vector similarity), not a feature bolted onto someone else's store. FluctlightDB exists to:
+
+1. **Define that model** — episodes (engrams), cue-driven recall, provenance, consolidation — as engine-level semantics, not app glue.
+2. **Ship an embedded engine** — `experience()` / `activate()` / `checkpoint()`, one durable store per agent, Rust core, no required cloud.
+3. **Prove it with public benchmarks** — LoCoMo evidence recall, BEIR IR parity, agent-specific FAMB — with frozen, reproducible numbers.
+4. **Stay honest about scope** — memory for agents, not a replacement for Postgres, not a doc-search index, not a managed Mem0-style SaaS.
+
+**Who it's for:** developers building coding agents, ops bots, research assistants, game NPCs, or any system where the agent must **remember across sessions** and **trust ledgers/files over chat**.
+
+Paper & positioning: [search.ambugo.help/paper](https://search.ambugo.help/paper/) · deep design: [Manifesto](docs/Manifesto.md)
+
 ```bash
 pip install "fluctlightdb[native]"
 ```
@@ -180,6 +195,7 @@ Production: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md)
 |-----|-----|
 | **[Getting started](docs/GETTING_STARTED.md)** | Paths, storage, FAQ |
 | **[BENCHMARKS.md](docs/BENCHMARKS.md)** | Paper-ready eval + citations |
+| **[PLATFORMS.md](docs/PLATFORMS.md)** | GitHub, PyPI, Docker, HF, arXiv checklist |
 | **[RESEARCH.md](docs/RESEARCH.md)** | Submission checklist |
 | [CLI.md](docs/CLI.md) | `fluctlight shell` |
 | [Manifesto.md](docs/Manifesto.md) | Brain-native design |
