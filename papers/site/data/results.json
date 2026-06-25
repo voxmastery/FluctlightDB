@@ -46,8 +46,7 @@
         "hits": "14/20",
         "sec_per_question": 30.4
       },
-      "harness": "benchmarks/run_longmemeval.sh",
-      "viewer": "https://search.ambugo.help/paper/"
+      "harness": "benchmarks/run_longmemeval.sh"
     }
   }
 }

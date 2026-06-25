@@ -7,7 +7,7 @@ While arXiv cs.DB endorsement is pending, keep messaging aligned everywhere.
 > **Goal:** SQLite for agent memory.  
 > **Claim:** Long-term agent memory is a **third data model** — native `experience()` / `activate()` in an embedded Rust engine, not a vector DB wrapper or Mem0-style chat layer.  
 > **Proof:** LoCoMo **98.1%** evidence recall, BEIR SciFact parity, FAMB 97–98%.  
-> **Paper:** https://search.ambugo.help/paper/
+> **Paper:** `papers/arxiv-v1/` in the repo (private draft workflow).
 
 ---
 
@@ -19,7 +19,7 @@ While arXiv cs.DB endorsement is pending, keep messaging aligned everywhere.
 | **PyPI** `fluctlightdb` | https://pypi.org/project/fluctlightdb/ | Live (0.4.3) | Bump `sdks/python/pyproject.toml` → tag or `workflow_dispatch` **Publish to PyPI** |
 | **PyPI** `fluctlightdb-native` | https://pypi.org/project/fluctlightdb-native/ | Live | Same release workflow (native wheels) |
 | **GHCR Docker** | `ghcr.io/voxmastery/fluctlightdb` | Live | Image labels in `Dockerfile`; new image on **Release** workflow |
-| **Paper viewer** | https://search.ambugo.help/paper/ | Live | `./papers/site/install-search-site.sh` after `papers/` edits |
+| **Paper (LaTeX)** | `papers/arxiv-v1/` in repo | Draft | arXiv when ready — no public viewer URL in README |
 | **crates.io** | (optional) | Not published | `cargo publish -p fluctlightdb` when ready |
 | **Hugging Face** | https://huggingface.co/voxmastery (create org) | Todo | Use `hub/README.md` as org profile; optional Space linking to paper |
 | **arXiv** | cs.DB | Pending endorsement | `papers/arxiv-v1/` + `papers/site/files/guide.md` |

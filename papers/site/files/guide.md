@@ -115,5 +115,4 @@ Upload `main.pdf` to arXiv; optionally upload source zip.
 
 ## Live viewer
 
-This page: **https://search.ambugo.help/paper/**  
-Brain dashboard (same auth): **https://search.ambugo.help/brain/**
+Private VPS viewer (not public). Deploy with `papers/site/install-search-site.sh` on your host.
