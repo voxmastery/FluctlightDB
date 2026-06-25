@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <base href="/paper/" />
+  <title>FluctlightDB Paper — Draft Viewer</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>FluctlightDB · Research Paper</h1>
+      <div class="sub">search.ambugo.help/paper · draft viewer &amp; submission guide</div>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#draft" data-page="draft" class="active">Draft</a>
+      <a href="#guide" data-page="guide">Format &amp; models</a>
+      <a href="#downloads" data-page="downloads">Downloads</a>
+    </nav>
+  </header>
+
+  <div class="layout">
+    <aside class="panel">
+      <h2>Frozen metrics</h2>
+      <ul id="metrics-sidebar">
+        <li>LoCoMo evidence recall <span class="metric">98.1%</span></li>
+        <li>BEIR SciFact nDCG@10 <span class="metric">0.645</span></li>
+        <li>FAMB macro (index) <span class="metric">98%</span></li>
+        <li>LongMemEval-S <span class="metric">deferred</span></li>
+      </ul>
+      <h2 style="margin-top:18px">Status</h2>
+      <ul>
+        <li><span class="tag">RETRIEVAL</span> LoCoMo complete</li>
+        <li><span class="tag">DRAFT</span> arXiv v1 LaTeX</li>
+        <li><span class="tag">LLM QA</span> pending quota</li>
+      </ul>
+    </aside>
+
+    <main class="content">
+      <section id="page-draft" class="page panel active">
+        <div class="paper-body" id="draft-root"></div>
+      </section>
+
+      <section id="page-guide" class="page panel">
+        <div class="paper-body" id="guide-root"></div>
+      </section>
+
+      <section id="page-downloads" class="page panel">
+        <h2 class="paper-title" style="font-size:1.2rem">Downloads</h2>
+        <p class="paper-meta">Source files from the repo · build PDF locally with pdfLaTeX</p>
+        <div class="dl-grid">
+          <div class="dl-card">
+            <h3>main.tex</h3>
+            <p>Full LaTeX manuscript (arxiv-v1)</p>
+            <a href="files/main.tex" download>Download .tex</a>
+          </div>
+          <div class="dl-card">
+            <h3>references.bib</h3>
+            <p>Bibliography (LoCoMo, LongMemEval, BEIR)</p>
+            <a href="files/references.bib" download>Download .bib</a>
+          </div>
+          <div class="dl-card">
+            <h3>results JSON</h3>
+            <p>Frozen benchmark numbers</p>
+            <a href="data/results.json" download>Download JSON</a>
+          </div>
+          <div class="dl-card">
+            <h3>draft.md</h3>
+            <p>Markdown mirror for editing</p>
+            <a href="files/draft.md" download>Download .md</a>
+          </div>
+        </div>
+        <div class="note" style="margin-top:20px">
+          PDF is not built on this VPS (no TeX installed). On a machine with TeX:
+          <code>cd papers/arxiv-v1 &amp;&amp; pdflatex main.tex &amp;&amp; bibtex main &amp;&amp; pdflatex main.tex</code>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
