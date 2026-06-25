@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "fluctlight": {
+      "command": "python3",
+      "args": ["-m", "fluctlightdb.mcp_server"],
+      "env": {
+        "FLUCTLIGHT_AGENT": "cursor"
+      }
+    }
+  }
+}

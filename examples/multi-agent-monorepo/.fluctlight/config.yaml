@@ -1,0 +1,14 @@
+version: 1
+project_id: demo-monorepo
+brains:
+  project: project
+  agents:
+    cursor: agents/cursor
+    claude: agents/claude
+    codex: agents/codex
+serve:
+  enabled: false
+defaults:
+  agent: auto
+git:
+  ignore_brains: true
