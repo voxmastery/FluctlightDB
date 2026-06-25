@@ -19,13 +19,16 @@ Long-term agent memory is a **third data model** (alongside relational facts and
 
 **Who it's for** — build with FluctlightDB when your agent needs to:
 
+- **Learn and retain over time** — accumulate what it picked up from chat, tools, files, APIs, and observations; not reset every session
 - **Remember across sessions** — restarts, days or weeks of work, not just the current context window
-- **Ingest many kinds of input** — user messages, tool/API output, files, logs, codebase reads, observations
 - **Recall from a vague cue** — the user asks differently than how the fact was stored
 - **Prefer evidence over chat** — ground-truth memories (tool results, files, verified data) outrank casual conversation or model guesses at recall time
-- **Run embedded** — one durable brain per agent on disk, no required memory SaaS
+- **Run embedded** — one durable brain on disk (or your VPS / your git), no required memory SaaS
+- **Share a repo brain across tools** — Cursor, Claude Code, Codex in one monorepo with handoffs (`fluctlight-project init`)
 
-Typical fits: coding agents, ops/automation bots, research assistants, game NPCs, personal assistants with real continuity.
+Typical fits: coding agents (solo or multi-tool teams), ops/automation bots, research assistants, game NPCs, personal assistants with real continuity.
+
+Managed cloud hosting is **not required** — git sync, local/VPS embedded brains, or your own `fluctlight-serve` hub are supported today. Optional managed sync is roadmap.
 
 Deep design: [Manifesto](docs/Manifesto.md) · paper source: [`papers/arxiv-v1/`](papers/arxiv-v1/)
 
