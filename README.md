@@ -30,6 +30,17 @@ Typical fits: coding agents (solo or multi-tool teams), ops/automation bots, res
 
 Managed cloud hosting is **not required** — git sync, local/VPS embedded brains, or your own `fluctlight-serve` hub are supported today. Optional managed sync is roadmap.
 
+### What we mean by “learning”
+
+**Not model training.** We do not update LLM weights. **Learning** here means **operational memory**:
+
+1. **Write** — the agent encodes episodes with context and salience (`experience()`).
+2. **Link & rank** — related memories connect; trusted sources outrank chat (graph activation, provenance).
+3. **Consolidate** — sleep/compaction prunes noise over time (`sleep()`, `checkpoint()`).
+4. **Recall** — a new cue activates what mattered before (`activate()`), even under paraphrase.
+
+The store gets richer and more useful the longer the agent runs. Chat logs and raw vectors alone do not provide that lifecycle — a **memory engine** does. Deeper framing: [Manifesto](docs/Manifesto.md) (*“learning is plasticity”* — Hebbian links, consolidation, growth).
+
 Deep design: [Manifesto](docs/Manifesto.md) · paper source: [`papers/arxiv-v1/`](papers/arxiv-v1/)
 
 ```bash
@@ -93,8 +104,9 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 ## Where it is going
 
 - **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo evidence recall** (full 10-conversation set), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
-- **Next:** full LongMemEval-S retrieval run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories.
+- **Next:** full LongMemEval-S retrieval run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
 - **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
+- **Long-term vision:** **foundational memory infrastructure** for durable, trustworthy autonomy — the persistence layer between a stateless LLM call and agents (or stacks) that must operate over weeks, prefer evidence over chat, and carry identity across tools. We are building the **database for that layer**, not claiming to be AGI. Any serious path toward general, long-horizon autonomy still needs a third data model for *what was learned and what can be trusted*; FluctlightDB is that engine.
 
 ---
 

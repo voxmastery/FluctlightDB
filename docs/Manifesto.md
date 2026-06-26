@@ -17,6 +17,9 @@ FluctlightDB exists so agents can:
 1. **Memory is physical** — engrams are neuron ensembles + synapses, not rows or vectors.
 2. **Recall is activation** — thoughts spread through a graph; they are not similarity searches.
 3. **Learning is plasticity** — Hebbian strengthening, neuromodulator gating, sleep consolidation.
+
+   In product terms (see [README](../README.md#what-we-mean-by-learning)): **learning is not model training**. It is **operational memory** — `experience()` to encode, `activate()` to recall under new cues, `sleep()` / `checkpoint()` to consolidate. The brain file gets richer and more linked the longer the agent lives.
+
 4. **Growth is developmental** — baby → adult; capability emerges from living, not from config.
 5. **Life has chapters** — episodic memory can reset; core identity can endure.
 6. **No vector DB as primary store** — vectors may assist later; they are not the mind.
@@ -32,6 +35,12 @@ Any autonomous or semi-autonomous agent that should get **smarter over time**:
 - Multi-agent systems where each agent carries its own brain
 
 FluctlightDB is **agent infrastructure**, not tied to any single product or company.
+
+## Long-term vision
+
+FluctlightDB aims to be **foundational memory infrastructure** for durable, trustworthy autonomy: the layer between a stateless LLM call and systems that must run for weeks, integrate tools and files as evidence, and carry continuity across sessions and agents.
+
+We are building the **database engine for that layer** — SQLite for *what agents learn* — not claiming to be AGI. Any serious path toward general, long-horizon autonomous intelligence still needs a third data model for *what was learned and what can be trusted*; relational and vector stores were not designed to answer that question.
 
 ## What we reject
 
