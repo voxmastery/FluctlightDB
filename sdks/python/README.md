@@ -12,6 +12,8 @@ Long-term agent memory is a **third data model** (alongside relational facts and
 
 **Who it's for** — agents that **learn and retain** across sessions (from chat, tools, files, and APIs), recall under paraphrase, prefer **verified evidence** over casual conversation at recall time, and — in monorepos — **share a project brain** across Cursor, Claude Code, and Codex (`fluctlight-project init`). No hosted SaaS required.
 
+**What “learning” means** — not fine-tuning. The agent **writes** episodes (`experience()`), **recalls** under new cues (`activate()`), and **consolidates** over time (`sleep()` / `checkpoint()`). See the [full README](https://github.com/voxmastery/FluctlightDB#what-we-mean-by-learning) and [Manifesto](https://github.com/voxmastery/FluctlightDB/blob/main/docs/Manifesto.md).
+
 Typical fits: coding agents, ops bots, research assistants, NPCs.
 
 ## Install
