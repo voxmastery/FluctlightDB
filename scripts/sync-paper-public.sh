@@ -3,17 +3,12 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PUBLIC="$ROOT/papers/public"
-SITE="$ROOT/papers/site"
 ARXIV="$ROOT/papers/arxiv-v1"
 
 mkdir -p "$PUBLIC"/{assets,files,data}
 
-cp "$SITE/assets/style.css" "$PUBLIC/assets/style.css"
-cp "$SITE/assets/app.js" "$PUBLIC/assets/app.js"
 cp "$ARXIV/main.tex" "$PUBLIC/files/main.tex"
 cp "$ARXIV/references.bib" "$PUBLIC/files/references.bib"
-cp "$SITE/files/draft.md" "$PUBLIC/files/draft.md"
-cp "$SITE/files/guide.md" "$PUBLIC/files/guide.md"
 cp "$ROOT/benchmarks/results/2025-06-22.json" "$PUBLIC/data/results.json" 2>/dev/null || true
 
 # index.html — public preprint (no nginx /paper base path)

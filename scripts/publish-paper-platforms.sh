@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sync paper artifacts for Hugging Face + private VPS viewer.
+# Sync paper artifacts for Hugging Face + papers/public viewer.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -11,7 +11,6 @@ echo ""
 echo "Hugging Face (HF_ORG=${HF_ORG:-Voxiesz}):"
 echo "  bash scripts/publish-paper-huggingface.sh"
 echo ""
-echo "Private VPS viewer:"
-echo "  ./papers/site/install-search-site.sh"
+echo "Public paper site: papers/public/ (HF Space + local static)"
 echo ""
 echo "Venue plan: docs/RESEARCH_VENUES.md"

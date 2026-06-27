@@ -115,4 +115,4 @@ Upload `main.pdf` to arXiv; optionally upload source zip.
 
 ## Live viewer
 
-Private VPS viewer (not public). Deploy with `papers/site/install-search-site.sh` on your host.
+Public static site in `papers/public/` — sync with `bash scripts/sync-paper-public.sh` (HF Space uses the same tree).
