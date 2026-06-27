@@ -15,7 +15,7 @@ datasets:
 
 **Preprint · June 2025 · arXiv cs.DB (submission pending)**
 
-**Author:** Ganesh S · [ORCID 0009-0006-7758-4114](https://orcid.org/0009-0006-7758-4114) · voxmastery@ambugo.tech
+**Author:** Ganesh S · [ORCID 0009-0006-7758-4114](https://orcid.org/0009-0006-7758-4114) · voxmastery@gmail.com
 
 ## One-line claim
 

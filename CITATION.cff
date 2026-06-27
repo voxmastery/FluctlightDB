@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: S
     given-names: Ganesh
-    email: voxmastery@ambugo.tech
+    email: voxmastery@gmail.com
     orcid: "https://orcid.org/0009-0006-7758-4114"
 repository-code: "https://github.com/voxmastery/FluctlightDB"
 url: "https://github.com/voxmastery/FluctlightDB"
