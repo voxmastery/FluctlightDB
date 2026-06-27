@@ -41,8 +41,8 @@ cd FluctlightDB
 
 ## Paper
 
-- Draft: https://voxmastery.github.io/FluctlightDB/paper/
-- Card: https://huggingface.co/voxmastery/fluctlightdb-paper
+- LaTeX: https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
+- Card: https://huggingface.co/Voxiesz/fluctlightdb-paper
 
 ## Citation
 

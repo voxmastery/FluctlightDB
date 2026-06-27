@@ -41,7 +41,7 @@ Managed cloud hosting is **not required** — git sync, local/VPS embedded brain
 
 The store gets richer and more useful the longer the agent runs. Chat logs and raw vectors alone do not provide that lifecycle — a **memory engine** does. Deeper framing: [Manifesto](docs/Manifesto.md) (*“learning is plasticity”* — Hebbian links, consolidation, growth).
 
-Deep design: [Manifesto](docs/Manifesto.md) · **Research preprint:** [Paper draft](https://voxmastery.github.io/FluctlightDB/) · LaTeX: [`papers/arxiv-v1/`](papers/arxiv-v1/)
+Deep design: [Manifesto](docs/Manifesto.md) · paper LaTeX: [`papers/arxiv-v1/`](papers/arxiv-v1/) · [where to publish](docs/RESEARCH_VENUES.md)
 
 ```bash
 pip install "fluctlightdb[native]"
@@ -55,20 +55,6 @@ brain.experience("User prefers dark mode", context="settings", salience=0.8)
 print(brain.activate("theme preference"))
 brain.checkpoint()
 ```
-
-## Research paper (preprint)
-
-Public draft (arXiv pending): **[voxmastery.github.io/FluctlightDB](https://voxmastery.github.io/FluctlightDB/)**
-
-| Platform | Link |
-|----------|------|
-| GitHub Pages | https://voxmastery.github.io/FluctlightDB/ |
-| Hugging Face | https://huggingface.co/voxmastery/fluctlightdb-paper |
-| Benchmarks dataset | https://huggingface.co/datasets/voxmastery/fluctlightdb-benchmarks |
-| LaTeX source | [`papers/arxiv-v1/`](papers/arxiv-v1/) |
-| Cite | [`CITATION.cff`](CITATION.cff) |
-
-Publish / update all platforms: **[docs/PUBLISH_PAPER.md](docs/PUBLISH_PAPER.md)**
 
 ---
 

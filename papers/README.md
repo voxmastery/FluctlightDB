@@ -18,7 +18,7 @@ cd papers/arxiv-v1
 ./build.sh
 ```
 
-See `docs/BENCHMARKS.md` for eval protocol and `docs/RESEARCH.md` for submission checklist.
+See `docs/BENCHMARKS.md` for eval protocol, `docs/RESEARCH_VENUES.md` for where to publish, and `docs/PUBLISH_PAPER.md` for HF/Zenodo steps.
 
 ## Results archive
 
