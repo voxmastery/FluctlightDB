@@ -38,4 +38,4 @@ pip install "fluctlightdb[native]"
 - [Benchmarks dataset](https://huggingface.co/datasets/Voxiesz/fluctlightdb-benchmarks)
 - [Paper viewer Space](https://huggingface.co/spaces/Voxiesz/fluctlightdb-paper-viewer)
 - [Paper source (LaTeX)](https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1)
-- [Where to publish](https://github.com/voxmastery/FluctlightDB/blob/main/docs/RESEARCH_VENUES.md)
+- [Zenodo DOI](https://doi.org/10.5281/zenodo.20949890)

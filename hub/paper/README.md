@@ -61,7 +61,6 @@ brain.checkpoint()
 | **Interactive viewer (Space)** | https://huggingface.co/spaces/Voxiesz/fluctlightdb-paper-viewer |
 | **GitHub** | https://github.com/voxmastery/FluctlightDB |
 | **PyPI** | https://pypi.org/project/fluctlightdb/ |
-| **Venue plan** | https://github.com/voxmastery/FluctlightDB/blob/main/docs/RESEARCH_VENUES.md |
 | **Reproduce benchmarks** | https://github.com/voxmastery/FluctlightDB/tree/main/benchmarks |
 
 ## Citation

@@ -157,7 +157,7 @@ PYTHONPATH=sdks/python python benchmarks/locomo_eval.py --mode index --rag-mode 
 PYTHONPATH=sdks/python python benchmarks/longmemeval_bench.py --mode index
 ```
 
-Full citations and paper protocol: **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)** · **[benchmarks/README.md](benchmarks/README.md)** · **[Launch the paper](docs/WORLD_LAUNCH.md)**
+Full citations and paper protocol: **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)** · **[benchmarks/README.md](benchmarks/README.md)** · **[Paper (LaTeX)](papers/arxiv-v1/)** · **DOI [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890)**
 
 ## Quick start
 
@@ -269,12 +269,11 @@ Production: [DEPLOYMENT.md](docs/DEPLOYMENT.md) · [DOCKER.md](docs/DOCKER.md)
 |-----|-----|
 | **[Getting started](docs/GETTING_STARTED.md)** | Paths, storage, FAQ |
 | **[BENCHMARKS.md](docs/BENCHMARKS.md)** | Paper-ready eval + citations |
-| **[PLATFORMS.md](docs/PLATFORMS.md)** | GitHub, PyPI, Docker, HF, arXiv checklist |
 | **[MULTI_AGENT.md](docs/MULTI_AGENT.md)** | Hub + spoke brains, MCP, hooks, handoffs |
 | **[ONBOARDING.md](docs/ONBOARDING.md)** | 5-minute setup · `fluctlight-project onboard` |
 | **[VPS_DESKTOP.md](docs/VPS_DESKTOP.md)** | Cursor CLI on VPS + local desktop |
 | **[PLATFORM_COMPAT.md](docs/PLATFORM_COMPAT.md)** | Windows / macOS / Linux matrix |
-| **[RESEARCH.md](docs/RESEARCH.md)** | Submission checklist |
+| [PUBLISHING.md](docs/PUBLISHING.md) | PyPI release (maintainers) |
 | [CLI.md](docs/CLI.md) | `fluctlight shell` |
 | [Manifesto.md](docs/Manifesto.md) | Brain-native design |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Rust/Python contributors |
