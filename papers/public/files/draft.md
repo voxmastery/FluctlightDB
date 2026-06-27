@@ -4,7 +4,7 @@
 
 **Author:** Ganesh S — Independent Researcher · voxmastery@ambugo.tech  
 **ORCID:** [0009-0006-7758-4114](https://orcid.org/0009-0006-7758-4114)  
-**Date:** June 2025 · **Draft:** arxiv-v1
+**Date:** June 2026 · **Draft:** arxiv-v1
 
 ## Abstract
 

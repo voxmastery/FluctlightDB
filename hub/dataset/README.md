@@ -17,7 +17,7 @@ size_categories:
 
 # FluctlightDB — Frozen Benchmark Results
 
-Official frozen metrics for the FluctlightDB research paper (June 2025).
+Official frozen metrics for the FluctlightDB research paper (June 2026).
 
 ## Files
 

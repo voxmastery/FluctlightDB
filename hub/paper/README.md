@@ -13,7 +13,7 @@ datasets:
 
 # FluctlightDB: A Memory Model of Data for AI Agents
 
-**Preprint · June 2025 · arXiv cs.DB (submission pending)**
+**Preprint · June 2026 · arXiv cs.DB (submission pending)**
 
 **Author:** Ganesh S · [ORCID 0009-0006-7758-4114](https://orcid.org/0009-0006-7758-4114) · voxmastery@gmail.com
 
