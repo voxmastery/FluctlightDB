@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ORG="${HF_ORG:-voxmastery}"
 PAPER_REPO="${ORG}/fluctlightdb-paper"
 BENCH_REPO="${ORG}/fluctlightdb-benchmarks"
-SPACE_REPO="spaces/${ORG}/fluctlightdb-paper-viewer"
+SPACE_REPO="${ORG}/fluctlightdb-paper-viewer"
 
 bash "$ROOT/scripts/sync-paper-public.sh"
 
