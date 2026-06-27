@@ -157,7 +157,7 @@ PYTHONPATH=sdks/python python benchmarks/locomo_eval.py --mode index --rag-mode 
 PYTHONPATH=sdks/python python benchmarks/longmemeval_bench.py --mode index
 ```
 
-Full citations and paper protocol: **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)** · **[benchmarks/README.md](benchmarks/README.md)**
+Full citations and paper protocol: **[docs/BENCHMARKS.md](docs/BENCHMARKS.md)** · **[benchmarks/README.md](benchmarks/README.md)** · **[Launch the paper](docs/WORLD_LAUNCH.md)**
 
 ## Quick start
 
