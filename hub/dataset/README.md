@@ -41,6 +41,7 @@ cd FluctlightDB
 
 ## Paper
 
+- DOI: https://doi.org/10.5281/zenodo.20949890
 - LaTeX: https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
 - Card: https://huggingface.co/Voxiesz/fluctlightdb-paper
 

@@ -41,7 +41,7 @@ Managed cloud hosting is **not required** — git sync, local/VPS embedded brain
 
 The store gets richer and more useful the longer the agent runs. Chat logs and raw vectors alone do not provide that lifecycle — a **memory engine** does. Deeper framing: [Manifesto](docs/Manifesto.md) (*“learning is plasticity”* — Hebbian links, consolidation, growth).
 
-Deep design: [Manifesto](docs/Manifesto.md) · paper LaTeX: [`papers/arxiv-v1/`](papers/arxiv-v1/) · [where to publish](docs/RESEARCH_VENUES.md)
+Deep design: [Manifesto](docs/Manifesto.md) · **Paper DOI:** [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890) · LaTeX: [`papers/arxiv-v1/`](papers/arxiv-v1/)
 
 ```bash
 pip install "fluctlightdb[native]"

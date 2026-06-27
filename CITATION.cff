@@ -25,5 +25,6 @@ preferred-citation:
     - family-names: S
       given-names: Ganesh
   year: 2026
-  notes: "Preprint. arXiv submission pending. LaTeX: https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1"
-  url: "https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1"
+  doi: 10.5281/zenodo.20949890
+  notes: "Zenodo preprint. arXiv cs.DB submission pending."
+  url: "https://doi.org/10.5281/zenodo.20949890"
