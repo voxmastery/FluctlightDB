@@ -22,7 +22,7 @@ Become **SQLite for agent memory**: one durable store per agent, cue-driven reca
 pip install "fluctlightdb[native]"
 ```
 
-## Results (June 2025)
+## Results (June 2026)
 
 | Benchmark | Result |
 |-----------|--------|

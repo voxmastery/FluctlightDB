@@ -114,7 +114,7 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 Frozen results: [`benchmarks/results/2025-06-22.json`](benchmarks/results/2025-06-22.json)
 
-### Latest measured results (June 2025)
+### Latest measured results (June 2026)
 
 | Benchmark | Metric | FluctlightDB | Baseline / note |
 |-----------|--------|--------------|-----------------|
