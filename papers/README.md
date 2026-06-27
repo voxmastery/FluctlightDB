@@ -1,25 +1,26 @@
 # FluctlightDB Paper Series
 
-Publication order (planned):
+LaTeX preprint and reproducible benchmarks live in this repository.
 
-| # | Venue | Title (working) | Status |
-|---|-------|-----------------|--------|
-| 1 | **arXiv cs.DB** | FluctlightDB: A Brain-Native Memory Engine for AI Agents | `arxiv-v1/` draft started |
-| 2 | **CIDR 2027** (target) | Short visionary / systems paper | outline after arXiv feedback |
-| 3 | **VLDB/SIGMOD** (target) | Full evaluation + scale | after benchmark freeze |
+| Artifact | Location |
+|----------|----------|
+| **Manuscript (LaTeX)** | `papers/arxiv-v1/` |
+| **Static viewer** | `papers/public/` (HF Space source) |
+| **Frozen metrics** | `benchmarks/results/` |
+| **Cite** | [CITATION.cff](../CITATION.cff) · [Zenodo DOI](https://doi.org/10.5281/zenodo.20949890) |
 
-## Paper 1 — arXiv cs.DB
-
-Directory: `papers/arxiv-v1/`
+## Build PDF
 
 ```bash
 cd papers/arxiv-v1
-# requires latex: pdflatex main.tex && bibtex main && pdflatex main.tex
-./build.sh
+./build.sh   # requires pdflatex + bibtex
 ```
 
-See `docs/BENCHMARKS.md` for eval protocol, `docs/RESEARCH_VENUES.md` for where to publish, and `docs/PUBLISH_PAPER.md` for HF/Zenodo steps.
+## Sync public viewer + Hugging Face
 
-## Results archive
+```bash
+bash scripts/sync-paper-public.sh
+bash scripts/publish-paper-huggingface.sh   # after hf auth login
+```
 
-After each benchmark run, copy JSON/summary to `benchmarks/results/` with date stamp.
+Eval protocol: `docs/BENCHMARKS.md`.

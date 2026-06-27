@@ -141,4 +141,4 @@ See [examples/multi-agent-monorepo](../examples/multi-agent-monorepo/).
 
 - [PLATFORM_COMPAT.md](PLATFORM_COMPAT.md)
 - [GETTING_STARTED.md](GETTING_STARTED.md)
-- [PLATFORMS.md](PLATFORMS.md)
+- [PUBLISHING.md](PUBLISHING.md)
