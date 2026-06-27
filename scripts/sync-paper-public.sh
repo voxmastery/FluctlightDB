@@ -34,7 +34,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
   <header class="topbar">
     <div>
       <h1>FluctlightDB · Research Paper</h1>
-      <div class="sub">Preprint · arXiv cs.DB (pending) · June 2025</div>
+      <div class="sub">Preprint · arXiv cs.DB (pending) · June 2026</div>
     </div>
     <nav class="nav" id="nav">
       <a href="#draft" data-page="draft" class="active">Draft</a>

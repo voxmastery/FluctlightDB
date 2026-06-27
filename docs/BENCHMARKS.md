@@ -74,7 +74,7 @@ Index-mode query latency uses slim vector-fast recalls (large doc bodies omitted
 | **Status** | **Full eval complete** — 98.1% mean evidence recall (10 conv, k=150, hybrid); frozen in `benchmarks/results/2025-06-22.json` |
 | **In-repo** | `benchmarks/locomo_eval.py`, `benchmarks/locomo_metrics.py` |
 
-**FluctlightDB results (June 2025):**
+**FluctlightDB results (June 2026, frozen run 2025-06-22):**
 
 | Run | Mean evidence recall | Evidence hits | Wall time |
 |-----|---------------------|---------------|-----------|
