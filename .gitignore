@@ -3,6 +3,7 @@
 *.pyc
 __pycache__/
 .venv/
+.bench-venv/
 embed-server/.venv/
 embed-server/__pycache__/
 *.egg-info/
@@ -15,3 +16,12 @@ dist/
 .fluctlight_history
 --path
 *.whl
+
+# Local-only — grants, funding manifests, journal kits (see private.example/README.md)
+/private/
+docs/grants/
+docs/GRANTS.md
+funding.json
+.well-known/funding-manifest-urls
+papers/submit/ieee-access/
+papers/site/
