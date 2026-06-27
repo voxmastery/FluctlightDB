@@ -33,7 +33,7 @@ brain.checkpoint()
 
 HTTP-only (no Rust extension): `pip install fluctlightdb`
 
-## Benchmarks (June 2025)
+## Benchmarks (June 2026)
 
 | Benchmark | Metric | Result |
 |-----------|--------|--------|
