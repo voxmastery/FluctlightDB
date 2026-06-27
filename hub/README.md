@@ -32,10 +32,10 @@ pip install "fluctlightdb[native]"
 
 ## Links
 
-- [Public paper preprint](https://voxmastery.github.io/FluctlightDB/)
 - [GitHub](https://github.com/voxmastery/FluctlightDB)
 - [PyPI](https://pypi.org/project/fluctlightdb/)
-- [Paper card (HF)](https://huggingface.co/voxmastery/fluctlightdb-paper)
-- [Benchmarks dataset](https://huggingface.co/datasets/voxmastery/fluctlightdb-benchmarks)
+- [Paper card (HF)](https://huggingface.co/Voxiesz/fluctlightdb-paper)
+- [Benchmarks dataset](https://huggingface.co/datasets/Voxiesz/fluctlightdb-benchmarks)
+- [Paper viewer Space](https://huggingface.co/spaces/Voxiesz/fluctlightdb-paper-viewer)
 - [Paper source (LaTeX)](https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1)
-- [Benchmarks JSON](https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/2025-06-22.json)
+- [Where to publish](https://github.com/voxmastery/FluctlightDB/blob/main/docs/RESEARCH_VENUES.md)

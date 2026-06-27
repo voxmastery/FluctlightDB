@@ -8,7 +8,7 @@ tags:
   - llm
   - research-paper
 datasets:
-  - voxmastery/fluctlightdb-benchmarks
+  - Voxiesz/fluctlightdb-benchmarks
 ---
 
 # FluctlightDB: A Memory Model of Data for AI Agents
@@ -29,7 +29,7 @@ Long-term agent memory is a **third data model** — not SQL rows, not vector AN
 | **BEIR SciFact** | nDCG@10 | **0.645** (ties Chroma + MiniLM) |
 | **FAMB** | Macro (index / agent) | **98% / 97%** |
 
-Frozen metrics: [fluctlightdb-benchmarks](https://huggingface.co/datasets/voxmastery/fluctlightdb-benchmarks)
+Frozen metrics: [fluctlightdb-benchmarks](https://huggingface.co/datasets/Voxiesz/fluctlightdb-benchmarks)
 
 ## Abstract
 
@@ -56,11 +56,11 @@ brain.checkpoint()
 
 | Resource | URL |
 |----------|-----|
-| **Public paper draft** | https://voxmastery.github.io/FluctlightDB/ |
-| **Interactive viewer (Space)** | https://huggingface.co/spaces/voxmastery/fluctlightdb-paper-viewer |
+| **LaTeX source** | https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1 |
+| **Interactive viewer (Space)** | https://huggingface.co/spaces/Voxiesz/fluctlightdb-paper-viewer |
 | **GitHub** | https://github.com/voxmastery/FluctlightDB |
 | **PyPI** | https://pypi.org/project/fluctlightdb/ |
-| **LaTeX source** | https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1 |
+| **Venue plan** | https://github.com/voxmastery/FluctlightDB/blob/main/docs/RESEARCH_VENUES.md |
 | **Reproduce benchmarks** | https://github.com/voxmastery/FluctlightDB/tree/main/benchmarks |
 
 ## Citation
@@ -71,7 +71,7 @@ brain.checkpoint()
   author={S, Ganesh},
   year={2025},
   note={Preprint. Software: https://github.com/voxmastery/FluctlightDB},
-  url={https://voxmastery.github.io/FluctlightDB/}
+  url={https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1}
 }
 ```
 

@@ -6,7 +6,7 @@ Not another vector DB wrapper. The native API is `experience()` and `activate()`
 
 The argument: agent memory is a third data model alongside relational facts and vector similarity. Rows answer "which records match?" Vectors answer "what's nearest?" Agents need "what did I learn, and what can I trust?"
 
-📄 Preprint: https://voxmastery.github.io/FluctlightDB/
+📄 Paper (LaTeX): https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
 💻 GitHub: https://github.com/voxmastery/FluctlightDB
 📦 pip install fluctlightdb[native]
 
