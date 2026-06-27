@@ -13,15 +13,13 @@ Embedded memory **database engine** for AI agents — not a vector DB wrapper.
 - **LoCoMo evidence recall:** 98.1% (full 10-conversation set, k=150)
 - **License:** MIT
 - **Links:**
-  - Preprint: https://voxmastery.github.io/FluctlightDB/
-  - GitHub: https://github.com/voxmastery/FluctlightDB
-  - PyPI: https://pypi.org/project/fluctlightdb/
-  - HF: https://huggingface.co/voxmastery/fluctlightdb-paper
+  - LaTeX: https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
+  - HF: https://huggingface.co/Voxiesz/fluctlightdb-paper
 
 ### Entry (paste into list)
 
 ```markdown
-- [FluctlightDB](https://github.com/voxmastery/FluctlightDB) - Embedded brain-native memory engine for agents (`experience`/`activate`). 98.1% LoCoMo evidence recall. [Paper](https://voxmastery.github.io/FluctlightDB/)
+- [FluctlightDB](https://github.com/voxmastery/FluctlightDB) - Embedded brain-native memory engine for agents (`experience`/`activate`). 98.1% LoCoMo evidence recall. [Paper source](https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1)
 ```
 
 ## Target lists

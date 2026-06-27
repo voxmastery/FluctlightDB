@@ -11,7 +11,7 @@ It's an embedded Rust engine (Python: `pip install fluctlightdb[native]`) with n
 - BEIR SciFact nDCG@10: **0.645** (ties Chroma + MiniLM)
 - FAMB: 97–98% macro
 
-Preprint draft: https://voxmastery.github.io/FluctlightDB/
+Paper + LaTeX: https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
 Code: https://github.com/voxmastery/FluctlightDB
 
 MIT. Happy to discuss the "third data model" framing vs Mem0/Zep-style layers.

@@ -2,7 +2,7 @@
 title: "FluctlightDB: SQLite for Agent Memory (98.1% LoCoMo Evidence Recall)"
 published: false
 tags: ai, agents, database, opensource, machinelearning
-canonical_url: https://voxmastery.github.io/FluctlightDB/
+canonical_url: https://github.com/voxmastery/FluctlightDB
 ---
 
 Every agent today remembers by stuffing context windows and vector stores. That is lookup, not memory.
@@ -45,10 +45,10 @@ brain.checkpoint()
 
 ## Read the paper
 
-Full preprint draft: **https://voxmastery.github.io/FluctlightDB/**
+Full paper (LaTeX): **https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1**
 
 - GitHub: https://github.com/voxmastery/FluctlightDB
-- Hugging Face: https://huggingface.co/voxmastery/fluctlightdb-paper
+- Hugging Face: https://huggingface.co/Voxiesz/fluctlightdb-paper
 - PyPI: https://pypi.org/project/fluctlightdb/
 
 MIT license. Benchmark harnesses included.

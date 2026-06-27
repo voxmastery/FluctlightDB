@@ -2,7 +2,7 @@
 # Upload paper card + benchmark dataset + static Space to Hugging Face.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ORG="${HF_ORG:-voxmastery}"
+ORG="${HF_ORG:-Voxiesz}"
 PAPER_REPO="${ORG}/fluctlightdb-paper"
 BENCH_REPO="${ORG}/fluctlightdb-benchmarks"
 SPACE_REPO="${ORG}/fluctlightdb-paper-viewer"
