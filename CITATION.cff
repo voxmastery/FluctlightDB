@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+title: "FluctlightDB: A Memory Model of Data for AI Agents"
+message: "If you use FluctlightDB in research, please cite our paper."
+type: software
+authors:
+  - family-names: S
+    given-names: Ganesh
+    email: voxmastery@ambugo.tech
+    orcid: "https://orcid.org/0009-0006-7758-4114"
+repository-code: "https://github.com/voxmastery/FluctlightDB"
+url: "https://github.com/voxmastery/FluctlightDB"
+license: MIT
+version: 0.5.0
+date-released: 2025-06-22
+keywords:
+  - agent memory
+  - database systems
+  - episodic memory
+  - vector retrieval
+  - AI agents
+preferred-citation:
+  type: article
+  title: "FluctlightDB: A Memory Model of Data for AI Agents"
+  authors:
+    - family-names: S
+      given-names: Ganesh
+  year: 2025
+  notes: "Preprint. arXiv submission pending. Public draft: https://voxmastery.github.io/FluctlightDB/"
+  url: "https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1"

@@ -1,0 +1,52 @@
+{
+  "date": "2025-06-22",
+  "harness": "FluctlightDB benchmark suite",
+  "mode_index": {
+    "beir_scifact": {
+      "ndcg_at_10": 0.6451,
+      "recall_at_10": 0.7833,
+      "recall_at_100": 0.925,
+      "query_ms": "4-7",
+      "chroma_query_ms": "4-7",
+      "embedder": "all-MiniLM-L6-v2 ONNX CPU"
+    },
+    "famb": {
+      "macro": 0.98,
+      "paraphrase_recall_at_1": 0.92,
+      "provenance_top1": 1.0,
+      "persistence": 1.0,
+      "confusion_ingest": 1.0,
+      "determinism": 1.0
+    },
+    "famb_agent_mode": {
+      "macro": 0.97,
+      "paraphrase_recall_at_1": 0.83
+    },
+    "locomo_full": {
+      "conversations": 10,
+      "memories_ingested": 8695,
+      "top_k": 150,
+      "mode": "index",
+      "rag_mode": "all",
+      "mean_evidence_recall": 0.981,
+      "evidence_all_in_context": 0.971,
+      "evidence_hits": "1925/1982",
+      "has_answer_in_context": 0.379,
+      "wall_s": 271,
+      "cpu_threads": 2,
+      "note": "official LoCoMo metrics; hybrid vector+BM25; embed cache warm"
+    },
+    "longmemeval_s": {
+      "status": "deferred",
+      "reason": "CPU-heavy per-question ingest (~30s/Q); run later with throttling",
+      "dataset": "/tmp/longmemeval/data/longmemeval_s_cleaned.json",
+      "questions": 500,
+      "pilot_n20": {
+        "answer_in_recall_at_8": 0.70,
+        "hits": "14/20",
+        "sec_per_question": 30.4
+      },
+      "harness": "benchmarks/run_longmemeval.sh"
+    }
+  }
+}
