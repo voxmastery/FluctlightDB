@@ -28,6 +28,7 @@ docs/PUBLISH_PAPER.md
 docs/PAPER_DRAFT.md
 papers/outreach/
 papers/submit/
+scripts/update-github-about.sh
 funding.json
 .well-known/funding-manifest-urls
 papers/submit/ieee-access/

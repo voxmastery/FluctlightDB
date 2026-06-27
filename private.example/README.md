@@ -15,6 +15,8 @@ Suggested layout:
 ├── outreach/            # HN, LinkedIn, Dev.to, awesome-list PR drafts
 ├── launch/              # WORLD_LAUNCH.md, launch-paper.sh, release-notes
 ├── venues/              # RESEARCH_VENUES.md, PLATFORMS.md, PUBLISH_PAPER.md
+├── maintainer/          # update-github-about.sh, GitHub About sync
+├── preprint.pdf         # Local copy of paper PDF (GitHub Release is canonical)
 ├── ieee-access/         # Journal submission kit
 ├── funding.json         # FOSS funding manifest (if you use grants)
 └── papers-site/         # Optional private VPS deploy scripts
