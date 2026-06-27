@@ -1,0 +1,11 @@
+Highlights (3–5 bullets for IEEE Access submission form)
+
+• Defines agent memory as a third data model—distinct from relational and vector stores—with native write/read semantics (experience/activate).
+
+• Presents FluctlightDB, an embedded open-source engine (MIT) implementing episodic encoding, cue activation, provenance-weighted recall, and consolidation.
+
+• Achieves 98.1% evidence recall on the full LoCoMo benchmark (1,982 gold spans)—warm and cold-start identical.
+
+• Matches tuned Chroma + MiniLM on BEIR SciFact nDCG@10 while improving deep recall in agent mode; 97–98% macro on agent-specific FAMB suite.
+
+• Releases reproducible benchmark harnesses and frozen result JSON with the engine artifact.

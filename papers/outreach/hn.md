@@ -1,21 +1,32 @@
-Title suggestion: **FluctlightDB – embedded memory engine for AI agents (98.1% LoCoMo evidence recall)**
+Title: FluctlightDB – SQLite for agent memory (98.1% LoCoMo evidence recall, MIT, open source)
 
 ---
 
-We built FluctlightDB because vector search alone isn't agent memory.
+We built an embedded **database engine** for AI agent memory—not a vector DB wrapper, not a chat extraction layer.
 
-It's an embedded Rust engine (Python: `pip install fluctlightdb[native]`) with native `experience()` / `activate()` — encode episodes, recall from cues, boost verified sources over chat.
+Native API: `experience()` to encode episodes, `activate()` to recall from a cue, provenance so trusted sources beat chat.
 
-**Benchmarks (frozen, reproducible):**
-- LoCoMo evidence recall: **98.1%** on full 10-conversation set
+**Numbers (frozen, reproducible harnesses in repo):**
+- LoCoMo evidence recall: **98.1%** on full 10-conversation set (1,982 gold spans, k=150)
 - BEIR SciFact nDCG@10: **0.645** (ties Chroma + MiniLM)
-- FAMB: 97–98% macro
+- FAMB agent-memory suite: **97–98%** macro
 
-Paper + LaTeX: https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
-Code: https://github.com/voxmastery/FluctlightDB
+The claim: agent memory is a **third data model** (after relational + vector). Rows answer "which records match?" Vectors answer "what's nearest?" Agents need "what did I learn, and what can I trust?"
 
-MIT. Happy to discuss the "third data model" framing vs Mem0/Zep-style layers.
+```bash
+pip install "fluctlightdb[native]"
+```
+
+Links:
+- Code: https://github.com/voxmastery/FluctlightDB
+- Paper (LaTeX): https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
+- HF: https://huggingface.co/Voxiesz/fluctlightdb-paper
+- Launch playbook: https://github.com/voxmastery/FluctlightDB/blob/main/docs/WORLD_LAUNCH.md
+
+Zenodo DOI: _(add after release — see WORLD_LAUNCH.md)_
+
+I'm the author (Ganesh S, independent). Happy to discuss metrics—LoCoMo **evidence recall** is not the same as end-to-end LLM QA scores some memory layers report.
 
 ---
 
-**Posting tips:** Post Tue–Thu morning US time. Link preprint first, GitHub second. Be ready to clarify evidence recall vs LLM QA metrics in comments.
+**Posting:** Tuesday–Thursday 9–11am US Eastern. Reply to every comment for 4 hours.
