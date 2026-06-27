@@ -13,7 +13,7 @@ datasets:
 
 # FluctlightDB: A Memory Model of Data for AI Agents
 
-**Preprint · June 2026 · arXiv cs.DB (submission pending)**
+**Preprint · June 2026 · DOI: [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890) · arXiv pending**
 
 **Author:** Ganesh S · [ORCID 0009-0006-7758-4114](https://orcid.org/0009-0006-7758-4114) · voxmastery@gmail.com
 
@@ -56,6 +56,7 @@ brain.checkpoint()
 
 | Resource | URL |
 |----------|-----|
+| **DOI (Zenodo preprint)** | https://doi.org/10.5281/zenodo.20949890 |
 | **LaTeX source** | https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1 |
 | **Interactive viewer (Space)** | https://huggingface.co/spaces/Voxiesz/fluctlightdb-paper-viewer |
 | **GitHub** | https://github.com/voxmastery/FluctlightDB |
@@ -66,12 +67,13 @@ brain.checkpoint()
 ## Citation
 
 ```bibtex
-@article{s2025fluctlightdb,
+@article{s2026fluctlightdb,
   title={FluctlightDB: A Memory Model of Data for AI Agents},
   author={S, Ganesh},
-  year={2025},
-  note={Preprint. Software: https://github.com/voxmastery/FluctlightDB},
-  url={https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1}
+  year={2026},
+  doi={10.5281/zenodo.20949890},
+  url={https://doi.org/10.5281/zenodo.20949890},
+  note={Preprint. Software: https://github.com/voxmastery/FluctlightDB}
 }
 ```
 
