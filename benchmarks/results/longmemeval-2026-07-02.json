@@ -1,0 +1,35 @@
+{
+  "summary": {
+    "benchmark": "longmemeval_s",
+    "dataset": "/tmp/longmemeval/data/longmemeval_s_cleaned.json",
+    "mode": "index",
+    "top_k": 8,
+    "questions": 2,
+    "answer_in_recall_at_k": 1.0,
+    "hits": "2/2",
+    "wall_s": 28.0,
+    "sec_per_question": 13.98,
+    "embed_cache_size": 0,
+    "by_type": {
+      "single-session-user": 1.0
+    }
+  },
+  "results": [
+    {
+      "question_id": "e47becba",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 550,
+      "recalls": 8,
+      "sec": 14.754
+    },
+    {
+      "question_id": "118b2229",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 485,
+      "recalls": 8,
+      "sec": 13.197
+    }
+  ]
+}

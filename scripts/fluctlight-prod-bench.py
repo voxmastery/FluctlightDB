@@ -56,28 +56,40 @@ def pct(values: list[float], p: float) -> float:
 
 
 def load_corpus_from_export() -> list[dict]:
-    """Load engrams from export-raw via HTTP or CLI."""
-    if FluctlightClient is not None:
-        client = FluctlightClient(base_url=SERVE, api_key=API_KEY)
-        if client.health():
-            try:
-                raw = client.export_raw()
-                return raw.get("engrams") or []
-            except Exception:
-                pass
+    """Load engrams from export-raw via CLI (fast) or HTTP fallback."""
     bin_path = Path(os.environ.get("FLUCTLIGHT_BIN", str(DEFAULT_BIN)))
     if bin_path.is_file():
         import subprocess
+        import tempfile
 
-        out = subprocess.run(
-            [str(bin_path), "export-raw", "--path", str(BRAIN)],
-            capture_output=True,
-            text=True,
-            timeout=120,
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tf:
+            out_path = tf.name
+        try:
+            out = subprocess.run(
+                [str(bin_path), "export-raw", out_path, "--path", str(BRAIN)],
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if out.returncode == 0 and Path(out_path).is_file():
+                data = json.loads(Path(out_path).read_text())
+                engrams = data.get("engrams")
+                if isinstance(engrams, list):
+                    return engrams
+        finally:
+            Path(out_path).unlink(missing_ok=True)
+    if FluctlightClient is not None:
+        client = FluctlightClient(
+            base_url=SERVE, api_key=API_KEY, timeout=float(os.environ.get("FLUCTLIGHT_HTTP_TIMEOUT", "30"))
         )
-        if out.returncode == 0 and out.stdout.strip():
-            data = json.loads(out.stdout)
-            return data.get("engrams") or []
+        if client.health():
+            try:
+                raw = client.export_raw()
+                engrams = raw.get("engrams")
+                if isinstance(engrams, list):
+                    return engrams
+            except Exception:
+                pass
     return []
 
 
@@ -212,14 +224,16 @@ def main() -> int:
     print(f"On-disk brain size: {brain_size_mb()} MB\n")
 
     cues = [c for _, c, _ in PAIRS]
-    sqlite_stats = sqlite_lexical_bench(engrams, cues, n=80)
-    vector_stats = vector_brute_bench(engrams, PAIRS, n=80)
+    bench_n = int(os.environ.get("FLUCTLIGHT_PROD_BENCH_N", "20"))
+    fl_n = int(os.environ.get("FLUCTLIGHT_PROD_BENCH_FL_N", "10"))
+    sqlite_stats = sqlite_lexical_bench(engrams, cues, n=bench_n)
+    vector_stats = vector_brute_bench(engrams, PAIRS, n=bench_n)
 
     fl_stats = {"error": "serve unavailable"}
     if FluctlightClient is not None:
         client = FluctlightClient(base_url=SERVE, api_key=API_KEY)
         if client.health():
-            fl_stats = fluctlight_http_bench(client, PAIRS, WALLET_CUES, n=40)
+            fl_stats = fluctlight_http_bench(client, PAIRS, WALLET_CUES, n=fl_n)
         else:
             fl_stats = {"error": f"health check failed at {SERVE}"}
 

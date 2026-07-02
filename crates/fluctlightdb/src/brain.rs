@@ -598,6 +598,103 @@ impl FluctlightBrain {
         self.neuromodulators.on_reward(magnitude);
     }
 
+    /// Rewrite an existing engram in place (Tier A reconsolidation).
+    pub fn reconsolidate(
+        &mut self,
+        engram_id: Uuid,
+        content: Option<String>,
+        outcome: Option<String>,
+        salience_boost: f32,
+        semantic_vector: Option<Vec<f32>>,
+        supersede_similar: bool,
+    ) -> Result<ReconsolidateReport> {
+        let tick = self.development.metrics.ticks;
+        let idx = self
+            .hippocampus
+            .engrams
+            .iter()
+            .position(|e| e.id == engram_id)
+            .ok_or_else(|| Error::Store(format!("engram not found: {engram_id}")))?;
+        {
+            let engram = &mut self.hippocampus.engrams[idx];
+            if let Some(c) = content {
+                engram.episode.content = c.chars().take(500).collect();
+            }
+            if let Some(o) = outcome {
+                engram.episode.outcome = Some(o.chars().take(200).collect());
+            }
+            if let Some(v) = semantic_vector {
+                engram.episode.semantic_vector = Some(v);
+            }
+            engram.salience = (engram.salience + salience_boost).clamp(0.0, 1.0);
+            engram.replay_count = engram.replay_count.saturating_add(1);
+        }
+        if let Some(v) = self.hippocampus.engrams[idx].episode.semantic_vector.clone() {
+            let eid = self.hippocampus.engrams[idx].id;
+            let lid = self.hippocampus.engrams[idx].life_id;
+            self.semantic.register_engram(eid, lid, v);
+        }
+        let report_content = self.hippocampus.engrams[idx].episode.content.clone();
+        let revision = self.hippocampus.engrams[idx].replay_count;
+        let labile_until_tick = tick.saturating_add(64);
+
+        let mut superseded_others = 0usize;
+        if supersede_similar {
+            let needle = report_content.to_lowercase();
+            for other in &mut self.hippocampus.engrams {
+                if other.id == engram_id {
+                    continue;
+                }
+                if other.life_id != self.life.life_id {
+                    continue;
+                }
+                let similar = other.episode.content.to_lowercase() == needle
+                    || (needle.len() > 12
+                        && other
+                            .episode
+                            .content
+                            .to_lowercase()
+                            .contains(needle.get(..32).unwrap_or(&needle)));
+                if similar && other.salience > 0.05 {
+                    other.salience *= 0.45;
+                    superseded_others += 1;
+                }
+            }
+        }
+
+        self.hippocampus.rebuild_rag_index();
+        self.activation_cache.lock().unwrap().invalidate();
+        self.maybe_checkpoint()?;
+        Ok(ReconsolidateReport {
+            updated: true,
+            engram_id,
+            content: report_content,
+            revision,
+            labile_until_tick,
+            superseded_others,
+        })
+    }
+
+    /// Executive goal bias (HTTP API — always records, even before PFC stage unlock).
+    pub fn api_set_goal(&mut self, goal: String) -> Result<()> {
+        let goal = goal.chars().take(200).collect::<String>();
+        if !goal.is_empty() && !self.prefrontal.goals.iter().any(|g| g == &goal) {
+            self.prefrontal.goals.push(goal);
+        }
+        self.maybe_checkpoint()?;
+        Ok(())
+    }
+
+    /// Inhibit recall phrases matching action (HTTP API).
+    pub fn api_inhibit(&mut self, action: String) -> Result<()> {
+        let action = action.chars().take(200).collect::<String>();
+        if !action.is_empty() && !self.prefrontal.inhibit_actions.iter().any(|a| a == &action) {
+            self.prefrontal.inhibit_actions.push(action);
+        }
+        self.maybe_checkpoint()?;
+        Ok(())
+    }
+
     pub fn mark_core(&mut self, engram_id: Uuid, key: String) -> Result<()> {
         self.wal_append(WalEntry::MarkCore {
             engram_id,
@@ -949,6 +1046,16 @@ impl Drop for FluctlightBrain {
             let _ = self.checkpoint();
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+pub struct ReconsolidateReport {
+    pub updated: bool,
+    pub engram_id: Uuid,
+    pub content: String,
+    pub revision: u32,
+    pub labile_until_tick: u64,
+    pub superseded_others: usize,
 }
 
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]

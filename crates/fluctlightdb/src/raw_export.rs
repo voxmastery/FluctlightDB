@@ -40,9 +40,24 @@ pub struct RawImportReport {
     pub synapses_total: usize,
 }
 
+fn export_include_synapses() -> bool {
+    matches!(
+        std::env::var("FLUCTLIGHT_EXPORT_SYNAPSES")
+            .unwrap_or_default()
+            .to_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "full"
+    )
+}
+
 pub fn export_raw(brain: &FluctlightBrain) -> RawExport {
     let synapses_total = brain.graph.synapse_count();
-    let synapses: Vec<Synapse> = brain.graph.synapses.clone();
+    let include_synapses = export_include_synapses();
+    let synapses: Vec<Synapse> = if include_synapses {
+        brain.graph.synapses.clone()
+    } else {
+        Vec::new()
+    };
     let engrams: Vec<Engram> = brain
         .hippocampus
         .engrams_for_life(brain.life.life_id)
@@ -52,7 +67,7 @@ pub fn export_raw(brain: &FluctlightBrain) -> RawExport {
         status: Some(brain.status()),
         engrams,
         synapses_total,
-        synapses_truncated: false,
+        synapses_truncated: !include_synapses && synapses_total > 0,
         synapses,
         core_memories: brain.core_memories.memories.clone(),
         recent_separations: brain.recent_separations.clone(),
