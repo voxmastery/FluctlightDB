@@ -58,6 +58,28 @@ brain.checkpoint()
 
 Read-only hot recall: `get_recall_client(path)`.
 
+### Fast path (agents that must feel instant)
+
+**Default for latency-sensitive agents:** embedded recall, not HTTP.
+
+```python
+from fluctlightdb import connect_agent_fast
+
+brain = connect_agent_fast("/tmp/my-agent-brain")  # hybrid index + shallow spread
+brain.experience("User prefers dark mode", context="settings", salience=0.7)
+print(brain.activate("dark mode"))  # typically sub-ms to low-ms with sidecar index
+```
+
+| Goal | API | When |
+|------|-----|------|
+| **Live agent** (full memory + fast recall) | `connect_agent_fast()` | Production agent loops |
+| **Bulk RAG / IR** | `connect_index()` | Backfills, BEIR-style benches |
+| **Long conv eval** | `connect_conv()` | LoCoMo / LongMemEval harness |
+| **Remote / shared brain** | `FluctlightClient` + `activate-lite` | Multi-tenant; slower than embedded |
+
+After bulk ingest, rebuild the FTS5+HNSW sidecar: `fluctlight index rebuild --path <brain>`.  
+Research-backed tuning (SYNAPSE, SwiftMem, Zep, Mem0) and env vars: **[FAST_PATH.md](FAST_PATH.md)**.
+
 Or from this repo: `./scripts/install-python-client.sh` (HTTP client); add `[native]` for embedded.
 
 ### 2. HTTP client + server (optional)
@@ -169,6 +191,7 @@ You **copy/back up that path** like you would `agent.db` or a Qdrant storage dir
 
 ## Next steps
 
+- [FAST_PATH.md](FAST_PATH.md) — embedded vs HTTP, `connect_agent_fast`, research mapping  
 - [CLI.md](CLI.md) — full command mapping from SQL/vector habits  
 - [DEPLOYMENT.md](DEPLOYMENT.md) — replicas, backup, industrial single-host HA  
 - [Manifesto.md](Manifesto.md) — why brain-native, not SQL  

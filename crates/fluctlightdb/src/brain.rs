@@ -386,7 +386,7 @@ impl FluctlightBrain {
             &self.hippocampus,
             &self.semantic,
             self.life.life_id,
-            4,
+            crate::activation::activation_max_hops(),
             self.development.stage.myelination(),
             8,
             candidate_set.as_ref(),

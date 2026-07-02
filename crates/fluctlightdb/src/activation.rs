@@ -11,6 +11,32 @@ use crate::index::DEFAULT_CANDIDATE_CAP;
 use crate::semantic::SemanticField;
 use crate::types::{ActivationResult, RecallResult};
 
+fn env_truthy(key: &str) -> bool {
+    std::env::var(key)
+        .map(|v| matches!(v.to_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+/// Index / vector-only recall: skip graph spreading (Chroma-class latency).
+pub fn vector_fast_mode() -> bool {
+    env_truthy("FLUCTLIGHT_VECTOR_FAST")
+}
+
+/// Agent hot path: shallow spread + capped hybrid candidates (SYNAPSE-style selective subgraph).
+pub fn agent_fast_mode() -> bool {
+    env_truthy("FLUCTLIGHT_AGENT_FAST")
+}
+
+pub fn activation_max_hops() -> u32 {
+    if vector_fast_mode() {
+        0
+    } else if agent_fast_mode() {
+        1
+    } else {
+        4
+    }
+}
+
 /// Spreading activation recall — graph propagation, optionally seeded by entorhinal semantic vectors.
 pub fn activate_from(
     cue: &str,
