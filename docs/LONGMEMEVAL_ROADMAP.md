@@ -100,9 +100,19 @@ if < 90% session_recall@8 → next hypothesis
 ## v2 harness
 
 ```bash
-PYTHONUNBUFFERED=1 PYTHONPATH=sdks/python python3 benchmarks/longmemeval_bench.py \
-  --granularity session --metric session --mode index --top-k 8 \
-  --dual-key --query-expand
+# Lexical v2 (dual-key + query-expand, no embed)
+./scripts/longmemeval-v2-run.sh fast
+
+# Full 500 with MiniLM embeds (:8793)
+export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8793
+./scripts/longmemeval-v2-run.sh full
+
+# Full 500 with retrieval-tuned mpnet (:8794) — recommended
+./scripts/start-embed-mpnet.sh   # or: ./scripts/longmemeval-v2-run.sh full-mpnet
+export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8794
+
+# Auto: wait for preference slice, then full-mpnet
+./scripts/longmemeval-v2-run.sh watch
 ```
 
 ## References
