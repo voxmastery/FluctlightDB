@@ -433,6 +433,12 @@ struct ApiRequest {
     #[serde(default)]
     goal: Option<String>,
     #[serde(default)]
+    action: Option<String>,
+    #[serde(default)]
+    salience_boost: Option<f32>,
+    #[serde(default)]
+    supersede_similar: Option<bool>,
+    #[serde(default)]
     steps: Option<u32>,
     #[serde(default)]
     batch: Option<Vec<ActivateBatchItem>>,
@@ -944,6 +950,57 @@ fn dispatch(
                 )
             })?;
             Ok(serde_json::json!({"ok": true, "engram_id": engram_id}))
+        }
+        "/api/v1/reconsolidate" | "/reconsolidate" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let engram_id = api_body
+                .engram_id
+                .clone()
+                .ok_or_else(|| Error::Store("missing engram_id".into()))?;
+            let id = Uuid::parse_str(&engram_id)
+                .map_err(|e| Error::Store(format!("invalid engram_id: {e}")))?;
+            let report = server.with_brain_write(tenant_id, |b| {
+                b.reconsolidate(
+                    id,
+                    api_body.content.clone(),
+                    api_body.outcome.clone(),
+                    api_body.salience_boost.unwrap_or(0.2),
+                    api_body.semantic_vector.clone(),
+                    api_body.supersede_similar.unwrap_or(true),
+                )
+            })?;
+            Ok(serde_json::to_value(report).unwrap())
+        }
+        "/api/v1/set-goal" | "/set-goal" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let goal = api_body
+                .goal
+                .clone()
+                .ok_or_else(|| Error::Store("missing goal".into()))?;
+            server.with_brain_write(tenant_id, |b| {
+                b.api_set_goal(goal)?;
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "goals": b.prefrontal.goals,
+                }))
+            })
+        }
+        "/api/v1/inhibit" | "/inhibit" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let action = api_body
+                .action
+                .clone()
+                .ok_or_else(|| Error::Store("missing action".into()))?;
+            server.with_brain_write(tenant_id, |b| {
+                b.api_inhibit(action)?;
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "inhibit_actions": b.prefrontal.inhibit_actions,
+                }))
+            })
         }
         "/api/v1/preplay" | "/preplay" => {
             require_role(auth, Role::Read)?;

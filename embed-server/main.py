@@ -30,8 +30,16 @@ class EmbedRequest(BaseModel):
     text: str
 
 
+class EmbedBatchRequest(BaseModel):
+    texts: List[str]
+
+
 class EmbedResponse(BaseModel):
     embedding: List[float]
+
+
+class EmbedBatchResponse(BaseModel):
+    embeddings: List[List[float]]
 
 
 @app.get("/health")
@@ -44,6 +52,16 @@ def embed(req: EmbedRequest):
     model = get_model()
     vec = model.encode(req.text, normalize_embeddings=True)
     return EmbedResponse(embedding=vec.tolist())
+
+
+@app.post("/embed/batch", response_model=EmbedBatchResponse)
+def embed_batch(req: EmbedBatchRequest):
+    model = get_model()
+    texts = [t or "" for t in req.texts]
+    if not texts:
+        return EmbedBatchResponse(embeddings=[])
+    vecs = model.encode(texts, normalize_embeddings=True, batch_size=64, show_progress_bar=False)
+    return EmbedBatchResponse(embeddings=[v.tolist() for v in vecs])
 
 
 if __name__ == "__main__":

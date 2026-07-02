@@ -81,6 +81,6 @@ fn longmemeval_style_recall_bar() {
         }
     }
     let rate = hits as f64 / PAIRS.len() as f64;
-    eprintln!("LongMemEval-style fixture hit rate: {rate:.0}%");
+    eprintln!("LongMemEval-style fixture hit rate: {:.1}%", rate * 100.0);
     assert!(rate >= 0.7, "recall hit rate {rate} below 70% bar");
 }

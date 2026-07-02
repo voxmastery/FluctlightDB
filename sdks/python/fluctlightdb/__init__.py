@@ -302,3 +302,32 @@ class FluctlightClient:
 
     def stage_report(self) -> dict[str, Any]:
         return self._post("/api/v1/stage-report", {})
+
+    def reconsolidate(
+        self,
+        engram_id: str,
+        *,
+        content: Optional[str] = None,
+        outcome: Optional[str] = None,
+        salience_boost: float = 0.2,
+        semantic_vector: Optional[list[float]] = None,
+        supersede_similar: bool = True,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "engram_id": str(engram_id),
+            "salience_boost": float(salience_boost),
+            "supersede_similar": bool(supersede_similar),
+        }
+        if content is not None:
+            payload["content"] = content
+        if outcome is not None:
+            payload["outcome"] = outcome
+        if semantic_vector is not None:
+            payload["semantic_vector"] = semantic_vector
+        return self._post("/api/v1/reconsolidate", payload)
+
+    def set_goal(self, goal: str) -> dict[str, Any]:
+        return self._post("/api/v1/set-goal", {"goal": goal[:200]})
+
+    def inhibit(self, action: str) -> dict[str, Any]:
+        return self._post("/api/v1/inhibit", {"action": action[:200]})
