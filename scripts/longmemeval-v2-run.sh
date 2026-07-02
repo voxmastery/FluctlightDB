@@ -4,7 +4,8 @@
 #   ./scripts/longmemeval-v2-run.sh fast          # lexical only (~30 min)
 #   ./scripts/longmemeval-v2-run.sh full          # with embeddings (~hours on CPU)
 #   ./scripts/longmemeval-v2-run.sh preference    # 30 preference questions only
-#   ./scripts/longmemeval-v2-run.sh watch         # wait for preference, then start full embed run
+#   ./scripts/longmemeval-v2-run.sh full-mpnet   # embeddings via multi-qa-mpnet :8794
+#   ./scripts/longmemeval-v2-run.sh watch         # wait for preference, then full-mpnet
 
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -31,11 +32,41 @@ run_fast() {
 }
 
 run_full() {
-  echo "[v2] full 500 with embeddings (slow on CPU)..."
-  "${BENCH[@]}" \
-    --checkpoint /tmp/longmemeval-v2-checkpoint.jsonl \
-    --json-out "${REPO}/benchmarks/results/longmemeval-session-v2-2026-07-02.json" \
-    2>&1 | tee /tmp/longmemeval-v2-full.log
+  local embed_url="${1:-${FLUCTLIGHT_EMBED_URL:-http://127.0.0.1:8793}}"
+  local out="${2:-${REPO}/benchmarks/results/longmemeval-session-v2-2026-07-02.json}"
+  local ckpt="${3:-/tmp/longmemeval-v2-checkpoint.jsonl}"
+  local log="${4:-/tmp/longmemeval-v2-full.log}"
+  echo "[v2] full 500 with embeddings embed_url=$embed_url"
+  FLUCTLIGHT_EMBED_URL="$embed_url" "${BENCH[@]}" \
+    --checkpoint "$ckpt" \
+    --json-out "$out" \
+    2>&1 | tee "$log"
+}
+
+ensure_mpnet() {
+  if curl -sf "http://127.0.0.1:8794/health" >/dev/null 2>&1; then
+    echo "[mpnet] already up on :8794"
+    return 0
+  fi
+  echo "[mpnet] starting sentence-transformers/multi-qa-mpnet-base-dot-v1 on :8794..."
+  nohup "${REPO}/scripts/start-embed-mpnet.sh" >> /tmp/embed-mpnet-8794.log 2>&1 &
+  for _ in $(seq 1 120); do
+    if curl -sf "http://127.0.0.1:8794/health" >/dev/null 2>&1; then
+      echo "[mpnet] ready"
+      return 0
+    fi
+    sleep 5
+  done
+  echo "[mpnet] failed to start on :8794" >&2
+  return 1
+}
+
+run_full_mpnet() {
+  ensure_mpnet
+  run_full "http://127.0.0.1:8794" \
+    "${REPO}/benchmarks/results/longmemeval-session-v2-mpnet.json" \
+    /tmp/longmemeval-v2-mpnet.jsonl \
+    /tmp/longmemeval-v2-mpnet.log
 }
 
 run_preference() {
@@ -53,14 +84,15 @@ watch_and_full() {
     echo "  preference progress: ${n}/30"
     sleep 120
   done
-  echo "[watch] preference done; starting full embed run..."
-  run_full
+  echo "[watch] preference done; starting full mpnet embed run on :8794..."
+  run_full_mpnet
 }
 
 case "${1:-fast}" in
   fast) run_fast ;;
   full) run_full ;;
+  full-mpnet) run_full_mpnet ;;
   preference) run_preference ;;
   watch) watch_and_full ;;
-  *) echo "usage: $0 {fast|full|preference|watch}"; exit 1 ;;
+  *) echo "usage: $0 {fast|full|full-mpnet|preference|watch}"; exit 1 ;;
 esac
