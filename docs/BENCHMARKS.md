@@ -17,14 +17,16 @@ This document lists **trusted, citable benchmarks** for evaluating agent memory 
 ### API modes (explicit, not env-only)
 
 ```python
-from fluctlightdb import connect, connect_index
+from fluctlightdb import connect, connect_agent_fast, connect_index
 
-brain = connect("/data/agent.brain")       # full agent path (episodic memory)
-index = connect_index("/data/rag.brain")   # bulk IR path (fast ingest + vector recall)
-index = connect_index()                    # ephemeral, for benchmarks
+brain = connect("/data/agent.brain")              # full agent path (episodic memory)
+fast = connect_agent_fast("/data/agent.brain")    # same writes, hybrid index + 1-hop recall
+index = connect_index("/data/rag.brain")          # bulk IR path (fast ingest + vector recall)
+index = connect_index()                           # ephemeral, for benchmarks
 ```
 
 - **`connect()` / agent mode** — dentate gate, graph co-activation, provenance ranking. Use for live agents.
+- **`connect_agent_fast()`** — same write path; `FLUCTLIGHT_AGENT_FAST` + capped hybrid candidates. See [FAST_PATH.md](FAST_PATH.md).
 - **`connect_index()` / index mode** — `FLUCTLIGHT_FAST_INGEST` + `FLUCTLIGHT_VECTOR_FAST`. Use for RAG backfills and IR comparisons.
 
 ---

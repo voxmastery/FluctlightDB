@@ -29,6 +29,7 @@ class FluctlightBrain:
     """In-process Fluctlight brain (like ``sqlite3.connect``). Requires ``fluctlightdb-native``."""
 
     MODE_AGENT = "agent"
+    MODE_AGENT_FAST = "agent_fast"
     MODE_INDEX = "index"
     MODE_CONV = "conv"
 
@@ -41,6 +42,8 @@ class FluctlightBrain:
             self._enable_index_mode()
         elif mode == self.MODE_CONV:
             self._enable_conv_mode()
+        elif mode == self.MODE_AGENT_FAST:
+            self._enable_agent_fast_mode()
 
     @staticmethod
     def _enable_index_mode() -> None:
@@ -53,6 +56,15 @@ class FluctlightBrain:
     def _enable_agent_mode() -> None:
         os.environ.pop("FLUCTLIGHT_FAST_INGEST", None)
         os.environ.pop("FLUCTLIGHT_VECTOR_FAST", None)
+        os.environ.pop("FLUCTLIGHT_AGENT_FAST", None)
+
+    @staticmethod
+    def _enable_agent_fast_mode() -> None:
+        """Live agent recall: hybrid sidecar pre-filter + 1-hop spread (full write path)."""
+        os.environ.pop("FLUCTLIGHT_FAST_INGEST", None)
+        os.environ.pop("FLUCTLIGHT_VECTOR_FAST", None)
+        os.environ["FLUCTLIGHT_AGENT_FAST"] = "1"
+        os.environ.setdefault("FLUCTLIGHT_CANDIDATE_CAP", "96")
 
     @staticmethod
     def _enable_conv_mode() -> None:
@@ -71,6 +83,21 @@ class FluctlightBrain:
         native = _require_native()
         brain = native.Brain.open_readonly(path) if readonly else native.Brain.open(path)
         obj = cls(brain, readonly=readonly, mode=cls.MODE_AGENT)
+        obj.brain_path = path
+        return obj
+
+    @classmethod
+    def connect_agent_fast(cls, path: str, *, readonly: bool = False) -> "FluctlightBrain":
+        """Agent memory with research-backed fast recall (hybrid index + shallow spread).
+
+        Keeps full episodic write path (dentate, provenance, graph wiring). For recall,
+        pre-filters via FTS5+HNSW sidecar (``FLUCTLIGHT_CANDIDATE_CAP``) and limits graph
+        spread to 1 hop. Rebuild sidecar after bulk ingest: ``fluctlight index rebuild``.
+        """
+        cls._enable_agent_fast_mode()
+        native = _require_native()
+        brain = native.Brain.open_readonly(path) if readonly else native.Brain.open(path)
+        obj = cls(brain, readonly=readonly, mode=cls.MODE_AGENT_FAST)
         obj.brain_path = path
         return obj
 
@@ -253,3 +280,8 @@ def connect_index(path: Optional[str] = None, *, readonly: bool = False) -> Fluc
 def connect_conv(path: Optional[str] = None, *, readonly: bool = False) -> FluctlightBrain:
     """Conversational RAG mode: fast ingest + hybrid recall."""
     return FluctlightBrain.connect_conv(path, readonly=readonly)
+
+
+def connect_agent_fast(path: str, *, readonly: bool = False) -> FluctlightBrain:
+    """Agent memory with fast hybrid recall (see :meth:`FluctlightBrain.connect_agent_fast`)."""
+    return FluctlightBrain.connect_agent_fast(path, readonly=readonly)
