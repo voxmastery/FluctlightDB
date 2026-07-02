@@ -372,6 +372,8 @@ def eval_one(
         brain, item, embedder, fast=fast, granularity=granularity, dual_key=dual_key
     )
     question = (item.get("question") or "").strip()
+    if item.get("question_type") == "temporal-reasoning" and item.get("question_date"):
+        question = f"{question} [{item['question_date']}]"
     recalls = activate_merged(
         brain,
         question,
