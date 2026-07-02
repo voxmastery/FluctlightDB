@@ -127,7 +127,40 @@ def load_dataset(path: Path) -> list[dict]:
     return data
 
 
-def ingest_item(brain: Any, item: dict, embedder: EmbedCache, *, fast: bool) -> int:
+def session_in_recalls(
+    recalls: list[dict], answer_session_ids: list[str], top_k: int = 8
+) -> bool:
+    """Official LongMemEval retrieval metric: gold session in top-k."""
+    gold = {str(x) for x in (answer_session_ids or [])}
+    if not gold:
+        return False
+    for r in recalls[:top_k]:
+        ep = r.get("episode") or {}
+        rag = ep.get("rag") or {}
+        sid = rag.get("doc_id") or ep.get("doc_id")
+        if sid and str(sid) in gold:
+            return True
+        ctx = ep.get("context") or ""
+        for g in gold:
+            if g in ctx:
+                return True
+    return False
+
+
+def ingest_item(
+    brain: Any,
+    item: dict,
+    embedder: EmbedCache,
+    *,
+    fast: bool,
+    granularity: str,
+) -> int:
+    if granularity == "session":
+        return _ingest_sessions(brain, item, embedder, fast=fast)
+    return _ingest_turns(brain, item, embedder, fast=fast)
+
+
+def _ingest_turns(brain: Any, item: dict, embedder: EmbedCache, *, fast: bool) -> int:
     turns: list[tuple[str, str]] = []
     for session in item.get("haystack_sessions") or []:
         if not isinstance(session, list):
@@ -157,6 +190,58 @@ def ingest_item(brain: Any, item: dict, embedder: EmbedCache, *, fast: bool) -> 
     return n
 
 
+def _ingest_sessions(brain: Any, item: dict, embedder: EmbedCache, *, fast: bool) -> int:
+    """One engram per chat session (LongMemEval paper value granularity)."""
+    session_ids: list[str] = list(item.get("haystack_session_ids") or [])
+    dates: list[str] = list(item.get("haystack_dates") or [])
+    sessions = item.get("haystack_sessions") or []
+    if not sessions:
+        return 0
+    texts: list[str] = []
+    sids: list[str] = []
+    for i, session in enumerate(sessions):
+        if not isinstance(session, list):
+            continue
+        sid = session_ids[i] if i < len(session_ids) else f"session_{i}"
+        date = dates[i] if i < len(dates) else ""
+        lines: list[str] = []
+        user_key: list[str] = []
+        for msg in session:
+            if not isinstance(msg, dict):
+                continue
+            role = (msg.get("role") or "user").strip()
+            content = (msg.get("content") or "").strip()
+            if not content:
+                continue
+            lines.append(f"{role}: {content}")
+            if role == "user":
+                user_key.append(content)
+        if not lines:
+            continue
+        # Key expansion (LongMemEval CP2): user utterances as extra FTS keys at index time.
+        key_block = " ".join(user_key)[:3000]
+        body = "\n".join(lines)
+        prefix = f"[{date}] " if date else ""
+        full = f"{prefix}{key_block}\n{body}"[:12000]
+        texts.append(full)
+        sids.append(sid)
+    vectors: list[Optional[list[float]]] = [None] * len(texts)
+    if not fast and texts:
+        vectors = embedder.embed_many(texts)
+    n = 0
+    for sid, content, vec in zip(sids, texts, vectors):
+        brain.experience(
+            content,
+            context=f"longmemeval:{sid}",
+            salience=0.6,
+            semantic_vector=vec,
+            doc_id=sid,
+            chunk_id="session",
+        )
+        n += 1
+    return n
+
+
 def eval_one(
     item: dict,
     *,
@@ -164,19 +249,24 @@ def eval_one(
     top_k: int,
     embedder: EmbedCache,
     fast: bool,
+    granularity: str,
+    metric: str,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
     if mode == "index":
         brain = connect_index()
     else:
         brain = connect_conv()
-    ingested = ingest_item(brain, item, embedder, fast=fast)
+    ingested = ingest_item(brain, item, embedder, fast=fast, granularity=granularity)
     question = (item.get("question") or "").strip()
     qvec = embedder.embed(question) if not fast else None
     act = brain.activate(question, semantic_vector=qvec, limit=top_k)
     recalls = act.get("recalls") or []
     answer = item.get("answer") or ""
-    hit = answer_in_recalls(recalls, answer, top_k=top_k)
+    if metric == "session":
+        hit = session_in_recalls(recalls, item.get("answer_session_ids") or [], top_k=top_k)
+    else:
+        hit = answer_in_recalls(recalls, answer, top_k=top_k)
     elapsed = time.perf_counter() - t0
     return {
         "question_id": item.get("question_id"),
@@ -196,6 +286,18 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0, help="0 = full dataset")
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--fast", action="store_true", help="skip embeddings (lexical only)")
+    ap.add_argument(
+        "--granularity",
+        choices=("turn", "session"),
+        default="turn",
+        help="turn=per message (legacy); session=one engram per chat session (LongMemEval paper)",
+    )
+    ap.add_argument(
+        "--metric",
+        choices=("answer", "session"),
+        default="answer",
+        help="answer=answer text in recall; session=gold session_id in top-k (official retrieval)",
+    )
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument("--checkpoint", type=Path, default=None, help="resume/save progress JSONL")
     args = ap.parse_args()
@@ -227,6 +329,10 @@ def main() -> int:
     results = list(prior)
     hits = sum(1 for r in results if r.get("hit"))
     t_start = time.perf_counter()
+    metric_key = (
+        "session_recall_at_k" if args.metric == "session" else "answer_in_recall_at_k"
+    )
+    metric_label = f"{metric_key}@{args.top_k}"
 
     for i, item in enumerate(items):
         qid = str(item.get("question_id") or i)
@@ -239,6 +345,8 @@ def main() -> int:
                 top_k=args.top_k,
                 embedder=embedder,
                 fast=args.fast,
+                granularity=args.granularity,
+                metric=args.metric,
             )
         except Exception as e:
             row = {
@@ -259,7 +367,7 @@ def main() -> int:
         if n_done % 5 == 0 or n_done == len(items) + len(prior):
             rate = hits / n_done if n_done else 0.0
             print(
-                f"[{n_done}] answer_in_recall@{args.top_k}={rate:.1%} "
+                f"[{n_done}] {metric_label}={rate:.1%} "
                 f"({hits}/{n_done}) last_sec={row.get('sec', 0)}",
                 flush=True,
             )
@@ -273,9 +381,11 @@ def main() -> int:
         "benchmark": "longmemeval_s",
         "dataset": str(args.data),
         "mode": args.mode,
+        "granularity": args.granularity,
+        "metric": args.metric,
         "top_k": args.top_k,
         "questions": len(results),
-        "answer_in_recall_at_k": round(hits / len(results), 4) if results else 0.0,
+        metric_key: round(hits / len(results), 4) if results else 0.0,
         "hits": f"{hits}/{len(results)}",
         "wall_s": round(wall, 1),
         "sec_per_question": round(wall / max(1, len(results) - len(prior)), 2),
