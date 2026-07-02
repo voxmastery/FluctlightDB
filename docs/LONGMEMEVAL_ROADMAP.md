@@ -91,26 +91,18 @@ if < 90% session_recall@8 → next hypothesis
 
 ### Next experiments (priority)
 
-1. **Full 500 session_recall@8** — confirm ≥90% on all types.
-2. **Skip abstention (470 Q)** — match official retrieval eval.
-3. **Embedding model** — `multi-qa-mpnet-base-dot-v1` (retrieval-tuned Q→passage).
-4. **Temporal pre-filter** — parse `question_date` / relative time → restrict candidate sessions.
-5. **RRF fusion** — explicit BM25+dense rank merge in sidecar (if lexical+dense gap shows in by_type).
-6. **E2E QA** — retrieve top-8 sessions → GPT-4o-mini answer → official LLJ (TiMem comparison).
+1. **v2 full run** — `--dual-key --query-expand` with fixed embed URL (semantic + lexical).
+2. **Preference slice** — 30 questions, was 53.3% lexical-only; v2 running now.
+3. **Embed URL** — `FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8793` (not `.../embed`); v1 93.8% was lexical-only.
+4. **Embedding model** — `FLUCTLIGHT_EMBED_MODEL=multi-qa-mpnet-base-dot-v1`.
+5. **Temporal pre-filter** — `question_date` + `haystack_dates` candidate restriction.
 
-## Commands
+## v2 harness
 
 ```bash
-# Official-style retrieval (target ≥90%)
-PYTHONPATH=sdks/python python3 benchmarks/longmemeval_bench.py \
-  --granularity session --metric session --mode index --top-k 8
-
-# Legacy turn / answer-string metric (expect ~40%)
-PYTHONPATH=sdks/python python3 benchmarks/longmemeval_bench.py \
-  --granularity turn --metric answer --mode index --top-k 8
-
-# Faster embed model swap
-export FLUCTLIGHT_EMBED_MODEL=multi-qa-mpnet-base-dot-v1
+PYTHONUNBUFFERED=1 PYTHONPATH=sdks/python python3 benchmarks/longmemeval_bench.py \
+  --granularity session --metric session --mode index --top-k 8 \
+  --dual-key --query-expand
 ```
 
 ## References
