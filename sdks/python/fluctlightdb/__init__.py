@@ -174,12 +174,15 @@ class FluctlightClient:
         cue: str,
         semantic_vector: Optional[list[float]] = None,
         agent_id: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {"cue": cue}
         if semantic_vector is not None:
             payload["semantic_vector"] = semantic_vector
         if agent_id is not None:
             payload["agent_id"] = agent_id
+        if limit is not None:
+            payload["limit"] = int(limit)
         return self._post("/api/v1/activate", payload)
 
     def activate_lite(
