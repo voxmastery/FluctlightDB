@@ -1,0 +1,264 @@
+{
+  "summary": {
+    "benchmark": "longmemeval_s",
+    "dataset": "/tmp/longmemeval/data/longmemeval_s_cleaned.json",
+    "mode": "index",
+    "granularity": "session",
+    "metric": "session",
+    "query_expand": true,
+    "dual_key": true,
+    "top_k": 8,
+    "questions": 30,
+    "session_recall_at_k": 0.7333,
+    "hits": "22/30",
+    "wall_s": 11150.3,
+    "sec_per_question": 371.68,
+    "embed_cache_size": 1485,
+    "embed_requests": 1485,
+    "by_type": {
+      "single-session-preference": 0.7333
+    }
+  },
+  "results": [
+    {
+      "question_id": "8a2466db",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 100,
+      "recalls": 7,
+      "sec": 440.791
+    },
+    {
+      "question_id": "06878be2",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 95,
+      "recalls": 8,
+      "sec": 377.197
+    },
+    {
+      "question_id": "75832dbd",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 96,
+      "recalls": 8,
+      "sec": 288.605
+    },
+    {
+      "question_id": "0edc2aef",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 92,
+      "recalls": 8,
+      "sec": 271.6
+    },
+    {
+      "question_id": "35a27287",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 102,
+      "recalls": 7,
+      "sec": 495.301
+    },
+    {
+      "question_id": "32260d93",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 92,
+      "recalls": 8,
+      "sec": 394.598
+    },
+    {
+      "question_id": "195a1a1b",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 92,
+      "recalls": 8,
+      "sec": 263.099
+    },
+    {
+      "question_id": "afdc33df",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 92,
+      "recalls": 8,
+      "sec": 258.797
+    },
+    {
+      "question_id": "caf03d32",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 102,
+      "recalls": 7,
+      "sec": 410.6
+    },
+    {
+      "question_id": "54026fce",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 98,
+      "recalls": 7,
+      "sec": 490.2
+    },
+    {
+      "question_id": "06f04340",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 109,
+      "recalls": 8,
+      "sec": 516.899
+    },
+    {
+      "question_id": "6b7dfb22",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 89,
+      "recalls": 8,
+      "sec": 261.7
+    },
+    {
+      "question_id": "1a1907b4",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 96,
+      "recalls": 8,
+      "sec": 290.896
+    },
+    {
+      "question_id": "09d032c9",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 86,
+      "recalls": 8,
+      "sec": 271.593
+    },
+    {
+      "question_id": "38146c39",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 92,
+      "recalls": 8,
+      "sec": 294.3
+    },
+    {
+      "question_id": "d24813b1",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 87,
+      "recalls": 8,
+      "sec": 254.097
+    },
+    {
+      "question_id": "57f827a0",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 102,
+      "recalls": 8,
+      "sec": 394.998
+    },
+    {
+      "question_id": "95228167",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 98,
+      "recalls": 8,
+      "sec": 438.703
+    },
+    {
+      "question_id": "505af2f5",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 106,
+      "recalls": 7,
+      "sec": 431.599
+    },
+    {
+      "question_id": "75f70248",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 84,
+      "recalls": 7,
+      "sec": 364.701
+    },
+    {
+      "question_id": "d6233ab6",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 88,
+      "recalls": 8,
+      "sec": 423.503
+    },
+    {
+      "question_id": "1da05512",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 94,
+      "recalls": 8,
+      "sec": 318.3
+    },
+    {
+      "question_id": "fca70973",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 90,
+      "recalls": 6,
+      "sec": 250.299
+    },
+    {
+      "question_id": "b6025781",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 94,
+      "recalls": 8,
+      "sec": 367.903
+    },
+    {
+      "question_id": "a89d7624",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 98,
+      "recalls": 8,
+      "sec": 385.504
+    },
+    {
+      "question_id": "b0479f84",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 96,
+      "recalls": 8,
+      "sec": 338.997
+    },
+    {
+      "question_id": "1d4e3b97",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 90,
+      "recalls": 8,
+      "sec": 366.694
+    },
+    {
+      "question_id": "07b6f563",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 104,
+      "recalls": 8,
+      "sec": 578.798
+    },
+    {
+      "question_id": "1c0ddc50",
+      "question_type": "single-session-preference",
+      "hit": false,
+      "ingested": 101,
+      "recalls": 7,
+      "sec": 557.495
+    },
+    {
+      "question_id": "0a34ad58",
+      "question_type": "single-session-preference",
+      "hit": true,
+      "ingested": 84,
+      "recalls": 8,
+      "sec": 348.795
+    }
+  ]
+}
