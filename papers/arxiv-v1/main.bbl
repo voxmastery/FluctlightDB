@@ -1,0 +1,57 @@
+\begin{thebibliography}{1}
+
+\bibitem{chhikara2025mem0}
+Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet Singh, and Deshraj Yadav.
+\newblock Mem0: Building production-ready ai agents with scalable long-term
+  memory.
+\newblock {\em arXiv preprint arXiv:2504.19413}, 2025.
+
+\bibitem{codd1970relational}
+Edgar~F Codd.
+\newblock A relational model of data for large shared data banks.
+\newblock {\em Communications of the ACM}, 13(6):377--387, 1970.
+
+\bibitem{gutierrez2024hipporag}
+Bernardo Guti{\'e}rrez, Yiheng Shu, Yu~Gu, Peter Pasupat, Barret Liu, Rishabh
+  Shah, Ming-Wei Chang, Ramakanth Pasunuru, Yujia Zhang, Avi Gupta, et~al.
+\newblock Hipporag: Neurobiologically inspired long-term memory for large
+  language models.
+\newblock {\em arXiv preprint arXiv:2405.14831}, 2024.
+
+\bibitem{maharana2024locomo}
+Adyasha Maharana, Dong-Ho Lee, Sergey Tulyakov, Mohit Bansal, Francesco
+  Barbieri, and Yuwei Fang.
+\newblock Evaluating very long-term conversational memory of llm agents.
+\newblock In {\em ACL}, 2024.
+
+\bibitem{packer2023memgpt}
+Charles Packer, Sarah Wooders, Kevin Lin, Vivian Fang, Shishir~G Patil, Ion
+  Stoica, and Joseph~E Gonzalez.
+\newblock Memgpt: Towards llms as operating systems.
+\newblock {\em arXiv preprint arXiv:2310.08560}, 2023.
+
+\bibitem{thakur2021beir}
+Nandan Thakur, Nils Reimers, Andreas R{\"u}ckl{\'e}, Abhishek Srivastava, and
+  Iryna Gurevych.
+\newblock Beir: A heterogeneous benchmark for zero-shot evaluation of
+  information retrieval models.
+\newblock In {\em NeurIPS Datasets and Benchmarks}, 2021.
+
+\bibitem{cognee2024}
+{Topoteretes}.
+\newblock Cognee: Memory engine for ai agents.
+\newblock \url{https://github.com/topoteretes/cognee}, 2024.
+\newblock Vector + knowledge-graph memory pipeline.
+
+\bibitem{wu2024longmemeval}
+Di~Wu, Hongwei Wang, Wenhao Yu, Yuwei Zhang, Kai-Wei Chang, and Dong Yu.
+\newblock Longmemeval: A benchmark for long-term memory in llm chat assistants.
+\newblock {\em arXiv preprint arXiv:2410.10813}, 2024.
+
+\bibitem{zep2024}
+{Zep AI}.
+\newblock Zep: A temporal knowledge graph architecture for agent memory.
+\newblock \url{https://www.getzep.com}, 2024.
+\newblock Agent memory platform; LoCoMo evaluations in product documentation.
+
+\end{thebibliography}

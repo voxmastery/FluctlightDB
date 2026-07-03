@@ -91,7 +91,7 @@ Separate retrieval metrics from LLM QA metrics.
 
 - [ ] ORCID created + linked to arXiv account (permanent author ID for "Ganesh S")
 - [ ] Related work paragraph with 4–6 real citations (Mem0, Zep, MemGPT, HippoRAG)
-- [ ] System figure (write path / read path diagram)
+- [ ] System figure (write path / read path diagram) — `figures/brain-architecture.pdf`; regenerate with `python3 figures/generate_architecture.py`
 - [ ] LongMemEval full number OR remove table row and say "deferred"
 - [ ] Limitations paragraph (CPU ingest, no multi-tenant eval at scale)
 - [ ] Optional: comparison table vs Mem0/Zep on LoCoMo *same metric*

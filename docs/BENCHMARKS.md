@@ -104,10 +104,31 @@ Config: `connect_index()`, ingest dialog + observations, `--rag-mode all --top-k
 | Field | Value |
 |---|---|
 | **What** | 500 questions testing 6 abilities: single/multi-session, temporal, knowledge update, … |
-| **Metrics** | End-to-end QA accuracy with memory module |
+| **Metrics** | Official **session_recall@K** (gold `answer_session_ids` in top-K); end-to-end QA with LLM judge is separate |
 | **Used by** | Mem0, Zep, multiple 2024–2025 memory papers |
-| **Paper** | Wu et al., *LongMemEval: Benchmarking Long-Term Memory in LLM Agents* |
-| **Status** | Recommended alongside LoCoMo for agent-specific credibility |
+| **Paper** | Wu et al., *LongMemEval: Benchmarking Long-Term Memory in LLM Agents*, ICLR 2025 |
+| **Status** | **Full eval complete** — 96.8% session recall@8 (frozen `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json`) |
+| **In-repo** | `benchmarks/longmemeval_bench.py`, `benchmarks/longmemeval_colab.ipynb`, `docs/LONGMEMEVAL_ROADMAP.md` |
+
+**FluctlightDB results (July 2026, LongMemEval-S v2, session granularity):**
+
+| Config | session@8 | sec/q | Notes |
+|--------|----------:|------:|-------|
+| session + dual-key + query-expand (MiniLM) | 73.3% | ~372 | preference slice only |
+| **session + dual-key + query-expand (mpnet, Colab GPU)** | **96.8%** | **6.4** | 484/500; index mode |
+
+By type (mpnet full): knowledge-update 100%, multi-session 98.5%, single-session-user 98.6%, single-session-assistant 98.2%, temporal-reasoning 96.2%, **single-session-preference 76.7%** (remaining gap).
+
+```bash
+# Local (CPU embeds slow; use Colab notebook for full run)
+export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8794
+./scripts/start-embed-mpnet.sh
+python3 benchmarks/longmemeval_bench.py \
+  --granularity session --metric session \
+  --dual-key --query-expand --top-k 8 --mode index
+```
+
+Leaderboard context: gbrain 97.6% R@5 (hybrid + text-embedding-3-large); YourMemory 95.8% R@5 (mpnet + BM25).
 
 ---
 
@@ -210,4 +231,5 @@ pip install chromadb pytrec-eval-terrier fluctlightdb[native]
 
 | Date | Change |
 |---|---|
+| 2026-07 | LongMemEval-S: 96.8% session@8 (mpnet, Colab); frozen in `longmemeval-colab-mpnet-2026-07-03.json` |
 | 2025-06 | Initial BENCHMARKS.md: BEIR harness in-repo, FAMB, Tier-1 citation table, connect vs connect_index |

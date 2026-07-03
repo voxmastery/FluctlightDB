@@ -13,7 +13,7 @@ datasets:
 
 # FluctlightDB: A Memory Model of Data for AI Agents
 
-**Preprint · June 2026 · DOI: [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890) · arXiv pending**
+**Preprint · July 2026 · DOI: [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890) · arXiv cs.DB (pending)**
 
 **Author:** Ganesh S · [ORCID 0009-0006-7758-4114](https://orcid.org/0009-0006-7758-4114) · voxmastery@gmail.com
 
@@ -26,6 +26,7 @@ Long-term agent memory is a **third data model** — not SQL rows, not vector AN
 | Benchmark | Metric | Result |
 |-----------|--------|--------|
 | **LoCoMo** (10 conv, 1,982 gold spans) | Mean evidence recall @ k=150 | **98.1%** |
+| **LongMemEval-S** (500 questions) | session_recall@8 | **96.8%** (484/500) |
 | **BEIR SciFact** | nDCG@10 | **0.645** (ties Chroma + MiniLM) |
 | **FAMB** | Macro (index / agent) | **98% / 97%** |
 
@@ -35,7 +36,7 @@ Frozen metrics: [fluctlightdb-benchmarks](https://huggingface.co/datasets/Voxies
 
 For fifty years, data systems answered two questions: which records match a predicate (relational), and which vectors lie nearest a query (vector). Autonomous agents ask a third: *what have I learned, and what of it can I trust?*
 
-We present **FluctlightDB**, an embedded brain-native database with write path `experience()` and read path `activate()`. On full LoCoMo it recalls **98.1%** of gold evidence (warm and cold-start identical). On BEIR SciFact it matches a tuned Chroma baseline; on FAMB it scores 97–98% macro.
+We present **FluctlightDB**, an embedded brain-native database with write path `experience()` and read path `activate()`. On full LoCoMo it recalls **98.1%** of gold evidence. On LongMemEval-S it scores **96.8%** session recall@8. On BEIR SciFact it matches a tuned Chroma baseline; on FAMB it scores 97–98% macro.
 
 ## Install
 
@@ -58,6 +59,8 @@ brain.checkpoint()
 |----------|-----|
 | **DOI (Zenodo preprint)** | https://doi.org/10.5281/zenodo.20949890 |
 | **LaTeX source** | https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1 |
+| **Figure 1** | Brain directory + engram + `experience()` / `activate()` paths |
+| **Figures 2–3** | Benchmark summary + LongMemEval by type — [`papers/figures/`](https://github.com/voxmastery/FluctlightDB/tree/main/papers/figures) |
 | **Interactive viewer (Space)** | https://huggingface.co/spaces/Voxiesz/fluctlightdb-paper-viewer |
 | **GitHub** | https://github.com/voxmastery/FluctlightDB |
 | **PyPI** | https://pypi.org/project/fluctlightdb/ |

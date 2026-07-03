@@ -34,3 +34,9 @@ funding.json
 papers/submit/ieee-access/
 papers/site/
 scripts/launch-paper.sh
+
+# LaTeX build artifacts (keep main.pdf committed)
+papers/arxiv-v1/*.aux
+papers/arxiv-v1/*.log
+papers/arxiv-v1/*.out
+papers/arxiv-v1/*.blg

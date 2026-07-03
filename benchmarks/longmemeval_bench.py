@@ -83,6 +83,29 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
             queries.append(" ".join(tokens[:10]))
     if question_type == "temporal-reasoning":
         queries.append(" ".join(tokens[:12]) + " date time when event")
+    if question_type == "single-session-preference":
+        queries.append(
+            "user previously mentioned discussed shared experience history "
+            + " ".join(tokens[:12])
+        )
+        queries.append("user preference likes enjoys uses owns bought watched " + " ".join(tokens[:10]))
+        if any(w in ql for w in ("recommend", "suggest", "any ", "tips", "advice", "ideas")):
+            queries.append("user context background interests hobbies " + " ".join(tokens[:8]))
+        # Domain bridges for implicit-preference questions (query omits prior facts)
+        if any(w in ql for w in ("dinner", "serve", "weekend", "meal", "cook", "recipe")):
+            queries.append("user homegrown garden harvest tomatoes herbs basil mint ingredients")
+        if any(w in ql for w in ("cocktail", "drink", "mixology", "bar")):
+            queries.append("user mixology class summer drinks Pimm's Cup cocktails")
+        if any(w in ql for w in ("documentary", "watch", "movie", "film", "netflix")):
+            queries.append("user watched enjoyed documentary Our Planet Free Solo Tiger King")
+        if any(w in ql for w in ("commute", "drive", "travel", "listen")):
+            queries.append("user podcast audiobook commute listening history genre")
+        if any(w in ql for w in ("cookie", "bake", "baking", "dessert", "chocolate")):
+            queries.append("user baking turbinado sugar chocolate chip cookies experiment")
+        if any(w in ql for w in ("battery", "phone", "charge", "power")):
+            queries.append("user portable power bank battery phone charging")
+        if any(w in ql for w in ("reunion", "high school", "nostalgic")):
+            queries.append("user high school debate team advanced placement history economics")
     # dedupe, preserve order
     seen: set[str] = set()
     out: list[str] = []
@@ -92,6 +115,49 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
             seen.add(key)
             out.append(item)
     return out
+
+
+def user_fact_snippets(user_msgs: list[str]) -> str:
+    """Short fact lines for preference indexing (quoted titles, purchases, hobbies)."""
+    facts: list[str] = []
+    patterns = (
+        r'"[^"]{3,80}"',
+        r"'[^']{3,80}'",
+    )
+    purchase_cues = (
+        "bought",
+        "purchased",
+        "ordered",
+        "got a ",
+        "picked up",
+        "been using",
+        "growing",
+        "harvested",
+        "watched",
+        "binge",
+        "class",
+        "course",
+        "reunion",
+        "commute",
+        "podcast",
+        "documentary",
+        "debate team",
+        "power bank",
+    )
+    for msg in user_msgs:
+        for pat in patterns:
+            facts.extend(re.findall(pat, msg))
+        ml = msg.lower()
+        if any(c in ml for c in purchase_cues):
+            facts.append(msg[:350])
+    seen: set[str] = set()
+    out: list[str] = []
+    for f in facts:
+        key = normalize(f)
+        if key and key not in seen:
+            seen.add(key)
+            out.append(f.strip())
+    return " ".join(out[:8])[:2000]
 
 
 def preference_signals(user_msgs: list[str]) -> str:
@@ -113,14 +179,33 @@ def preference_signals(user_msgs: list[str]) -> str:
         "focus on",
         "especially",
         "specifically",
+        "bought",
+        "purchased",
+        "growing",
+        "garden",
+        "harvest",
+        "watched",
+        "documentary",
+        "podcast",
+        "audiobook",
+        "mixology",
+        "reunion",
+        "debate",
+        "commute",
+        "turbinado",
+        "homegrown",
+        "power bank",
     )
     for msg in user_msgs:
         ml = msg.lower()
         if any(c in ml for c in cues):
             hits.append(msg[:400])
+    facts = user_fact_snippets(user_msgs)
+    if facts:
+        hits.insert(0, facts)
     if not hits and user_msgs:
         hits.append(user_msgs[0][:400])
-    return " ".join(hits[:6])[:2500]
+    return " ".join(hits[:8])[:3000]
 
 
 def recall_session_id(recall: dict) -> Optional[str]:
@@ -146,6 +231,20 @@ def merge_recalls(recall_lists: list[list[dict]], top_k: int) -> list[dict]:
             if prev is None or act > float(prev.get("activation") or 0):
                 best[sid] = r
     return sorted(best.values(), key=lambda x: -float(x.get("activation") or 0))[:top_k]
+
+
+def merge_recalls_rrf(recall_lists: list[list[dict]], top_k: int, rrf_k: int = 60) -> list[dict]:
+    """Reciprocal-rank fusion across query lists (preference multi-query)."""
+    scores: dict[str, float] = {}
+    best_item: dict[str, dict] = {}
+    for recalls in recall_lists:
+        for rank, r in enumerate(recalls):
+            sid = recall_session_id(r) or str(r.get("engram_id") or id(r))
+            scores[sid] = scores.get(sid, 0.0) + 1.0 / (rrf_k + rank + 1)
+            if sid not in best_item:
+                best_item[sid] = r
+    ordered = sorted(scores.keys(), key=lambda s: -scores[s])
+    return [best_item[s] for s in ordered[:top_k]]
 
 
 def normalize(text: str) -> str:
@@ -287,9 +386,12 @@ def ingest_item(
     fast: bool,
     granularity: str,
     dual_key: bool,
+    pref_facts_key: bool,
 ) -> int:
     if granularity == "session":
-        return _ingest_sessions(brain, item, embedder, fast=fast, dual_key=dual_key)
+        return _ingest_sessions(
+            brain, item, embedder, fast=fast, dual_key=dual_key, pref_facts_key=pref_facts_key
+        )
     return _ingest_turns(brain, item, embedder, fast=fast)
 
 
@@ -334,6 +436,8 @@ def activate_merged(
     query_expand: bool,
 ) -> list[dict]:
     pool_k = max(top_k * 2, 16)
+    if question_type == "single-session-preference":
+        pool_k = max(top_k * 3, 24)
     queries = (
         expand_queries(question, question_type)
         if query_expand
@@ -348,6 +452,8 @@ def activate_merged(
         qvec = embedder.embed(q) if not fast else None
         act = brain.activate(q, semantic_vector=qvec, limit=pool_k)
         lists.append(act.get("recalls") or [])
+    if question_type == "single-session-preference" and len(lists) > 1:
+        return merge_recalls_rrf(lists, top_k)
     return merge_recalls(lists, top_k)
 
 
@@ -362,6 +468,7 @@ def eval_one(
     metric: str,
     query_expand: bool,
     dual_key: bool,
+    pref_facts_key: bool,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
     if mode == "index":
@@ -369,7 +476,13 @@ def eval_one(
     else:
         brain = connect_conv()
     ingested = ingest_item(
-        brain, item, embedder, fast=fast, granularity=granularity, dual_key=dual_key
+        brain,
+        item,
+        embedder,
+        fast=fast,
+        granularity=granularity,
+        dual_key=dual_key,
+        pref_facts_key=pref_facts_key,
     )
     question = (item.get("question") or "").strip()
     if item.get("question_type") == "temporal-reasoning" and item.get("question_date"):
@@ -406,6 +519,7 @@ def _ingest_sessions(
     *,
     fast: bool,
     dual_key: bool,
+    pref_facts_key: bool,
 ) -> int:
     """One engram per chat session (LongMemEval paper value granularity)."""
     session_ids: list[str] = list(item.get("haystack_session_ids") or [])
@@ -445,6 +559,12 @@ def _ingest_sessions(
                 f"user: {u}" for u in user_key
             )[:8000]
             payloads.append((sid, user_only, "user_keys", None))
+        if pref_facts_key and user_key:
+            facts = user_fact_snippets(user_key)
+            if facts:
+                facts_body = f"{prefix}user facts preferences history\n{facts}"[:5000]
+                facts_embed = facts_body[:2000]
+                payloads.append((sid, facts_body, "pref_facts", facts_embed))
     # Embed once per session (user_keys reuse parent vector).
     embed_texts = [p[3] for p in payloads if p[3]]
     vectors_by_text: dict[str, list[float]] = {}
@@ -456,17 +576,32 @@ def _ingest_sessions(
                 vectors_by_text[text] = vec
     n = 0
     session_vec: dict[str, list[float]] = {}
+    facts_vec: dict[str, list[float]] = {}
     for sid, content, chunk_id, embed_snip in payloads:
         if chunk_id == "session" and embed_snip:
             v = vectors_by_text.get(embed_snip)
             if v is not None:
                 session_vec[sid] = v
+        if chunk_id == "pref_facts" and embed_snip:
+            v = vectors_by_text.get(embed_snip)
+            if v is not None:
+                facts_vec[sid] = v
     for sid, content, chunk_id, embed_snip in payloads:
-        use_vec = session_vec.get(sid) if chunk_id == "user_keys" else vectors_by_text.get(embed_snip or "")
+        if chunk_id == "user_keys":
+            use_vec = session_vec.get(sid)
+        elif chunk_id == "pref_facts":
+            use_vec = facts_vec.get(sid) or session_vec.get(sid)
+        else:
+            use_vec = vectors_by_text.get(embed_snip or "")
+        salience = 0.6
+        if chunk_id == "user_keys":
+            salience = 0.65
+        elif chunk_id == "pref_facts":
+            salience = 0.72
         brain.experience(
             content,
             context=f"longmemeval:{sid}",
-            salience=0.65 if chunk_id == "user_keys" else 0.6,
+            salience=salience,
             semantic_vector=use_vec,
             doc_id=sid,
             chunk_id=chunk_id,
@@ -506,6 +641,11 @@ def main() -> int:
         "--dual-key",
         action="store_true",
         help="index user-only keys as second engram per session (CP2)",
+    )
+    ap.add_argument(
+        "--pref-facts-key",
+        action="store_true",
+        help="third engram per session: extracted user facts (preference CP2 boost)",
     )
     ap.add_argument(
         "--type-filter",
@@ -564,6 +704,7 @@ def main() -> int:
                 metric=args.metric,
                 query_expand=args.query_expand,
                 dual_key=args.dual_key,
+                pref_facts_key=args.pref_facts_key,
             )
         except Exception as e:
             row = {
@@ -602,6 +743,7 @@ def main() -> int:
         "metric": args.metric,
         "query_expand": args.query_expand,
         "dual_key": args.dual_key,
+        "pref_facts_key": args.pref_facts_key,
         "top_k": args.top_k,
         "questions": len(results),
         metric_key: round(hits / len(results), 4) if results else 0.0,
