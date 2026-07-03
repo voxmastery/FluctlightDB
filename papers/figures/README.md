@@ -17,9 +17,12 @@ Design spec: [`docs/superpowers/specs/2026-07-03-brain-figure-redesign-design.md
 ## Regenerate
 
 ```bash
-pip install matplotlib networkx
+pip install matplotlib networkx playwright
+python3 -m playwright install chromium   # one-time
 python3 papers/figures/generate_all.py
 ```
+
+Figure 1 uses **Playwright** (`fig1_template.html`) for clean layout. Bar charts (Fig 2–3) use matplotlib.
 
 Then rebuild the PDF:
 
