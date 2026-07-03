@@ -8,78 +8,263 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+import networkx as nx
+import numpy as np
+from matplotlib.gridspec import GridSpec
+from matplotlib.patches import Ellipse, FancyArrowPatch, FancyBboxPatch
 
 ROOT = Path(__file__).resolve().parent
 METRICS = ROOT.parents[1] / "benchmarks" / "results" / "paper-2026-07-03.json"
 
+# Print-safe academic palette
+C_STORAGE = "#4C78A8"
+C_SEED = "#72B7B2"
+C_WRITE = "#F28E2B"
+C_READ = "#59A14F"
+C_GRAPH = "#B07AA1"
+C_ENGRAM = "#9C755F"
+C_EDGE = "#64748B"
+C_BG_PANEL = "#F8FAFC"
+C_BORDER = "#334155"
+
 
 def save(fig, stem: str) -> None:
-    fig.savefig(ROOT / f"{stem}.pdf", bbox_inches="tight")
-    fig.savefig(ROOT / f"{stem}.png", dpi=200, bbox_inches="tight")
+    fig.savefig(ROOT / f"{stem}.pdf", bbox_inches="tight", facecolor="white")
+    fig.savefig(ROOT / f"{stem}.png", dpi=200, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"wrote {stem}.pdf / .png")
 
 
-def fig_architecture() -> None:
-    fig, ax = plt.subplots(figsize=(11, 6.2))
+def _panel_label(ax, letter: str, title: str) -> None:
+    ax.text(
+        0.02, 0.98, f"({letter}) {title}",
+        transform=ax.transAxes, fontsize=10, fontweight="bold",
+        va="top", ha="left", color=C_BORDER,
+    )
+
+
+def _rounded_box(ax, xy, w, h, fc, ec=C_BORDER, lw=1.0, alpha=1.0, zorder=1):
+    x, y = xy
+    patch = FancyBboxPatch(
+        (x, y), w, h,
+        boxstyle="round,pad=0.012,rounding_size=0.02",
+        linewidth=lw, edgecolor=ec, facecolor=fc, alpha=alpha, zorder=zorder,
+        transform=ax.transAxes,
+    )
+    ax.add_patch(patch)
+    return patch
+
+
+def _arrow_axes(ax, p1, p2, color=C_EDGE, style="-|>", lw=1.1):
+    arr = FancyArrowPatch(
+        p1, p2, arrowstyle=style, mutation_scale=11,
+        linewidth=lw, color=color, transform=ax.transAxes, zorder=3,
+        connectionstyle="arc3,rad=0.08",
+    )
+    ax.add_patch(arr)
+
+
+def fig_hero_graph(ax) -> None:
+    """Panel (a): cue-driven activation graph with subtle brain contour."""
+    ax.set_xlim(-1.35, 1.35)
+    ax.set_ylim(-1.05, 1.15)
+    ax.axis("off")
+    _panel_label(ax, "a", "Cue-driven memory activation")
+
+    # Brain casing (faint ellipse behind graph)
+    brain = Ellipse(
+        (0, 0.05), 2.35, 1.85, angle=0,
+        facecolor="#EEF2FF", edgecolor="#CBD5E1", linewidth=1.8, alpha=0.55, zorder=0,
+    )
+    ax.add_patch(brain)
+    ax.text(0, 1.02, "agent memory field", ha="center", va="bottom", fontsize=7.5, color="#94A3B8")
+
+    G = nx.DiGraph()
+    G.add_edges_from([
+        ("Cue", "FTS5"), ("Cue", "HNSW"),
+        ("FTS5", "E1"), ("FTS5", "E2"),
+        ("HNSW", "E2"), ("HNSW", "E3"),
+        ("E1", "G1"), ("E2", "G1"), ("E2", "G2"), ("E3", "G2"),
+        ("G1", "Rank"), ("G2", "Rank"),
+    ])
+    pos = {
+        "Cue": (0, 0.82),
+        "FTS5": (-0.62, 0.28),
+        "HNSW": (0.62, 0.28),
+        "E1": (-0.78, -0.22),
+        "E2": (0.0, -0.18),
+        "E3": (0.78, -0.22),
+        "G1": (-0.35, -0.62),
+        "G2": (0.35, -0.62),
+        "Rank": (0, -0.92),
+    }
+    node_style = {
+        "Cue": (C_STORAGE, 520),
+        "FTS5": (C_SEED, 380), "HNSW": (C_SEED, 380),
+        "E1": (C_ENGRAM, 340), "E2": (C_ENGRAM, 400), "E3": (C_ENGRAM, 340),
+        "G1": (C_GRAPH, 320), "G2": (C_GRAPH, 320),
+        "Rank": (C_READ, 460),
+    }
+    labels_display = {
+        "Cue": "cue", "FTS5": "FTS5\nseed", "HNSW": "HNSW\nseed",
+        "E1": "engram", "E2": "engram", "E3": "engram",
+        "G1": "graph\nspread", "G2": "graph\nspread", "Rank": "fused\nrank",
+    }
+
+    for u, v in G.edges():
+        x1, y1 = pos[u]
+        x2, y2 = pos[v]
+        rad = 0.12 if u.startswith("E") else 0.06
+        ax.annotate(
+            "", xy=(x2, y2), xytext=(x1, y1),
+            arrowprops=dict(
+                arrowstyle="-|>", color=C_EDGE, lw=1.0,
+                connectionstyle=f"arc3,rad={rad}",
+                shrinkA=14, shrinkB=14,
+            ),
+            zorder=1,
+        )
+
+    for n, (x, y) in pos.items():
+        color, size = node_style[n]
+        ax.scatter(x, y, s=size, c=color, edgecolors="white", linewidths=1.5, zorder=2, alpha=0.95)
+        ax.text(x, y, labels_display[n], ha="center", va="center", fontsize=7, color="white", fontweight="bold", zorder=3)
+
+    ax.text(-1.2, -1.0, "activate(cue)", fontsize=8, color=C_READ, fontstyle="italic")
+    ax.text(0.55, 0.55, "write path\nexperience()", fontsize=7, color=C_WRITE, ha="center",
+            bbox=dict(boxstyle="round,pad=0.3", fc="#FFF7ED", ec=C_WRITE, lw=0.8, alpha=0.9))
+
+
+def fig_technical_stack(ax) -> None:
+    """Panels (b)(c)(d): directory, engram, sidecar — stacked, no overlap."""
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
 
-    def box(xy, w, h, title, lines, fc):
-        x, y = xy
-        patch = FancyBboxPatch(
-            (x, y), w, h,
-            boxstyle="round,pad=0.02,rounding_size=0.02",
-            linewidth=1.2, edgecolor="#333", facecolor=fc,
-        )
-        ax.add_patch(patch)
-        ax.text(x + 0.02, y + h - 0.05, title, fontsize=11, fontweight="bold", va="top")
-        ax.text(x + 0.02, y + h - 0.11, "\n".join(lines), fontsize=8.5, va="top", family="monospace")
+    _rounded_box(ax, (0.04, 0.66), 0.92, 0.30, C_BG_PANEL)
+    ax.text(0.06, 0.93, "(b) Agent brain directory", fontsize=9, fontweight="bold", va="top", color=C_BORDER)
+    ax.text(
+        0.06, 0.86,
+        "manifest.json\n"
+        "hippocampus/   engrams\n"
+        "graph/         synapses\n"
+        "recall_index.sqlite\n"
+        "  FTS5 + vector blobs\n"
+        "*.wal  →  checkpoint()",
+        fontsize=7.5, va="top", family="monospace", color="#1E293B",
+    )
 
-    def arrow(p1, p2, text=None):
-        arr = FancyArrowPatch(p1, p2, arrowstyle="-|>", mutation_scale=12, linewidth=1.2, color="#444")
-        ax.add_patch(arr)
-        if text:
-            mx, my = (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2
-            ax.text(mx, my + 0.02, text, fontsize=7.5, ha="center", color="#555")
+    _rounded_box(ax, (0.04, 0.35), 0.92, 0.27, "#F5F3FF")
+    ax.text(0.06, 0.59, "(c) Engram (logical unit)", fontsize=9, fontweight="bold", va="top", color=C_BORDER)
+    ax.text(
+        0.06, 0.53,
+        "content · context · outcome\n"
+        "provenance: kind, verified\n"
+        "rag: doc_id, chunk_id\n"
+        "semantic_vector (opt.) · graph wiring",
+        fontsize=7.5, va="top", color="#1E293B",
+    )
 
-    box((0.04, 0.52), 0.34, 0.38, "(a) Agent brain directory",
-        ["manifest.json", "hippocampus/  engrams", "graph/        synapses",
-         "recall_index.sqlite", "  FTS5 + vector blobs", "*.wal  -> checkpoint()"], "#e8f0ff")
-    box((0.44, 0.62), 0.28, 0.28, "(b) Engram (logical unit)",
-        ["content, context, outcome", "provenance: kind, verified", "rag: doc_id, chunk_id",
-         "semantic_vector (opt.)", "graph neuron ensemble"], "#f3e8ff")
-    box((0.44, 0.38), 0.28, 0.18, "Recall sidecar",
-        ["FTS5 lexical seeds", "HNSW semantic seeds"], "#e8f8ec")
-    arrow((0.58, 0.62), (0.58, 0.56), "index")
-    box((0.08, 0.08), 0.22, 0.22, "(c) Write: experience()",
-        ["separation gate", "encode episode", "wire graph", "upsert sidecar"], "#fff3e6")
-    box((0.36, 0.08), 0.22, 0.22, "(d) Read: activate(cue)",
-        ["lexical + semantic seed", "graph spread (0-4 hops)", "fuse scores", "provenance boost"], "#fff3e6")
-    arrow((0.20, 0.30), (0.20, 0.52))
-    arrow((0.47, 0.30), (0.50, 0.38))
-    arrow((0.30, 0.19), (0.36, 0.19), "same store")
-    box((0.64, 0.10), 0.32, 0.80, "Third data model",
-        ["Relational: typed rows,", "  no provenance recall", "",
-         "Vector DB: ANN top-k,", "  no episode graph", "",
-         "FluctlightDB: engram +", "  graph + hybrid index", "  in one contract"], "#f5f5f5")
-    ax.text(0.5, 0.98, "Figure 1 — FluctlightDB persistence and recall layout",
-            ha="center", va="top", fontsize=13, fontweight="bold")
-    ax.text(0.5, 0.94, "One embedded directory per agent — experience() writes; activate() recalls",
-            ha="center", va="top", fontsize=9, color="#555")
+    _rounded_box(ax, (0.04, 0.04), 0.92, 0.26, "#ECFDF5")
+    ax.text(0.06, 0.27, "(d) Recall sidecar", fontsize=9, fontweight="bold", va="top", color=C_BORDER)
+    ax.text(0.06, 0.20, "FTS5 lexical seeds  +  HNSW semantic seeds", fontsize=7.5, va="top", color="#1E293B")
+
+    _arrow_axes(ax, (0.5, 0.35), (0.5, 0.30), color=C_EDGE)
+    ax.text(0.52, 0.325, "index", fontsize=6.5, color="#64748B")
+
+
+def fig_write_path(ax) -> None:
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    _rounded_box(ax, (0.05, 0.08), 0.90, 0.84, "#FFF7ED", ec=C_WRITE)
+    _panel_label(ax, "e", "Write: experience()")
+    steps = [
+        "1. separation gate",
+        "2. encode episode",
+        "3. wire graph synapses",
+        "4. upsert recall sidecar",
+    ]
+    ax.text(0.10, 0.72, "\n".join(steps), fontsize=8.5, va="top", color="#1E293B", linespacing=1.45)
+
+
+def fig_read_path(ax) -> None:
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    _rounded_box(ax, (0.05, 0.08), 0.90, 0.84, "#ECFDF5", ec=C_READ)
+    _panel_label(ax, "f", "Read: activate(cue)")
+    steps = [
+        "1. lexical + semantic seed",
+        "2. graph spread (0–4 hops)",
+        "3. fuse FTS5 + vector scores",
+        "4. provenance boost → rank",
+    ]
+    ax.text(0.10, 0.72, "\n".join(steps), fontsize=8.5, va="top", color="#1E293B", linespacing=1.45)
+
+
+def fig_third_model(ax) -> None:
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    _panel_label(ax, "g", "Third data model")
+
+    cols = [
+        ("Relational", ["Typed rows", "Predicate match", "No episode graph"], "#F1F5F9"),
+        ("Vector DB", ["ANN top-k", "Embedding index", "No provenance recall"], "#F1F5F9"),
+        ("FluctlightDB", ["Engram + graph", "Hybrid FTS5+HNSW", "Agent-native contract"], "#EEF2FF"),
+    ]
+    w = 0.30
+    for i, (title, lines, fc) in enumerate(cols):
+        x = 0.02 + i * (w + 0.02)
+        ec = C_STORAGE if i == 2 else C_BORDER
+        lw = 1.4 if i == 2 else 1.0
+        _rounded_box(ax, (x, 0.12), w, 0.72, fc, ec=ec, lw=lw)
+        ax.text(x + 0.03, 0.78, title, fontsize=8.5, fontweight="bold", va="top", color=C_BORDER)
+        ax.text(x + 0.03, 0.68, "\n".join(lines), fontsize=7.2, va="top", color="#1E293B")
+
+
+def fig_architecture() -> None:
+    """Combined Figure 1: hero + technical panels (arXiv figure*)."""
+    fig = plt.figure(figsize=(12, 7.5), facecolor="white")
+    gs = GridSpec(
+        2, 3, figure=fig,
+        height_ratios=[1.15, 0.85],
+        width_ratios=[1.35, 0.9, 0.9],
+        hspace=0.28, wspace=0.22,
+        left=0.04, right=0.98, top=0.97, bottom=0.05,
+    )
+
+    ax_hero = fig.add_subplot(gs[0, 0])
+    ax_stack = fig.add_subplot(gs[0, 1:])
+    ax_write = fig.add_subplot(gs[1, 0])
+    ax_read = fig.add_subplot(gs[1, 1])
+    ax_model = fig.add_subplot(gs[1, 2])
+
+    fig_hero_graph(ax_hero)
+    fig_technical_stack(ax_stack)
+    fig_write_path(ax_write)
+    fig_read_path(ax_read)
+    fig_third_model(ax_model)
+
     save(fig, "01-brain-architecture")
+
+
+def fig_hero_standalone() -> None:
+    """Standalone hero for README / GitHub (panel a only, larger)."""
+    fig, ax = plt.subplots(figsize=(8, 6.5), facecolor="white")
+    fig_hero_graph(ax)
+    save(fig, "01-brain-hero")
 
 
 def fig_benchmark_summary() -> None:
     labels = ["LoCoMo\nevidence recall", "LongMemEval-S\nsession@8", "BEIR SciFact\nnDCG@10", "FAMB\nmacro (index)"]
-    values = [98.1, 96.8, 64.5, 98.0]  # nDCG scaled to % for visual comparison
+    values = [98.1, 96.8, 64.5, 98.0]
     colors = ["#4C78A8", "#59A14F", "#E15759", "#B07AA1"]
     display = ["98.1%", "96.8%", "0.645", "98%"]
 
-    fig, ax = plt.subplots(figsize=(8, 4.5))
-    bars = ax.bar(labels, values, color=colors, edgecolor="#333", linewidth=0.8)
+    fig, ax = plt.subplots(figsize=(8, 4.5), facecolor="white")
+    bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
     ax.set_ylim(0, 105)
     ax.set_ylabel("Score (% scale; BEIR nDCG×100)")
     ax.set_title("Figure 2 — FluctlightDB headline benchmark results (July 2026)")
@@ -108,8 +293,8 @@ def fig_longmemeval_by_type() -> None:
     values = [data[o[0]] * 100 for o in order]
     colors = ["#59A14F" if v >= 90 else "#F28E2B" if v >= 80 else "#E15759" for v in values]
 
-    fig, ax = plt.subplots(figsize=(9, 4.5))
-    bars = ax.bar(labels, values, color=colors, edgecolor="#333", linewidth=0.8)
+    fig, ax = plt.subplots(figsize=(9, 4.5), facecolor="white")
+    bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
     ax.set_ylim(0, 105)
     ax.set_ylabel("session_recall@8 (%)")
     ax.set_title("Figure 3 — LongMemEval-S by question type (484/500 overall = 96.8%)")
@@ -126,6 +311,7 @@ def fig_longmemeval_by_type() -> None:
 def main() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     fig_architecture()
+    fig_hero_standalone()
     fig_benchmark_summary()
     fig_longmemeval_by_type()
     print(f"All figures in {ROOT}")
