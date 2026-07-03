@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: #fff;
+    color: #1e293b;
+    width: 1440px;
+    padding: 28px 32px 32px;
+  }
+  .figure {
+    display: grid;
+    grid-template-columns: 1.45fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 28px 32px;
+  }
+  .panel-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+  .panel-title span { color: #64748b; font-weight: 600; }
+
+  /* ── (a) Hero SVG ── */
+  .hero-wrap {
+    background: #fafbfc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px 16px 18px;
+    min-height: 440px;
+  }
+  .hero-svg { width: 100%; height: auto; display: block; }
+  .hero-legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+  }
+  .hero-legend .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+
+  /* ── Right stack b,c,d ── */
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .card {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 14px 16px 14px;
+    flex: 1;
+  }
+  .card.blue  { background: #f0f5ff; border-color: #93b4e8; }
+  .card.purple{ background: #f5f3ff; border-color: #c4b5fd; }
+  .card.green { background: #ecfdf5; border-color: #6ee7b7; }
+  .card h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 10px;
+  }
+  .card pre, .card p {
+    font-size: 13px;
+    line-height: 1.55;
+    color: #1e293b;
+  }
+  .card pre { font-family: "SF Mono", "Consolas", monospace; font-size: 12.5px; }
+  .index-arrow {
+    text-align: center;
+    font-size: 11px;
+    color: #94a3b8;
+    margin: -6px 0;
+    line-height: 1;
+  }
+
+  /* ── Bottom row ── */
+  .bottom {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.15fr;
+    gap: 24px;
+  }
+  .flow-card {
+    border-radius: 10px;
+    padding: 16px 18px;
+    min-height: 200px;
+  }
+  .flow-card.write { background: #fff7ed; border: 1.5px solid #f28e2b; }
+  .flow-card.read  { background: #ecfdf5; border: 1.5px solid #59a14f; }
+  .flow-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+  .flow-card.write h3 { color: #c2410c; }
+  .flow-card.read  h3 { color: #15803d; }
+  .flow-card ol {
+    padding-left: 20px;
+    font-size: 13.5px;
+    line-height: 1.75;
+    color: #1e293b;
+  }
+
+  /* ── (g) comparison ── */
+  .compare {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 14px;
+    background: #fafbfc;
+    min-height: 200px;
+  }
+  .compare h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: #334155; }
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .compare-col {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 12px 10px;
+    background: #f8fafc;
+    min-height: 130px;
+  }
+  .compare-col.hl {
+    background: #eef2ff;
+    border: 1.5px solid #4c78a8;
+  }
+  .compare-col h4 {
+    font-size: 12.5px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #334155;
+  }
+  .compare-col ul {
+    list-style: none;
+    font-size: 12px;
+    line-height: 1.65;
+    color: #475569;
+  }
+  .compare-col li::before { content: "· "; color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="figure">
+
+  <!-- (a) Hero -->
+  <div class="hero-wrap">
+    <div class="panel-title"><span>(a)</span> Cue-driven memory activation</div>
+    <svg class="hero-svg" viewBox="0 0 520 400" xmlns="http://www.w3.org/2000/svg">
+      <!-- brain casing -->
+      <ellipse cx="260" cy="205" rx="228" ry="172" fill="#eef2ff" stroke="#cbd5e1" stroke-width="1.5" opacity="0.7"/>
+
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#64748b"/>
+        </marker>
+      </defs>
+
+      <!-- edges (endpoints offset to circle perimeters) -->
+      <g stroke="#94a3b8" stroke-width="1.3" fill="none" marker-end="url(#arr)">
+        <line x1="260" y1="92" x2="210" y2="118"/>
+        <line x1="260" y1="92" x2="310" y2="118"/>
+        <line x1="195" y1="158" x2="138" y2="188"/>
+        <line x1="195" y1="158" x2="245" y2="188"/>
+        <line x1="325" y1="158" x2="275" y2="188"/>
+        <line x1="325" y1="158" x2="382" y2="188"/>
+        <line x1="138" y1="232" x2="178" y2="268"/>
+        <line x1="260" y1="232" x2="260" y2="268"/>
+        <line x1="382" y1="232" x2="342" y2="268"/>
+        <line x1="195" y1="312" x2="245" y2="342"/>
+        <line x1="325" y1="312" x2="275" y2="342"/>
+      </g>
+
+      <!-- nodes -->
+      <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+        <circle cx="260" cy="68" r="32" fill="#4c78a8" stroke="#fff" stroke-width="2.5"/>
+        <text x="260" y="73" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">cue</text>
+
+        <circle cx="195" cy="140" r="28" fill="#72b7b2" stroke="#fff" stroke-width="2.5"/>
+        <text x="195" y="186" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">FTS5 seed</text>
+
+        <circle cx="325" cy="140" r="28" fill="#72b7b2" stroke="#fff" stroke-width="2.5"/>
+        <text x="325" y="186" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">HNSW seed</text>
+
+        <circle cx="115" cy="210" r="26" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
+        <text x="115" y="252" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">engram</text>
+
+        <circle cx="260" cy="210" r="26" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
+        <text x="260" y="252" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">engram</text>
+
+        <circle cx="405" cy="210" r="26" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
+        <text x="405" y="252" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">engram</text>
+
+        <circle cx="195" cy="290" r="24" fill="#b07aa1" stroke="#fff" stroke-width="2.5"/>
+        <text x="195" y="330" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">graph spread</text>
+
+        <circle cx="325" cy="290" r="24" fill="#b07aa1" stroke="#fff" stroke-width="2.5"/>
+        <text x="325" y="330" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">graph spread</text>
+
+        <circle cx="260" cy="362" r="28" fill="#59a14f" stroke="#fff" stroke-width="2.5"/>
+        <text x="260" y="367" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">fused rank</text>
+      </g>
+
+      <text x="24" y="392" font-size="12" fill="#59a14f" font-style="italic">activate(cue)</text>
+    </svg>
+    <div class="hero-legend">
+      <span><span class="dot" style="background:#f28e2b"></span>write path · experience()</span>
+      <span><span class="dot" style="background:#59a14f"></span>read path · activate(cue)</span>
+    </div>
+  </div>
+
+  <!-- (b)(c)(d) stack -->
+  <div class="stack">
+    <div class="card blue">
+      <h3>(b) Agent brain directory</h3>
+      <pre>manifest.json
+hippocampus/   engrams
+graph/         synapses
+recall_index.sqlite
+  FTS5 + vector blobs
+*.wal  →  checkpoint()</pre>
+    </div>
+    <div class="card purple">
+      <h3>(c) Engram (logical unit)</h3>
+      <p>content · context · outcome<br/>
+      provenance: kind, verified<br/>
+      rag: doc_id, chunk_id<br/>
+      semantic_vector (opt.) · graph wiring</p>
+    </div>
+    <div class="index-arrow">↓ index</div>
+    <div class="card green">
+      <h3>(d) Recall sidecar</h3>
+      <p>FTS5 lexical seeds &nbsp;+&nbsp; HNSW semantic seeds</p>
+    </div>
+  </div>
+
+  <!-- bottom row -->
+  <div class="bottom">
+    <div class="flow-card write">
+      <h3>(e) Write: experience()</h3>
+      <ol>
+        <li>separation gate</li>
+        <li>encode episode</li>
+        <li>wire graph synapses</li>
+        <li>upsert recall sidecar</li>
+      </ol>
+    </div>
+    <div class="flow-card read">
+      <h3>(f) Read: activate(cue)</h3>
+      <ol>
+        <li>lexical + semantic seed</li>
+        <li>graph spread (0–4 hops)</li>
+        <li>fuse FTS5 + vector scores</li>
+        <li>provenance boost → rank</li>
+      </ol>
+    </div>
+    <div class="compare">
+      <h3>(g) Third data model</h3>
+      <div class="compare-grid">
+        <div class="compare-col">
+          <h4>Relational</h4>
+          <ul><li>Typed rows</li><li>Predicate match</li><li>No episode graph</li></ul>
+        </div>
+        <div class="compare-col">
+          <h4>Vector DB</h4>
+          <ul><li>ANN top-k</li><li>Embedding index</li><li>No provenance recall</li></ul>
+        </div>
+        <div class="compare-col hl">
+          <h4>FluctlightDB</h4>
+          <ul><li>Engram + graph</li><li>Hybrid FTS5+HNSW</li><li>Agent-native contract</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

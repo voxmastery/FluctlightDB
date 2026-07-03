@@ -225,36 +225,17 @@ def fig_third_model(ax) -> None:
 
 
 def fig_architecture() -> None:
-    """Combined Figure 1: hero + technical panels (arXiv figure*)."""
-    fig = plt.figure(figsize=(12, 7.5), facecolor="white")
-    gs = GridSpec(
-        2, 3, figure=fig,
-        height_ratios=[1.15, 0.85],
-        width_ratios=[1.35, 0.9, 0.9],
-        hspace=0.28, wspace=0.22,
-        left=0.04, right=0.98, top=0.97, bottom=0.05,
-    )
+    """Combined Figure 1 via Playwright HTML/SVG (pixel-perfect layout)."""
+    from render_fig1_playwright import render
 
-    ax_hero = fig.add_subplot(gs[0, 0])
-    ax_stack = fig.add_subplot(gs[0, 1:])
-    ax_write = fig.add_subplot(gs[1, 0])
-    ax_read = fig.add_subplot(gs[1, 1])
-    ax_model = fig.add_subplot(gs[1, 2])
-
-    fig_hero_graph(ax_hero)
-    fig_technical_stack(ax_stack)
-    fig_write_path(ax_write)
-    fig_read_path(ax_read)
-    fig_third_model(ax_model)
-
-    save(fig, "01-brain-architecture")
+    render("01-brain-architecture")
 
 
 def fig_hero_standalone() -> None:
-    """Standalone hero for README / GitHub (panel a only, larger)."""
-    fig, ax = plt.subplots(figsize=(8, 6.5), facecolor="white")
-    fig_hero_graph(ax)
-    save(fig, "01-brain-hero")
+    """Standalone hero for README / GitHub (panel a only)."""
+    from render_fig1_playwright import render
+
+    render("01-brain-hero", hero_only=True)
 
 
 def fig_benchmark_summary() -> None:
