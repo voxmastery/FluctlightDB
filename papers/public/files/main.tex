@@ -159,13 +159,16 @@ to the hybrid recall sidecar.
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.98\textwidth]{../figures/01-brain-architecture.pdf}
-\caption{FluctlightDB persistence and recall layout. Each agent owns a brain
-directory (a) with segmented engram storage, a co-activation graph, and a hybrid
-recall sidecar (FTS5 + HNSW). The logical engram (b) bundles episode content,
-provenance, optional RAG keys, and graph wiring. \texttt{experience()} (c) gates
-near-duplicates, encodes, and indexes; \texttt{activate()} (d) seeds candidates
-lexically and semantically, spreads through the graph, and ranks by fused score
-with provenance boosts.}
+\caption{FluctlightDB persistence and recall layout. \textbf{(a)}~Cue-driven
+activation: lexical and semantic seeds retrieve engrams, graph spread fuses
+candidates, and provenance-aware ranking returns recalled episodes.
+\textbf{(b--d)}~On-disk layout: each agent owns a brain directory with engram
+storage, a co-activation graph, and a hybrid recall sidecar; the logical engram
+bundles episode content, provenance, optional RAG keys, and graph wiring.
+\textbf{(e--f)}~\texttt{experience()} gates near-duplicates, encodes, and indexes;
+\texttt{activate()} seeds, spreads, and ranks. \textbf{(g)}~Compared to
+relational and vector stores, FluctlightDB is a third data model with its own
+write/read contract.}
 \label{fig:architecture}
 \end{figure*}
 
