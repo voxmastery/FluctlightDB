@@ -8,6 +8,7 @@ language:
 tags:
   - agent-memory
   - locomo
+  - longmemeval
   - beir
   - benchmarks
 pretty_name: FluctlightDB Benchmark Results
@@ -17,32 +18,48 @@ size_categories:
 
 # FluctlightDB — Frozen Benchmark Results
 
-Official frozen metrics for the FluctlightDB research paper (June 2026).
+Official frozen metrics for the FluctlightDB research paper (July 2026).
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `results.json` | Full benchmark output — LoCoMo, BEIR SciFact, FAMB |
+| `results.json` | Merged paper metrics — LoCoMo, BEIR, FAMB, LongMemEval-S |
 
 ## Key numbers
 
-- **LoCoMo evidence recall:** 98.1% (1925/1982 gold spans, k=150, hybrid)
-- **BEIR SciFact nDCG@10:** 0.645 (index mode, ties Chroma)
-- **FAMB macro:** 98% index / 97% agent
+| Benchmark | Metric | Score |
+|-----------|--------|------:|
+| LoCoMo | Evidence recall | **98.1%** (1925/1982, k=150) |
+| LongMemEval-S | session_recall@8 | **96.8%** (484/500) |
+| BEIR SciFact | nDCG@10 | **0.645** (index, ties Chroma) |
+| FAMB | Macro | **98%** index / **97%** agent |
+
+### LongMemEval-S by type (session@8)
+
+| Type | Score |
+|------|------:|
+| knowledge-update | 100% |
+| multi-session | 98.5% |
+| single-session-user | 98.6% |
+| single-session-assistant | 98.2% |
+| temporal-reasoning | 96.2% |
+| single-session-preference | 76.7% |
 
 ## Reproduce
 
 ```bash
 git clone https://github.com/voxmastery/FluctlightDB.git
 cd FluctlightDB
-# See benchmarks/README.md and docs/BENCHMARKS.md
+# LoCoMo / BEIR / FAMB: benchmarks/README.md
+# LongMemEval full 500: benchmarks/longmemeval_colab.ipynb (GPU)
 ```
 
 ## Paper
 
 - DOI: https://doi.org/10.5281/zenodo.20949890
 - LaTeX: https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1
+- arXiv checklist: `papers/arxiv-v1/ARXIV_SUBMISSION.md`
 - Card: https://huggingface.co/Voxiesz/fluctlightdb-paper
 
 ## Citation

@@ -1,0 +1,47 @@
+{
+  "summary": {
+    "benchmark": "longmemeval_s",
+    "platform": "google_colab_gpu",
+    "embed_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
+    "profile": "full",
+    "granularity": "session",
+    "metric": "session",
+    "query_expand": true,
+    "dual_key": true,
+    "top_k": 8,
+    "questions": 500,
+    "session_recall_at_k": 0.968,
+    "hits": "484/500",
+    "wall_s": 3202.9,
+    "sec_per_question": 6.41,
+    "embed_cache_size": 25054,
+    "by_type": {
+      "knowledge-update": 1.0,
+      "multi-session": 0.985,
+      "single-session-assistant": 0.9821,
+      "single-session-preference": 0.7667,
+      "single-session-user": 0.9857,
+      "temporal-reasoning": 0.9624
+    },
+    "target_met": "90%+ session_recall@8 achieved (96.8%)",
+    "notes": "Full per-question results from Colab run; 16 misses listed below."
+  },
+  "misses": [
+    {"question_id": "ccb36322", "question_type": "single-session-user"},
+    {"question_id": "gpt4_f2262a51", "question_type": "multi-session"},
+    {"question_id": "06f04340", "question_type": "single-session-preference"},
+    {"question_id": "1a1907b4", "question_type": "single-session-preference"},
+    {"question_id": "09d032c9", "question_type": "single-session-preference"},
+    {"question_id": "38146c39", "question_type": "single-session-preference"},
+    {"question_id": "d6233ab6", "question_type": "single-session-preference"},
+    {"question_id": "b0479f84", "question_type": "single-session-preference"},
+    {"question_id": "1c0ddc50", "question_type": "single-session-preference"},
+    {"question_id": "c18a7dc8", "question_type": "multi-session"},
+    {"question_id": "gpt4_468eb063", "question_type": "temporal-reasoning"},
+    {"question_id": "gpt4_e061b84f", "question_type": "temporal-reasoning"},
+    {"question_id": "gpt4_e061b84g", "question_type": "temporal-reasoning"},
+    {"question_id": "6e984302", "question_type": "temporal-reasoning"},
+    {"question_id": "gpt4_8279ba03", "question_type": "temporal-reasoning"},
+    {"question_id": "ceb54acb", "question_type": "single-session-assistant"}
+  ]
+}

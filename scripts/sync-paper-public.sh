@@ -2,6 +2,7 @@
 # Sync LaTeX + markdown + metrics into public paper site (GitHub Pages + HF Space).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+FIGURES="$ROOT/papers/figures"
 PUBLIC="$ROOT/papers/public"
 ARXIV="$ROOT/papers/arxiv-v1"
 
@@ -9,7 +10,15 @@ mkdir -p "$PUBLIC"/{assets,files,data}
 
 cp "$ARXIV/main.tex" "$PUBLIC/files/main.tex"
 cp "$ARXIV/references.bib" "$PUBLIC/files/references.bib"
-cp "$ROOT/benchmarks/results/2025-06-22.json" "$PUBLIC/data/results.json" 2>/dev/null || true
+for f in 01-brain-architecture 02-benchmark-summary 03-longmemeval-by-type; do
+  cp "$FIGURES/${f}.png" "$PUBLIC/assets/${f}.png" 2>/dev/null || true
+  cp "$FIGURES/${f}.pdf" "$PUBLIC/assets/${f}.pdf" 2>/dev/null || true
+done
+# legacy alias for draft markdown
+cp "$FIGURES/01-brain-architecture.png" "$PUBLIC/assets/brain-architecture.png" 2>/dev/null || true
+cp "$ROOT/benchmarks/results/paper-2026-07-03.json" "$PUBLIC/data/results.json"
+cp "$ROOT/benchmarks/results/paper-2026-07-03.json" "$ROOT/hub/dataset/results.json" 2>/dev/null || true
+cp "$ROOT/benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json" "$PUBLIC/data/longmemeval-colab-mpnet-2026-07-03.json" 2>/dev/null || true
 
 # index.html — public preprint (no nginx /paper base path)
 cat > "$PUBLIC/index.html" << 'HTML'
@@ -19,9 +28,9 @@ cat > "$PUBLIC/index.html" << 'HTML'
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FluctlightDB — Research Paper (Preprint)</title>
-  <meta name="description" content="FluctlightDB: a brain-native memory engine for AI agents. 98.1% LoCoMo evidence recall." />
+  <meta name="description" content="FluctlightDB: a brain-native memory engine for AI agents. 98.1% LoCoMo evidence recall, 96.8% LongMemEval-S session recall@8." />
   <meta property="og:title" content="FluctlightDB: A Memory Model of Data for AI Agents" />
-  <meta property="og:description" content="Third data model for agent memory — 98.1% LoCoMo evidence recall, BEIR SciFact parity, FAMB 97–98%." />
+  <meta property="og:description" content="Third data model for agent memory — 98.1% LoCoMo, 96.8% LongMemEval-S, BEIR SciFact parity, FAMB 97–98%." />
   <meta property="og:type" content="article" />
   <link rel="stylesheet" href="assets/style.css" />
 </head>
@@ -45,9 +54,9 @@ cat > "$PUBLIC/index.html" << 'HTML'
       <h2>Frozen metrics</h2>
       <ul id="metrics-sidebar">
         <li>LoCoMo evidence recall <span class="metric">98.1%</span></li>
+        <li>LongMemEval-S session@8 <span class="metric">96.8%</span></li>
         <li>BEIR SciFact nDCG@10 <span class="metric">0.645</span></li>
         <li>FAMB macro (index) <span class="metric">98%</span></li>
-        <li>LongMemEval-S <span class="metric">deferred</span></li>
       </ul>
       <h2 style="margin-top:18px">Cite</h2>
       <p style="font-size:0.75rem;color:#8ba3c7;margin-top:6px">
@@ -56,7 +65,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
       </p>
       <h2 style="margin-top:18px">Status</h2>
       <ul>
-        <li><span class="tag">RETRIEVAL</span> LoCoMo complete</li>
+        <li><span class="tag">RETRIEVAL</span> LoCoMo + LongMemEval complete</li>
         <li><span class="tag">PREPRINT</span> Public draft</li>
         <li><span class="tag">ARXIV</span> Submission pending</li>
       </ul>
@@ -85,8 +94,16 @@ cat > "$PUBLIC/index.html" << 'HTML'
           </div>
           <div class="dl-card">
             <h3>results.json</h3>
-            <p>Frozen benchmark metrics (2025-06-22)</p>
+            <p>Frozen benchmark metrics (paper-2026-07-03)</p>
             <a href="data/results.json" download>Download JSON</a>
+          </div>
+          <div class="dl-card">
+            <h3>Figures (PNG)</h3>
+            <p>Architecture + benchmark diagrams</p>
+            <a href="assets/01-brain-architecture.png" download>Fig 1 architecture</a><br/>
+            <a href="assets/02-benchmark-summary.png" download>Fig 2 benchmarks</a><br/>
+            <a href="assets/03-longmemeval-by-type.png" download>Fig 3 LongMemEval</a><br/>
+            <a href="https://github.com/voxmastery/FluctlightDB/tree/main/papers/figures" target="_blank" rel="noopener">All figures on GitHub →</a>
           </div>
           <div class="dl-card">
             <h3>Repository</h3>

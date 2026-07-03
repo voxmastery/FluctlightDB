@@ -41,7 +41,7 @@ Managed cloud hosting is **not required** — git sync, local/VPS embedded brain
 
 The store gets richer and more useful the longer the agent runs. Chat logs and raw vectors alone do not provide that lifecycle — a **memory engine** does. Deeper framing: [Manifesto](docs/Manifesto.md) (*“learning is plasticity”* — Hebbian links, consolidation, growth).
 
-Deep design: [Manifesto](docs/Manifesto.md) · **Paper DOI:** [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890) · LaTeX: [`papers/arxiv-v1/`](papers/arxiv-v1/)
+Deep design: [Manifesto](docs/Manifesto.md) · **Paper DOI:** [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890) · LaTeX: [`papers/arxiv-v1/`](papers/arxiv-v1/) · **Figures:** [`papers/figures/`](papers/figures/)
 
 ```bash
 pip install "fluctlightdb[native]"
@@ -85,7 +85,7 @@ That gap shows up as the same pain in every serious agent:
 
 **In one line:** FluctlightDB is a **database engine for what agents learn** — write episodes, recall from cues, hybrid retrieval, evidence ranking, compaction — **embedded on disk**, not a hosted memory SaaS and not a replacement for Postgres.
 
-**Proof:** **98.1%** LoCoMo evidence recall · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/2025-06-22.json).
+**Proof:** **98.1%** LoCoMo evidence recall · **96.8%** LongMemEval-S session@8 · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/paper-2026-07-03.json).
 
 ---
 
@@ -103,8 +103,8 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 ## Where it is going
 
-- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo evidence recall** (full 10-conversation set), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
-- **Next:** full LongMemEval-S retrieval run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
+- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **96.8% LongMemEval-S** (full retrieval runs), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
+- **Next:** preference slice on LongMemEval (76.7% → 90%+), LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
 - **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
 - **Long-term vision:** **foundational memory infrastructure** for durable, trustworthy autonomy — the persistence layer between a stateless LLM call and agents (or stacks) that must operate over weeks, prefer evidence over chat, and carry identity across tools. We are building the **database for that layer**, not claiming to be AGI. Any serious path toward general, long-horizon autonomy still needs a third data model for *what was learned and what can be trusted*; FluctlightDB is that engine.
 
@@ -112,23 +112,25 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 ## Benchmarks
 
-Frozen results: [`benchmarks/results/2025-06-22.json`](benchmarks/results/2025-06-22.json)
+Frozen results: [`benchmarks/results/paper-2026-07-03.json`](benchmarks/results/paper-2026-07-03.json)
 
-### Latest measured results (June 2026)
+### Latest measured results (July 2026)
 
 | Benchmark | Metric | FluctlightDB | Baseline / note |
 |-----------|--------|--------------|-----------------|
 | **LoCoMo** (10 conv, 1,982 gold spans) | Mean **evidence recall** @ k=150 | **98.1%** (1925/1982) | Warm and cold-start identical |
 | | All evidence in context | 97.1% | Hybrid vector + BM25, index mode |
 | | Wall time | 271s warm / 335s cold | 2 CPU threads, MiniLM ONNX |
+| **LongMemEval-S** (500 Q) | **session_recall@8** | **96.8%** (484/500) | mpnet GPU, dual-key + query-expand |
+| | By type (lowest) | preference **76.7%** | implicit pref; main remaining gap |
+| | Wall time | 3203s (~6.4 s/Q) | Colab GPU; see `longmemeval_colab.ipynb` |
 | **BEIR SciFact** | nDCG@10 (index mode) | **0.645** | Chroma + same MiniLM: 0.645 (tie) |
 | | Recall@100 (agent mode) | **0.941** | Chroma: 0.925 |
 | | Query latency (index) | **4–7 ms** | Chroma: 4–7 ms |
 | **FAMB** (agent-specific) | Macro (index mode) | **98%** | Paraphrase 92%, provenance/persistence 100% |
 | | Macro (agent mode) | **97%** | Paraphrase 83%, other suites 100% |
-| **LongMemEval-S** | Answer-in-recall@8 | **70%** pilot (n=20) | Full 500-Q run deferred (CPU ingest) |
 
-> **Metric note:** LoCoMo **evidence recall** measures whether gold dialogue evidence appears in retrieved context (official RAG metric). Mem0/Zep often report **LLM-as-judge end-to-end QA** on LoCoMo — a harder, different number. Do not compare 98.1% recall to ~92% QA without a table that names the metric.
+> **Metric note:** LoCoMo **evidence recall** and LongMemEval **session_recall@K** are retrieval metrics (gold evidence/session in top-K). Mem0/Zep often report **LLM-as-judge end-to-end QA** — a harder, different number. Do not compare retrieval % to QA % without naming the metric.
 
 ### Reproduce
 

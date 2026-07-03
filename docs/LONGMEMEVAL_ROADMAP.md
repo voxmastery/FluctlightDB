@@ -4,10 +4,10 @@ Research → invent → test loop for FluctlightDB on [LongMemEval-S](https://gi
 
 ## Two different “90%” targets
 
-| Metric | What it measures | SOTA | Fluctlight (turn, running) |
-|--------|------------------|------|----------------------------|
-| **Session recall@K** | Gold `answer_session_ids` in top-K | **95–98% @5** (gbrain, YourMemory) | **98% @8** on first 50 (user-only slice) |
-| **Answer-in-recall@K** | Answer string tokens in recalled text | N/A (not official) | **~40% @8** (turn-level) |
+| Metric | What it measures | SOTA | Fluctlight (session@8) |
+|--------|------------------|------|------------------------|
+| **Session recall@K** | Gold `answer_session_ids` in top-K | **95–98% @5** (gbrain, YourMemory) | **96.8% @8** (mpnet, Colab GPU) |
+| **Answer-in-recall@K** | Answer string tokens in recalled text | N/A (not official) | Deprecated (turn-level was ~40%) |
 | **End-to-end QA (LLJ)** | LLM reads retrieval + answers; GPT judge | **76–90%** (TiMem, PlugMem) | Not run yet |
 
 **Preference questions** (30/500) have *meta* answers (“user would prefer…”) that never appear verbatim in chat — answer-in-recall cannot reach 90% without an LLM reader. **Session recall** is the fair retrieval bar.
@@ -89,28 +89,37 @@ full 500 + by_type breakdown
 if < 90% session_recall@8 → next hypothesis
 ```
 
-### Next experiments (priority)
+**Status (2026-07-03):** 90%+ session recall target **met** — 96.8% @8 on Colab GPU (mpnet + dual-key + query-expand). Next focus: preference slice (76.7%) and temporal edge cases.
 
-1. **v2 full run** — `--dual-key --query-expand` with fixed embed URL (semantic + lexical).
-2. **Preference slice** — 30 questions, was 53.3% lexical-only; v2 running now.
-3. **Embed URL** — `FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8793` (not `.../embed`); v1 93.8% was lexical-only.
-4. **Embedding model** — `FLUCTLIGHT_EMBED_MODEL=multi-qa-mpnet-base-dot-v1`.
-5. **Temporal pre-filter** — `question_date` + `haystack_dates` candidate restriction.
+### Next experiments (post-arXiv v1)
+
+1. **Preference v4** — `--pref-facts-key` + RRF merge + domain query bridges (`longmemeval_bench.py`).
+2. **End-to-end QA** — reader LLM + GPT judge vs Mem0/Zep ([LONGMEMEVAL_E2E.md](LONGMEMEVAL_E2E.md)).
+3. **Temporal pre-filter** — `question_date` + `haystack_dates` candidate restriction.
+4. **LLM key expansion** — optional fact extraction on ingest (LongMemEval CP2 full).
+
+See also: `docs/LONGMEMEVAL_E2E.md` for retrieval vs end-to-end metric separation.
 
 ## Results snapshot (2026-07-03)
 
 | Run | Metric | Score | Notes |
 |-----|--------|-------|-------|
 | v1 session (lexical-only embed bug) | session@8 | **93.8%** (469/500) | preference 53.3% |
-| **preference v2** (MiniLM + dual-key + expand) | session@8 | **73.3%** (22/30) | +20pp on preference |
-| **v2 fast** (lexical + dual-key + expand) | session@8 | **~91%** @ 265/500 | in progress |
-| v2 mpnet full | session@8 | TBD | ~45min/q CPU; resumes after fast |
+| preference v2 (MiniLM + dual-key + expand) | session@8 | **73.3%** (22/30) | +20pp on preference |
+| v2 fast (lexical + dual-key + expand) | session@8 | **~91%** | lexical-only baseline |
+| **Colab GPU mpnet full** | session@8 | **96.8%** (484/500) | **target met**; 6.41 s/q |
+| ↳ knowledge-update | session@8 | **100%** | |
+| ↳ multi-session | session@8 | **98.5%** | |
+| ↳ single-session-user | session@8 | **98.6%** | |
+| ↳ single-session-assistant | session@8 | **98.2%** | |
+| ↳ temporal-reasoning | session@8 | **96.2%** | |
+| ↳ single-session-preference | session@8 | **76.7%** → **86.7%** lexical v4 | v4: pref-facts-key + RRF; mpnet Colab re-run pending |
+
+Frozen result: `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json`
 
 ```bash
-# Monitor
-wc -l /tmp/longmemeval-v2-fast.jsonl          # target 500
-tail -f /tmp/longmemeval-v2-fast.log
-tail -f /tmp/longmemeval-resume.log           # auto-starts mpnet when fast done
+# Colab (recommended for full 500 + GPU embeds)
+# benchmarks/longmemeval_colab.ipynb — multi-qa-mpnet, dual-key, query-expand
 ```
 
 ```bash
