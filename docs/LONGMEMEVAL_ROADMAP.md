@@ -97,7 +97,21 @@ if < 90% session_recall@8 → next hypothesis
 4. **Embedding model** — `FLUCTLIGHT_EMBED_MODEL=multi-qa-mpnet-base-dot-v1`.
 5. **Temporal pre-filter** — `question_date` + `haystack_dates` candidate restriction.
 
-## v2 harness
+## Results snapshot (2026-07-03)
+
+| Run | Metric | Score | Notes |
+|-----|--------|-------|-------|
+| v1 session (lexical-only embed bug) | session@8 | **93.8%** (469/500) | preference 53.3% |
+| **preference v2** (MiniLM + dual-key + expand) | session@8 | **73.3%** (22/30) | +20pp on preference |
+| **v2 fast** (lexical + dual-key + expand) | session@8 | **~91%** @ 265/500 | in progress |
+| v2 mpnet full | session@8 | TBD | ~45min/q CPU; resumes after fast |
+
+```bash
+# Monitor
+wc -l /tmp/longmemeval-v2-fast.jsonl          # target 500
+tail -f /tmp/longmemeval-v2-fast.log
+tail -f /tmp/longmemeval-resume.log           # auto-starts mpnet when fast done
+```
 
 ```bash
 # Lexical v2 (dual-key + query-expand, no embed)
