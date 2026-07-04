@@ -7,7 +7,7 @@ Retrieval numbers in the paper (**98.0%** session@8 composite) and Mem0/Zep head
 | Layer | What it tests | FluctlightDB today | Mem0 / Zep cited |
 |-------|----------------|-------------------|------------------|
 | **Retrieval** | Gold session/evidence in top-K | **98.0%** LongMemEval session@8 (composite) | Often reported internally, not always public |
-| **End-to-end QA** | Retrieve → LLM reads → answer → GPT judge | **Not run (full 500)** | LoCoMo ~92% / ~75% LLM-J |
+| **End-to-end QA** | Retrieve → LLM reads → answer → GPT judge | **Colab `v2` profile** | LoCoMo ~92% / ~75% LLM-J |
 
 FluctlightDB's contribution is the **engine retrieval layer**. End-to-end QA additionally depends on:
 
@@ -33,7 +33,7 @@ Wu et al. (ICLR 2025) report **LLM-as-judge** accuracy when the memory module fe
 
 **Implemented:** `benchmarks/longmemeval_e2e.py` — retrieval + official reader prompt + GPT-4o judge.
 
-Colab: `BENCH_PROFILE = "e2e"`, set `OPENAI_API_KEY` in Secrets.
+Colab: `BENCH_PROFILE = "v2"` (500 retrieval + e2e) or `"e2e"` only; set `OPENAI_API_KEY` in Secrets.
 
 ```bash
 export OPENAI_API_KEY=...
@@ -68,7 +68,7 @@ Preference failures are **retrieval** failures: the question is generic ("docume
 - Domain query bridges (dinner, cocktail, documentary, commute, …)
 - RRF merge for preference multi-query
 
-**Colab (recommended):** open [`benchmarks/longmemeval_colab.ipynb`](../benchmarks/longmemeval_colab.ipynb) — defaults to `BENCH_PROFILE = "preference"` with `PREF_FACTS_KEY = True`. Runtime → GPU, run all cells, paste JSON back.
+**Colab (recommended):** open [`benchmarks/longmemeval_colab.ipynb`](../benchmarks/longmemeval_colab.ipynb) — paper v2: `BENCH_PROFILE = "v2"`, `E2E_LIMIT = 500`, GPU runtime, `OPENAI_API_KEY` in Secrets. Run all cells; two JSON files download.
 
 Local CLI (needs mpnet embed sidecar):
 
