@@ -68,7 +68,9 @@ Preference failures are **retrieval** failures: the question is generic ("docume
 - Domain query bridges (dinner, cocktail, documentary, commute, …)
 - RRF merge for preference multi-query
 
-Re-run preference slice:
+**Colab (recommended):** open [`benchmarks/longmemeval_colab.ipynb`](../benchmarks/longmemeval_colab.ipynb) — defaults to `BENCH_PROFILE = "preference"` with `PREF_FACTS_KEY = True`. Runtime → GPU, run all cells, paste JSON back.
+
+Local CLI (needs mpnet embed sidecar):
 
 ```bash
 export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8794   # mpnet
@@ -77,10 +79,10 @@ python3 benchmarks/longmemeval_bench.py \
   --dual-key --pref-facts-key --query-expand \
   --type-filter single-session-preference \
   --top-k 8 --mode index \
-  --json-out benchmarks/results/longmemeval-preference-v4.json
+  --json-out benchmarks/results/longmemeval-preference-v4-mpnet.json
 ```
 
-Full 500 with v4: re-run Colab notebook after merging `--pref-facts-key`.
+**Baselines:** lexical v4 = **86.7%** (26/30); mpnet without v4 = **76.7%** (23/30). Target: **≥90%** with mpnet + v4 on Colab.
 
 ## arXiv positioning
 

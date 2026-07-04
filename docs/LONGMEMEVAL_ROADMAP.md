@@ -93,7 +93,7 @@ if < 90% session_recall@8 → next hypothesis
 
 ### Next experiments (post-arXiv v1)
 
-1. **Preference v4** — `--pref-facts-key` + RRF merge + domain query bridges (`longmemeval_bench.py`).
+1. **Preference v4 Colab run** — `longmemeval_colab.ipynb` now defaults to `preference` profile + `PREF_FACTS_KEY` (mpnet GPU). Paste result → freeze JSON if ≥90%.
 2. **End-to-end QA** — reader LLM + GPT judge vs Mem0/Zep ([LONGMEMEVAL_E2E.md](LONGMEMEVAL_E2E.md)).
 3. **Temporal pre-filter** — `question_date` + `haystack_dates` candidate restriction.
 4. **LLM key expansion** — optional fact extraction on ingest (LongMemEval CP2 full).
@@ -113,7 +113,7 @@ See also: `docs/LONGMEMEVAL_E2E.md` for retrieval vs end-to-end metric separatio
 | ↳ single-session-user | session@8 | **98.6%** | |
 | ↳ single-session-assistant | session@8 | **98.2%** | |
 | ↳ temporal-reasoning | session@8 | **96.2%** | |
-| ↳ single-session-preference | session@8 | **76.7%** → **86.7%** lexical v4 | v4: pref-facts-key + RRF; mpnet Colab re-run pending |
+| ↳ single-session-preference | session@8 | **76.7%** → **86.7%** lexical v4 | mpnet+v4 Colab run pending (notebook ready) |
 
 Frozen result: `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json`
 
