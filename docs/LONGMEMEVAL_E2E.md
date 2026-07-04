@@ -68,7 +68,11 @@ Preference failures are **retrieval** failures: the question is generic ("docume
 - Domain query bridges (dinner, cocktail, documentary, commute, …)
 - RRF merge for preference multi-query
 
-**Colab (recommended):** open [`benchmarks/longmemeval_colab.ipynb`](../benchmarks/longmemeval_colab.ipynb) — paper v2: `BENCH_PROFILE = "v2"`, `E2E_LIMIT = 500`, GPU runtime, `OPENAI_API_KEY` in Secrets. Run all cells; two JSON files download.
+**Colab (recommended):** [`longmemeval_colab_v2.ipynb`](../benchmarks/longmemeval_colab_v2.ipynb) — **not** the old `longmemeval_colab.ipynb` (Colab caches it).
+
+Open: https://colab.research.google.com/github/voxmastery/FluctlightDB/blob/main/benchmarks/longmemeval_colab_v2.ipynb
+
+Paper v2: `BENCH_PROFILE = "v2"`, `E2E_LIMIT = 500`, GPU runtime, **`OPENAI_API_KEY` in Secrets** (real OpenAI key — **not** Cursor `crsr_*` Agent SDK key).
 
 Local CLI (needs mpnet embed sidecar):
 
