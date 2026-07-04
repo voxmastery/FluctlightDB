@@ -247,20 +247,21 @@ chat claim), persistence (recall survives checkpoint + reopen), confusion ingest
 (near-duplicates do not block new facts), and determinism. Index-mode macro is
 \textbf{98\%}; agent-mode macro is \textbf{97\%}.
 
-\subsection{LongMemEval-S: 98.0\% session recall@8 (composite 500)}
+\subsection{LongMemEval-S: 98.0\% session recall@8 (v4 unified 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
 questions. The official \emph{retrieval} metric is \texttt{session\_recall@$K$}:
 whether gold \texttt{answer\_session\_ids} appear in the top-$K$ recalled
-sessions. This is the fair bar for comparing memory \emph{indexes} before any
-reader LLM is invoked; end-to-end QA with an LLM judge is a separate, higher
-layer (TiMem reports $\sim$77\% LLJ on LongMemEval-S; PlugMem $\sim$90\% Acc).
+sessions. End-to-end QA---retrieve, reader LLM, GPT-4o judge---is a separate
+layer (Table~\ref{tab:longmemeval-e2e}).
 
-We run retrieval-only with \texttt{connect\_index()}, one engram per chat session
-(LongMemEval ``value'' granularity), hybrid BM25 + dense recall, dual-key user
-indexing (CP2), heuristic query expansion (CP3), and a third \emph{pref-facts}
-engram per session (v4, CP2 boost for implicit preference). Embeddings use
-\texttt{multi-qa-mpnet-base-dot-v1} on GPU (Google Colab); the full 500-question
-run completes in $\sim$53 minutes ($6.4$\,s/question).
+We run retrieval with \texttt{connect\_index()}, one engram per chat session,
+hybrid BM25 + dense recall, dual-key user indexing (CP2), heuristic query
+expansion (CP3), and a third \emph{pref-facts} engram per session (v4). Embeddings
+use \texttt{multi-qa-mpnet-base-dot-v1} on GPU; the unified 500-question v4 run
+scores \textbf{98.0\%} (490/500) and completes in $\sim$53 minutes on Colab T4
+($6.4$\,s/question). Reproduce: \texttt{benchmarks/longmemeval\_colab.ipynb}
+(\texttt{BENCH\_PROFILE=full}) or \texttt{longmemeval\_bench.py} with
+\texttt{--dual-key --pref-facts-key --query-expand}.
 
 \begin{table}[h]
 \centering
@@ -269,7 +270,7 @@ run completes in $\sim$53 minutes ($6.4$\,s/question).
 \toprule
 \textbf{System / slice} & \textbf{session@8} & \textbf{Notes} \\
 \midrule
-FluctlightDB (composite) & \textbf{98.0\%} & 490/500; v4 hybrid + pref-facts \\
+FluctlightDB (v4 unified) & \textbf{98.0\%} & 490/500; pref-facts + RRF \\
 \quad knowledge-update & 100\% & \\
 \quad multi-session & 98.5\% & \\
 \quad single-session-user & 98.6\% & \\
@@ -286,20 +287,47 @@ M3 Memory (leaderboard) & 96.8\% @10 & FTS5 + vector + MMR \\
 
 Leaderboard figures use $K{=}5$ or $K{=}10$ and different embedders; our $K{=}8$
 run is directly comparable in \emph{protocol} (gold session in top-$K$) but not
-a claim of strict SOTA. The headline---98.0\% on all 500 questions (composite:
-470-question full mpnet run plus v4 preference slice at 29/30) with a
-reproducible open harness---places FluctlightDB alongside published hybrid memory
-systems. Implicit \texttt{single-session-preference} questions rose from 76.7\%
-(23/30) to \textbf{96.7\%} (29/30) when we add pref-facts engrams and RRF
-multi-query merge; the sole remaining preference miss is question
-\texttt{95228167}. Reproduce via \texttt{benchmarks/longmemeval\_colab.ipynb} or
-\texttt{benchmarks/longmemeval\_bench.py} with \texttt{--granularity session
---metric session --dual-key --pref-facts-key --query-expand}.
+a claim of strict SOTA. Preference questions rose from 76.7\% (23/30) without
+v4 pref-facts to \textbf{96.7\%} (29/30); the sole remaining preference miss is
+\texttt{95228167}.
+
+\subsection{End-to-end QA on LongMemEval-S}
+We evaluate the full stack with the official LongMemEval reader prompt and
+GPT-4o judge (\texttt{benchmarks/longmemeval\_e2e.py}; Colab profile
+\texttt{e2e}). Retrieved sessions are formatted as JSON chat history; the reader
+is \texttt{gpt-4o-2024-08-06}; judging uses Wu et al.'s task-specific yes/no
+templates. Table~\ref{tab:longmemeval-e2e} reports \emph{both} retrieval and
+end-to-end accuracy so FluctlightDB is not compared to Mem0/Zep on mismatched
+metrics. Mem0/Zep LoCoMo figures ($\sim$92\% / $\sim$75\% LLM-J) use a different
+benchmark; LongMemEval-S numbers below are cited from published LongMemEval runs.
+
+\begin{table}[h]
+\centering
+\caption{LongMemEval-S: retrieval vs.\ end-to-end QA (500 questions).}
+\label{tab:longmemeval-e2e}
+\small
+\begin{tabular}{lrrl}
+\toprule
+\textbf{System} & \textbf{session@8} & \textbf{E2E acc.} & \textbf{Notes} \\
+\midrule
+FluctlightDB (v4) & \textbf{98.0\%} & (Colab run) & gpt-4o reader + judge \\
+Zep & --- & 71.2\% & gpt-4o; arXiv:2501.13956 \\
+TiMem & --- & 76.9\% & LLJ; gpt-4o-mini reader \\
+PlugMem & --- & $\sim$90\% & graph memory \\
+Mem0 (vendor) & --- & 94.4\% & GPT-5; top-200; vendor report \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+FluctlightDB's end-to-end score is produced by the open harness above; paste
+Colab JSON into \texttt{benchmarks/results/longmemeval-e2e-v4-mpnet.json} to
+freeze. We report retrieval and QA in one table because a 98\% retrieval layer
+that feeds a weak reader still fails in production---both numbers matter.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\textwidth]{../figures/03-longmemeval-by-type.pdf}
-\caption{LongMemEval-S session recall@8 by question type (composite 490/500).
+\caption{LongMemEval-S session recall@8 by question type (v4 unified 490/500).
 Preference questions reach 96.7\% (29/30) with v4 pref-facts indexing; temporal
 reasoning is the main remaining gap.}
 \label{fig:longmemeval-types}
@@ -324,12 +352,11 @@ evidence that the memory model benefits from machinery a pure vector DB lacks.
 
 \textbf{Limitations.} A handful of temporal-reasoning misses and one preference
 miss remain; LLM-based key expansion (LongMemEval CP2 full) is not yet in the
-default ingest path. The 98.0\% headline composes a 470-question full run with a
-30-question v4 preference slice---a single end-to-end 500-question v4 run is
-planned for confirmation. We have not yet evaluated multi-tenant isolation at scale,
-ANN beyond $10^5$ memories, or full end-to-end LLM QA against published
-Mem0/Zep baselines on LongMemEval (their numbers use reader-LLM judges, not
-session recall). These are the natural next steps.
+default ingest path. End-to-end LongMemEval QA depends on reader/judge API access
+and is reported separately from retrieval (Table~\ref{tab:longmemeval-e2e}).
+Mem0/Zep end-to-end figures use different reader setups; we cite published
+LongMemEval-S numbers only where protocols match. Multi-tenant isolation at scale
+and ANN beyond $10^5$ memories are not yet evaluated.
 
 \section{Related Work}
 \subsection{Vector databases}
@@ -407,7 +434,8 @@ LongMemEval-S. We release everything needed to reproduce and contest these claim
 Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
 \texttt{benchmarks/longmemeval\_bench.py}, \texttt{benchmarks/longmemeval\_colab.ipynb},
 \texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py}.
-Frozen metrics: \texttt{benchmarks/results/paper-2026-07-04.json}. Preprint DOI:
+Frozen metrics: \texttt{benchmarks/results/paper-2026-07-04.json}. End-to-end:
+\texttt{benchmarks/longmemeval\_e2e.py}. Preprint DOI:
 \url{https://doi.org/10.5281/zenodo.20949890}. Source:
 \url{https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1}.
 
