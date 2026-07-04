@@ -124,6 +124,7 @@ pub fn export_graph(
     let mut nodes = Vec::new();
     let mut links = Vec::new();
     let mut neuron_to_engram: HashMap<NeuronId, String> = HashMap::new();
+    let mut id_by_neuron: HashMap<NeuronId, String> = HashMap::new();
 
     let region_hubs = [
         ("hub-ec", "Entorhinal (EC)", "frontal-r"),
@@ -188,6 +189,7 @@ pub fn export_graph(
         for (i, neuron) in engram.dg_neurons.iter().enumerate() {
             let nid = format!("n:{}:{}", engram.id, i);
             neuron_to_engram.insert(*neuron, eid.clone());
+            id_by_neuron.insert(*neuron, nid.clone());
             nodes.push(GraphNode {
                 id: nid.clone(),
                 label: format!("dg-{i}"),
@@ -266,21 +268,6 @@ pub fn export_graph(
     }
 
     // Strong synapses between exported neurons (connectome filaments inside the hull).
-    let exported_neurons: HashSet<String> = nodes
-        .iter()
-        .filter(|n| n.kind == "neuron")
-        .map(|n| n.id.clone())
-        .collect();
-    let id_by_neuron: HashMap<NeuronId, String> = neuron_to_engram
-        .iter()
-        .flat_map(|(nid, eid)| {
-            exported_neurons
-                .iter()
-                .filter(|id| id.contains(&eid[2..10]))
-                .map(move |id| (*nid, id.clone()))
-        })
-        .collect();
-
     for syn in &graph.synapses {
         let Some(from) = id_by_neuron.get(&syn.from) else {
             continue;

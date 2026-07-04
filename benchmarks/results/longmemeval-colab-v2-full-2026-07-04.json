@@ -1,0 +1,49 @@
+{
+  "summary": {
+    "benchmark": "longmemeval_s",
+    "platform": "google_colab_gpu",
+    "harness": "v4",
+    "embed_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
+    "profile": "v2",
+    "granularity": "session",
+    "metric": "session",
+    "query_expand": true,
+    "dual_key": true,
+    "pref_facts_key": true,
+    "top_k": 8,
+    "questions": 500,
+    "session_recall_at_k": 0.976,
+    "hits": "488/500",
+    "wall_s": 4379.7,
+    "sec_per_question": 8.76,
+    "embed_cache_size": 40971,
+    "embed_requests": 40971,
+    "by_type": {
+      "knowledge-update": 1.0,
+      "multi-session": 0.985,
+      "single-session-assistant": 0.9821,
+      "single-session-preference": 0.9667,
+      "single-session-user": 0.9714,
+      "temporal-reasoning": 0.9549
+    },
+    "preference_session_recall_at_k": 0.9667,
+    "preference_target_90pct": true,
+    "unified_v4_full_500": true,
+    "reproduce": "benchmarks/longmemeval_colab_v2.ipynb, BENCH_PROFILE=v2"
+  },
+  "misses": [
+    {"question_id": "6b168ec8", "question_type": "single-session-user"},
+    {"question_id": "ccb36322", "question_type": "single-session-user"},
+    {"question_id": "gpt4_f2262a51", "question_type": "multi-session"},
+    {"question_id": "95228167", "question_type": "single-session-preference"},
+    {"question_id": "c18a7dc8", "question_type": "multi-session"},
+    {"question_id": "gpt4_7f6b06db", "question_type": "temporal-reasoning"},
+    {"question_id": "gpt4_468eb063", "question_type": "temporal-reasoning"},
+    {"question_id": "gpt4_e061b84f", "question_type": "temporal-reasoning"},
+    {"question_id": "gpt4_e061b84g", "question_type": "temporal-reasoning"},
+    {"question_id": "6e984302", "question_type": "temporal-reasoning"},
+    {"question_id": "gpt4_8279ba03", "question_type": "temporal-reasoning"},
+    {"question_id": "ceb54acb", "question_type": "single-session-assistant"}
+  ],
+  "note": "Full per-question results array omitted here (500 rows); Colab v2 export retained by author."
+}

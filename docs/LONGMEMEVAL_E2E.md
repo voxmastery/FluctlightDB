@@ -1,26 +1,51 @@
 # LongMemEval E2E
 
-End-to-end QA uses **Cursor Cloud Agents API only**:
+End-to-end QA: **retrieve (v4)** → **reader LLM** → **official judge prompts**.
 
-- **Key:** `CURSOR_API_KEY` (`crsr_*`) — same as `/opt/ambugo/serverbrain/.env`
-- **Model:** Auto (`default` on `GET /v1/models`)
-- **Endpoint:** `POST https://api.cursor.com/v1/agents` → poll run → `run.result`
-- **No** OpenAI key, **no** OpenRouter, **no** `cursor_sdk`
+## Recommended: Gemini 2.5 Flash (Colab, free tier)
 
-## Local
+**Best path without PayGo.** Full ~22k-token reader payloads fit in Gemini’s 1M context. Free tier: **1,500 requests/day** — enough for 500 questions (2 calls each = 1,000).
+
+| Provider | Free tier full 500 today? |
+|----------|---------------------------|
+| **Gemini 2.5 Flash** | **Yes** (~4–8 h Colab, 2 workers) |
+| Cerebras gpt-oss-120b | **No** (~1M tokens/day ≈ 22 questions) |
+| Groq / OpenRouter free | **No** (TPM / prompt size caps) |
+
+### Colab (`longmemeval_colab_v2.ipynb`)
+
+1. **Runtime → GPU**
+2. **Secrets** → `GEMINI_API_KEY` ([aistudio.google.com/apikey](https://aistudio.google.com/apikey))
+3. Config: `BENCH_PROFILE = "v2"`, `E2E_LIMIT = 500`, `E2E_LLM_BACKEND = "gemini"`, `E2E_WORKERS = 2`
+4. Run all cells (or `BENCH_PROFILE = "e2e"` if retrieval already done)
+5. Download `longmemeval_colab_e2e_500.json`
+
+### After Colab (finalize paper)
 
 ```bash
-bash scripts/run-longmemeval-e2e-cursor.sh 50
+bash scripts/post-colab-e2e.sh /path/to/longmemeval_colab_e2e_500.json
 ```
 
-Loads key from `CURSOR_ENV_FILE` (default `/opt/ambugo/serverbrain/.env`).
+### Server (optional)
 
-## Colab
+```bash
+export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8794
+export LONGMEMEVAL_LLM_BACKEND=gemini
+export LONGMEMEVAL_E2E_WORKERS=2
+bash scripts/run-longmemeval-e2e-500.sh 500
+```
 
-[`longmemeval_colab_v2.ipynb`](../benchmarks/longmemeval_colab_v2.ipynb)
+## Smoke test
 
-1. Colab **Secrets** → `CURSOR_API_KEY` = paste from serverbrain `.env`
-2. `BENCH_PROFILE = "v2"` (500 retrieval + E2E) or `"e2e"`
-3. GPU runtime for retrieval; E2E calls Cursor API over HTTPS
+```bash
+source /home/ambugo/litellm/.env
+PYTHONPATH=benchmarks python3 -c "from cloud_llm import smoke_test; print(smoke_test('gemini'))"
+```
 
-Open: https://colab.research.google.com/github/voxmastery/FluctlightDB/blob/main/benchmarks/longmemeval_colab_v2.ipynb
+## Protocol note
+
+Our E2E uses **Gemini 2.5 Flash** reader + judge with Wu et al. judge *templates*. Baselines cite **gpt-4o** — report side-by-side, not strict SOTA.
+
+## Cerebras (PayGo only)
+
+If you add Cerebras PayGo later: `--llm-backend cerebras --reader-model gpt-oss-120b`

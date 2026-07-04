@@ -26,7 +26,7 @@ Long-term agent memory is a **third data model** — not SQL rows, not vector AN
 | Benchmark | Metric | Result |
 |-----------|--------|--------|
 | **LoCoMo** (10 conv, 1,982 gold spans) | Mean evidence recall @ k=150 | **98.1%** |
-| **LongMemEval-S** (500 questions) | session_recall@8 | **98.0%** (490/500 composite) |
+| **LongMemEval-S** (500 questions) | session_recall@8 | **97.6%** (488/500 unified v4) |
 | **BEIR SciFact** | nDCG@10 | **0.645** (ties Chroma + MiniLM) |
 | **FAMB** | Macro (index / agent) | **98% / 97%** |
 
@@ -36,7 +36,7 @@ Frozen metrics: [fluctlightdb-benchmarks](https://huggingface.co/datasets/Voxies
 
 For fifty years, data systems answered two questions: which records match a predicate (relational), and which vectors lie nearest a query (vector). Autonomous agents ask a third: *what have I learned, and what of it can I trust?*
 
-We present **FluctlightDB**, an embedded brain-native database with write path `experience()` and read path `activate()`. On full LoCoMo it recalls **98.1%** of gold evidence. On LongMemEval-S it scores **98.0%** session recall@8 (composite); preference **96.7%** (29/30) with v4 pref-facts. On BEIR SciFact it matches a tuned Chroma baseline; on FAMB it scores 97–98% macro.
+We present **FluctlightDB**, an embedded brain-native database with write path `experience()` and read path `activate()`. On full LoCoMo it recalls **98.1%** of gold evidence. On LongMemEval-S it scores **97.6%** session recall@8 (unified v4 full 500); preference **96.7%** (29/30) with v4 pref-facts. On BEIR SciFact it matches a tuned Chroma baseline; on FAMB it scores 97–98% macro.
 
 ## Install
 

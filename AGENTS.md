@@ -31,7 +31,7 @@ cd sdks/python && python3 -m unittest discover -s tests              # 12 tests,
 
 - **Recall cap:** `index::hybrid_candidates` clamps caller cap to `MAX_CANDIDATE_CAP` (4096). `DEFAULT_CANDIDATE_CAP` (128) is the default, NOT an upper bound — bench runs use k=150.
 - **Provenance ranking:** trusted sources (tool results, files) outrank chat at recall time — don't flatten salience/provenance when touching ranking.
-- **Benchmarks are frozen claims:** README numbers (98.1% LoCoMo, 98.0% LongMemEval-S) map to `benchmarks/results/paper-*.json`. Changing recall code requires re-running before touching README.
+- **Benchmarks are frozen claims:** README numbers (98.1% LoCoMo, 97.6% LongMemEval-S) map to `benchmarks/results/paper-*.json`. Changing recall code requires re-running before touching README.
 - **Metric honesty rule:** retrieval recall ≠ LLM-judge QA. Never compare across metric types in docs.
 - One store folder per agent; `store_lock.rs` guards concurrent access — don't open one brain from two processes without the lock.
 - Test suites `*_bench.rs` are load/scale benches wearing `#[test]` hats; slow by design.

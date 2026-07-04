@@ -49,6 +49,7 @@ def main() -> int:
         "questions": es.get("questions"),
         "reader_model": es.get("reader_model"),
         "judge_model": es.get("judge_model"),
+        "llm_backend": es.get("llm_backend"),
         "by_type_accuracy": es.get("by_type_accuracy"),
         "frozen_source": str(args.e2e.name),
     }

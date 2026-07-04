@@ -85,7 +85,7 @@ That gap shows up as the same pain in every serious agent:
 
 **In one line:** FluctlightDB is a **database engine for what agents learn** — write episodes, recall from cues, hybrid retrieval, evidence ranking, compaction — **embedded on disk**, not a hosted memory SaaS and not a replacement for Postgres.
 
-**Proof:** **98.1%** LoCoMo evidence recall · **98.0%** LongMemEval-S session@8 · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/paper-2026-07-04.json).
+**Proof:** **98.1%** LoCoMo evidence recall · **97.6%** LongMemEval-S session@8 · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/paper-2026-07-04.json).
 
 ---
 
@@ -103,7 +103,7 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 ## Where it is going
 
-- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **98.0% LongMemEval-S** (composite retrieval runs), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
+- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **97.6% LongMemEval-S** (unified v4 full 500 on Colab GPU), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
 - **Next:** full 500 v4 confirmation run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
 - **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
 - **Long-term vision:** **foundational memory infrastructure** for durable, trustworthy autonomy — the persistence layer between a stateless LLM call and agents (or stacks) that must operate over weeks, prefer evidence over chat, and carry identity across tools. We are building the **database for that layer**, not claiming to be AGI. Any serious path toward general, long-horizon autonomy still needs a third data model for *what was learned and what can be trusted*; FluctlightDB is that engine.
@@ -121,9 +121,9 @@ Frozen results: [`benchmarks/results/paper-2026-07-04.json`](benchmarks/results/
 | **LoCoMo** (10 conv, 1,982 gold spans) | Mean **evidence recall** @ k=150 | **98.1%** (1925/1982) | Warm and cold-start identical |
 | | All evidence in context | 97.1% | Hybrid vector + BM25, index mode |
 | | Wall time | 271s warm / 335s cold | 2 CPU threads, MiniLM ONNX |
-| **LongMemEval-S** (500 Q) | **session_recall@8** | **98.0%** (490/500) | mpnet GPU v4 composite |
+| **LongMemEval-S** (500 Q) | **session_recall@8** | **97.6%** (488/500) | mpnet GPU v4 unified |
 | | By type (preference) | **96.7%** (29/30) | v4 pref-facts-key |
-| | Wall time | 3203s (~6.4 s/Q) | Colab GPU; see `longmemeval_colab.ipynb` |
+| | Wall time | 4380s (~8.8 s/Q) | Colab GPU; see `longmemeval_colab_v2.ipynb` |
 | **BEIR SciFact** | nDCG@10 (index mode) | **0.645** | Chroma + same MiniLM: 0.645 (tie) |
 | | Recall@100 (agent mode) | **0.941** | Chroma: 0.925 |
 | | Query latency (index) | **4–7 ms** | Chroma: 4–7 ms |

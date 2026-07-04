@@ -36,8 +36,8 @@ this model behind two primitives, \texttt{experience()} and \texttt{activate()}.
 On the official LoCoMo long-conversation benchmark (10 conversations,
 1{,}982 gold evidence spans), FluctlightDB's hybrid index recalls \textbf{98.1\%}
 of gold evidence---warm and cold-start identical. On LongMemEval-S (500 questions,
-official \texttt{session\_recall@8}), our retrieval harness scores \textbf{98.0\%}
-(490/500), competitive with published hybrid memory systems on the same benchmark.
+official \texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\%}
+(488/500), competitive with published hybrid memory systems on the same benchmark.
 On BEIR SciFact it matches a tuned Chroma + MiniLM baseline on nDCG@10 at equal
 latency, while agent mode improves Recall@100. On an agent-specific suite (FAMB)
 it scores 97--98\% macro across paraphrase recall, provenance ranking,
@@ -77,9 +77,8 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   \texttt{experience()} / \texttt{activate()} / \texttt{checkpoint()}---one
   durable store per agent, with no external services.
   \item \textbf{Evidence.} \textbf{98.1\%} evidence recall on full LoCoMo,
-  \textbf{98.0\%} session recall@8 on LongMemEval-S (composite full run + v4
-  preference slice), parity with a tuned
-  vector baseline on BEIR SciFact, and 97--98\% macro on an agent-specific
+  \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
+  parity with a tuned vector baseline on BEIR SciFact, and 97--98\% macro on an agent-specific
   benchmark.
   \item \textbf{Reproducibility.} Open harnesses and frozen result JSON so every
   number here can be re-run with one command.
@@ -177,7 +176,7 @@ write/read contract.}
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
 \texttt{benchmarks/results/paper-2026-07-04.json} (LoCoMo, BEIR, FAMB from
-2025-06-22; LongMemEval composite from 2026-07-04).
+2025-06-22; LongMemEval unified v4 from 2026-07-04).
 
 \begin{figure}[t]
 \centering
@@ -247,7 +246,7 @@ chat claim), persistence (recall survives checkpoint + reopen), confusion ingest
 (near-duplicates do not block new facts), and determinism. Index-mode macro is
 \textbf{98\%}; agent-mode macro is \textbf{97\%}.
 
-\subsection{LongMemEval-S: 98.0\% session recall@8 (v4 unified 500)}
+\subsection{LongMemEval-S: 97.6\% session recall@8 (v4 unified 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
 questions. The official \emph{retrieval} metric is \texttt{session\_recall@$K$}:
 whether gold \texttt{answer\_session\_ids} appear in the top-$K$ recalled
@@ -258,8 +257,8 @@ We run retrieval with \texttt{connect\_index()}, one engram per chat session,
 hybrid BM25 + dense recall, dual-key user indexing (CP2), heuristic query
 expansion (CP3), and a third \emph{pref-facts} engram per session (v4). Embeddings
 use \texttt{multi-qa-mpnet-base-dot-v1} on GPU; the unified 500-question v4 run
-scores \textbf{98.0\%} (490/500) and completes in $\sim$53 minutes on Colab T4
-($6.4$\,s/question). Reproduce: \texttt{benchmarks/longmemeval\_colab.ipynb}
+scores \textbf{97.6\%} (488/500) and completes in $\sim$73 minutes on Colab T4
+($8.8$\,s/question). Reproduce: \texttt{benchmarks/longmemeval\_colab\_v2.ipynb}
 (\texttt{BENCH\_PROFILE=full}) or \texttt{longmemeval\_bench.py} with
 \texttt{--dual-key --pref-facts-key --query-expand}.
 
@@ -270,13 +269,13 @@ scores \textbf{98.0\%} (490/500) and completes in $\sim$53 minutes on Colab T4
 \toprule
 \textbf{System / slice} & \textbf{session@8} & \textbf{Notes} \\
 \midrule
-FluctlightDB (v4 unified) & \textbf{98.0\%} & 490/500; pref-facts + RRF \\
+FluctlightDB (v4 unified) & \textbf{97.6\%} & 488/500; pref-facts + RRF \\
 \quad knowledge-update & 100\% & \\
 \quad multi-session & 98.5\% & \\
-\quad single-session-user & 98.6\% & \\
+\quad single-session-user & 97.1\% & \\
 \quad single-session-assistant & 98.2\% & \\
-\quad temporal-reasoning & 96.2\% & \\
-\quad single-session-preference & 96.7\% & v4 mpnet slice: 29/30 \\
+\quad temporal-reasoning & 95.5\% & \\
+\quad single-session-preference & 96.7\% & 29/30 \\
 \midrule
 gbrain (leaderboard) & 97.6\% @5 & hybrid + text-embedding-3-large \\
 YourMemory (leaderboard) & 95.8\% @5 & mpnet + BM25 + graph BFS \\
@@ -293,13 +292,13 @@ v4 pref-facts to \textbf{96.7\%} (29/30); the sole remaining preference miss is
 
 \subsection{End-to-end QA on LongMemEval-S}
 We evaluate the full stack with the official LongMemEval reader prompt and
-GPT-4o judge (\texttt{benchmarks/longmemeval\_e2e.py}; Colab profile
-\texttt{e2e}). Retrieved sessions are formatted as JSON chat history; the reader
-is \texttt{gpt-4o-2024-08-06}; judging uses Wu et al.'s task-specific yes/no
-templates. Table~\ref{tab:longmemeval-e2e} reports \emph{both} retrieval and
-end-to-end accuracy so FluctlightDB is not compared to Mem0/Zep on mismatched
-metrics. Mem0/Zep LoCoMo figures ($\sim$92\% / $\sim$75\% LLM-J) use a different
-benchmark; LongMemEval-S numbers below are cited from published LongMemEval runs.
+Wu et al.'s task-specific GPT judge templates
+(\texttt{benchmarks/longmemeval\_e2e.py}; Colab profile \texttt{v2} with
+\texttt{E2E\_LIMIT=500}). Retrieved sessions are formatted as JSON chat history;
+the reader and judge use \textbf{Gemini 2.5 Flash} via the Google AI API (1M-token
+context; sufficient for our top-8 session payloads). Baselines in
+Table~\ref{tab:longmemeval-e2e} use \texttt{gpt-4o} or vendor-reported readers; we report our retrieval and E2E numbers together without claiming a
+like-for-like SOTA comparison.
 
 \begin{table}[h]
 \centering
@@ -310,7 +309,7 @@ benchmark; LongMemEval-S numbers below are cited from published LongMemEval runs
 \toprule
 \textbf{System} & \textbf{session@8} & \textbf{E2E acc.} & \textbf{Notes} \\
 \midrule
-FluctlightDB (v4) & \textbf{98.0\%} & (Colab run) & gpt-4o reader + judge \\
+FluctlightDB (v4) & \textbf{97.6\%} & (pending) & Gemini 2.5 Flash reader + judge \\
 Zep & --- & 71.2\% & gpt-4o; arXiv:2501.13956 \\
 TiMem & --- & 76.9\% & LLJ; gpt-4o-mini reader \\
 PlugMem & --- & $\sim$90\% & graph memory \\
@@ -319,15 +318,17 @@ Mem0 (vendor) & --- & 94.4\% & GPT-5; top-200; vendor report \\
 \end{tabular}
 \end{table}
 
-FluctlightDB's end-to-end score is produced by the open harness above; paste
-Colab JSON into \texttt{benchmarks/results/longmemeval-e2e-v4-mpnet.json} to
-freeze. We report retrieval and QA in one table because a 98\% retrieval layer
-that feeds a weak reader still fails in production---both numbers matter.
+FluctlightDB's end-to-end score is produced by the open harness above; when the
+500-question run completes, freeze JSON at
+\texttt{benchmarks/results/longmemeval-e2e-v4-mpnet.json} and run
+\texttt{scripts/finalize-paper-v2-e2e.sh}. We report retrieval and QA in one
+table because a 97.6\% retrieval layer that feeds a weak reader still fails in
+production---both numbers matter.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\textwidth]{../figures/03-longmemeval-by-type.pdf}
-\caption{LongMemEval-S session recall@8 by question type (v4 unified 490/500).
+\caption{LongMemEval-S session recall@8 by question type (v4 unified 488/500).
 Preference questions reach 96.7\% (29/30) with v4 pref-facts indexing; temporal
 reasoning is the main remaining gap.}
 \label{fig:longmemeval-types}
@@ -411,7 +412,7 @@ MemGPT / Letta & Agent OS & Context tiers / blocks & --- & Session QA \\
 HippoRAG & Graph RAG & Associative graph retrieval & --- & Multi-hop QA \\
 Chroma / Qdrant & Vector DB & ANN top-$k$ & --- & IR / similarity \\
 FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{98.1\%} & LoCoMo evidence \\
-FluctlightDB & Engine & hybrid index + session keys & \textbf{98.0\%} & LongMemEval session@8 \\
+FluctlightDB & Engine & hybrid index + session keys & \textbf{97.6\%} & LongMemEval session@8 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -427,7 +428,7 @@ model gave search a database for \emph{similarity}. Autonomous agents need a
 database for \emph{memory}, and it should be as boring to adopt and as rigorous to
 trust as SQLite. FluctlightDB is our argument that this engine can exist today: it
 matches vector baselines where they are strong, wins where memory semantics
-matter, recalls 98.1\% of gold evidence on LoCoMo and 98.0\% session recall on
+matter, recalls 98.1\% of gold evidence on LoCoMo and 97.6\% session recall on
 LongMemEval-S. We release everything needed to reproduce and contest these claims.
 
 \section*{Artifacts}

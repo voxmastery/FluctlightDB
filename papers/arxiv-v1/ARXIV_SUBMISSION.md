@@ -4,11 +4,10 @@ Use this after `paper-2026-07-04.json` metrics are frozen and `main.tex` builds 
 
 ## 1. Pre-flight (metrics & reproducibility)
 
-- [x] `benchmarks/results/paper-2026-07-04.json` — merged frozen numbers (98.0% composite)
-- [x] `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json` — LongMemEval full (470 non-pref)
-- [x] `benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json` — preference v4 (29/30)
+- [x] `benchmarks/results/paper-2026-07-04.json` — merged frozen numbers (97.6% unified v4)
+- [x] `benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json` — LongMemEval unified 500
 - [x] `benchmarks/results/2025-06-22.json` — LoCoMo + BEIR + FAMB
-- [x] Colab notebook runs end-to-end: `benchmarks/longmemeval_colab.ipynb`
+- [x] Colab notebook runs end-to-end: `benchmarks/longmemeval_colab_v2.ipynb`
 - [x] `papers/figures/` — all diagrams (PDF + PNG); Figure 1 Playwright audit passes
 
 ```bash
@@ -50,12 +49,13 @@ zip -r fluctlightdb-arxiv-source.zip main.tex references.bib main.bbl ../figures
 | Benchmark | Metric | Score |
 |-----------|--------|------:|
 | LoCoMo | Evidence recall | **98.1%** (1925/1982, k=150) |
-| LongMemEval-S | session_recall@8 | **98.0%** (490/500 composite) |
+| LongMemEval-S | session_recall@8 | **97.6%** (488/500 unified v4) |
+| LongMemEval-S E2E | overall accuracy | **(running → freeze via finalize script)** |
 | LongMemEval preference | session_recall@8 | **96.7%** (29/30, v4 mpnet) |
 | BEIR SciFact | nDCG@10 | **0.645** (ties Chroma + MiniLM) |
 | FAMB | Macro | **97–98%** |
 
-LongMemEval by type: knowledge-update 100%, multi-session 98.5%, user 98.6%, assistant 98.2%, temporal 96.2%, **preference 96.7%** (v4 pref-facts).
+LongMemEval by type: knowledge-update 100%, multi-session 98.5%, user 97.1%, assistant 98.2%, temporal 95.5%, **preference 96.7%** (v4 pref-facts).
 
 ## 5. After arXiv accepts
 
@@ -82,14 +82,14 @@ hf upload Voxiesz/fluctlightdb-benchmarks hub/dataset/README.md README.md
 **Say:**
 - Third data model for agent memory; embedded engine with `experience()` / `activate()`.
 - 98.1% LoCoMo evidence recall (official retrieval metric).
-- 98.0% LongMemEval-S session recall@8 (composite 490/500) — competitive with published hybrid systems.
+- 97.6% LongMemEval-S session recall@8 (unified v4 488/500) — competitive with published hybrid systems.
 - 96.7% on preference slice (29/30) with v4 pref-facts harness.
 - Open harnesses + frozen JSON; reproducible via Colab notebook.
 
 **Do not say:**
 - "SOTA on LongMemEval" (gbrain 97.6% @5 uses different K and embedder).
-- "90%+ on all question types" without noting composite methodology.
-- End-to-end QA numbers unless you run the official LLM-judge pipeline.
+- "90%+ on all question types" without noting temporal is 95.5%.
+- End-to-end QA numbers unless you run the official LLM-judge pipeline (**500-question E2E in progress** — `scripts/watch-longmemeval-e2e.sh`).
 
 ## 7. Suggested arXiv abstract (matches main.tex)
 
