@@ -247,7 +247,7 @@ chat claim), persistence (recall survives checkpoint + reopen), confusion ingest
 (near-duplicates do not block new facts), and determinism. Index-mode macro is
 \textbf{98\%}; agent-mode macro is \textbf{97\%}.
 
-\subsection{LongMemEval-S: 96.8\% session recall@8 on the full set}
+\subsection{LongMemEval-S: 98.0\% session recall@8 (composite 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
 questions. The official \emph{retrieval} metric is \texttt{session\_recall@$K$}:
 whether gold \texttt{answer\_session\_ids} appear in the top-$K$ recalled
@@ -384,7 +384,7 @@ MemGPT / Letta & Agent OS & Context tiers / blocks & --- & Session QA \\
 HippoRAG & Graph RAG & Associative graph retrieval & --- & Multi-hop QA \\
 Chroma / Qdrant & Vector DB & ANN top-$k$ & --- & IR / similarity \\
 FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{98.1\%} & LoCoMo evidence \\
-FluctlightDB & Engine & hybrid index + session keys & \textbf{96.8\%} & LongMemEval session@8 \\
+FluctlightDB & Engine & hybrid index + session keys & \textbf{98.0\%} & LongMemEval session@8 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -400,7 +400,7 @@ model gave search a database for \emph{similarity}. Autonomous agents need a
 database for \emph{memory}, and it should be as boring to adopt and as rigorous to
 trust as SQLite. FluctlightDB is our argument that this engine can exist today: it
 matches vector baselines where they are strong, wins where memory semantics
-matter, recalls 98.1\% of gold evidence on LoCoMo and 96.8\% session recall on
+matter, recalls 98.1\% of gold evidence on LoCoMo and 98.0\% session recall on
 LongMemEval-S. We release everything needed to reproduce and contest these claims.
 
 \section*{Artifacts}

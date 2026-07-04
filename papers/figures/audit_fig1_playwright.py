@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Playwright layout audit — logs element bounding boxes and overlap pairs."""
+"""Playwright layout audit — overlap, clipping, and out-of-frame checks."""
 
 from __future__ import annotations
 
@@ -19,47 +19,85 @@ def overlap(a: dict, b: dict, pad: float = 2) -> bool:
     )
 
 
+def contains(outer: dict, inner: dict, tol: float = 1.5) -> bool:
+    return (
+        inner["x"] >= outer["x"] - tol
+        and inner["y"] >= outer["y"] - tol
+        and inner["x"] + inner["width"] <= outer["x"] + outer["width"] + tol
+        and inner["y"] + inner["height"] <= outer["y"] + outer["height"] + tol
+    )
+
+
 def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
+        page = browser.new_page(device_scale_factor=2)
         page.goto(HTML.as_uri())
         page.wait_for_load_state("networkidle")
 
-        selectors = [
-            ".hero-wrap",
-            ".stack .card",
-            ".bottom .flow-card",
-            ".compare",
-            ".hero-svg circle",
-            ".hero-svg text",
-        ]
-        boxes: list[tuple[str, dict]] = []
-        for sel in selectors:
+        body = page.locator("body").bounding_box()
+        assert body
+        print(f"Body: {body['width']:.0f}×{body['height']:.0f}px\n")
+
+        # Clipping: each compare-col contains its own children
+        clip_issues = 0
+        for i, col in enumerate(page.locator(".compare-col").all()):
+            cb = col.bounding_box()
+            if not cb:
+                continue
+            for sel in ("h4", "ul", "li"):
+                for j, el in enumerate(col.locator(sel).all()):
+                    eb = el.bounding_box()
+                    if eb and not contains(cb, eb):
+                        clip_issues += 1
+                        print(f"CLIP compare-col[{i}] {sel}[{j}]: outside parent by "
+                              f"R={eb['x']+eb['width']-cb['x']-cb['width']:.1f} "
+                              f"B={eb['y']+eb['height']-cb['y']-cb['height']:.1f}")
+
+        # Out of body
+        oob = 0
+        for sel in (".hero-wrap", ".stack", ".flow-card", ".compare", ".compare-col"):
             for i, el in enumerate(page.locator(sel).all()):
                 bb = el.bounding_box()
-                if bb:
-                    boxes.append((f"{sel}[{i}]", bb))
+                if bb and not contains(body, bb):
+                    oob += 1
+                    print(f"OUT OF BODY: {sel}[{i}] right={bb['x']+bb['width']-body['x']-body['width']:.1f} "
+                          f"bottom={bb['y']+bb['height']-body['y']-body['height']:.1f}")
 
-        print(f"Audited {len(boxes)} elements\n")
-        overlaps = []
-        for i, (na, a) in enumerate(boxes):
-            for nb, b in boxes[i + 1 :]:
+        # Cross-panel overlaps (top-level panels only)
+        panels: list[tuple[str, dict]] = []
+        for sel, name in (
+            (".hero-wrap", "hero"),
+            (".stack", "stack"),
+            (".bottom .flow-card.write", "write"),
+            (".bottom .flow-card.read", "read"),
+            (".compare", "compare"),
+        ):
+            bb = page.locator(sel).first.bounding_box()
+            if bb:
+                panels.append((name, bb))
+
+        cross = 0
+        for i, (na, a) in enumerate(panels):
+            for nb, b in panels[i + 1 :]:
                 if overlap(a, b):
-                    overlaps.append((na, nb, a, b))
+                    cross += 1
+                    print(f"CROSS-PANEL OVERLAP: {na} ↔ {nb}")
 
-        if overlaps:
-            print(f"WARNING: {len(overlaps)} overlap pairs (may be intentional nesting):\n")
-            for na, nb, a, b in overlaps[:25]:
-                print(f"  {na} ↔ {nb}")
-        else:
-            print("No unexpected overlaps detected.")
+        # Small text
+        small = 0
+        for name, bb in panels:
+            pass
+        for sel in (".compare-col ul", ".flow-card ol li", ".hero-svg text"):
+            for i, el in enumerate(page.locator(sel).all()):
+                bb = el.bounding_box()
+                if bb and (bb["width"] < 20 or bb["height"] < 14):
+                    small += 1
+                    print(f"SMALL: {sel}[{i}] {bb['width']:.0f}×{bb['height']:.0f}")
 
-        # Size warnings
-        print("\nSmall elements (width or height < 24px):")
-        for name, bb in boxes:
-            if bb["width"] < 24 or bb["height"] < 24:
-                print(f"  {name}: {bb['width']:.0f}×{bb['height']:.0f}")
+        print(f"\nSummary: clip={clip_issues} out_of_body={oob} cross_panel={cross} small={small}")
+        if clip_issues == 0 and oob == 0 and cross == 0:
+            print("PASS — no layout defects detected.")
 
         browser.close()
 

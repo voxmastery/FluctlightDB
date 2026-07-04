@@ -9,7 +9,7 @@
     background: #fff;
     color: #1e293b;
     width: 1440px;
-    padding: 28px 32px 32px;
+    padding: 28px 32px 40px;
   }
   .figure {
     display: grid;
@@ -31,15 +31,16 @@
     background: #fafbfc;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 20px 16px 18px;
-    min-height: 440px;
+    padding: 20px 20px 22px;
+    min-height: 460px;
+    overflow: visible;
   }
-  .hero-svg { width: 100%; height: auto; display: block; }
+  .hero-svg { width: 100%; height: auto; display: block; overflow: visible; }
   .hero-legend {
     display: flex;
-    gap: 20px;
+    gap: 24px;
     justify-content: center;
-    margin-top: 6px;
+    margin-top: 10px;
     font-size: 12px;
     color: #64748b;
   }
@@ -76,10 +77,12 @@
   .card pre { font-family: "SF Mono", "Consolas", monospace; font-size: 12.5px; }
   .index-arrow {
     text-align: center;
-    font-size: 11px;
-    color: #94a3b8;
-    margin: -6px 0;
-    line-height: 1;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.2;
+    padding: 2px 0;
   }
 
   /* ── Bottom row ── */
@@ -88,11 +91,13 @@
     display: grid;
     grid-template-columns: 1fr 1fr 1.15fr;
     gap: 24px;
+    align-items: stretch;
   }
   .flow-card {
     border-radius: 10px;
-    padding: 16px 18px;
-    min-height: 200px;
+    padding: 16px 18px 18px;
+    min-height: 228px;
+    overflow: visible;
   }
   .flow-card.write { background: #fff7ed; border: 1.5px solid #f28e2b; }
   .flow-card.read  { background: #ecfdf5; border: 1.5px solid #59a14f; }
@@ -102,7 +107,7 @@
   .flow-card ol {
     padding-left: 20px;
     font-size: 13.5px;
-    line-height: 1.75;
+    line-height: 1.8;
     color: #1e293b;
   }
 
@@ -110,22 +115,27 @@
   .compare {
     border: 1px solid #e2e8f0;
     border-radius: 10px;
-    padding: 16px 14px;
+    padding: 16px 16px 18px;
     background: #fafbfc;
-    min-height: 200px;
+    min-height: 228px;
+    overflow: visible;
   }
   .compare h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: #334155; }
   .compare-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
+    gap: 14px;
+    align-items: stretch;
   }
   .compare-col {
     border: 1px solid #cbd5e1;
     border-radius: 8px;
-    padding: 12px 10px;
+    padding: 12px 12px 14px;
     background: #f8fafc;
-    min-height: 130px;
+    min-height: 158px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
   }
   .compare-col.hl {
     background: #eef2ff;
@@ -134,15 +144,18 @@
   .compare-col h4 {
     font-size: 12.5px;
     font-weight: 700;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     color: #334155;
+    line-height: 1.3;
   }
   .compare-col ul {
     list-style: none;
-    font-size: 12px;
-    line-height: 1.65;
+    font-size: 11.5px;
+    line-height: 1.7;
     color: #475569;
+    overflow-wrap: anywhere;
   }
+  .compare-col li { padding-left: 0; }
   .compare-col li::before { content: "· "; color: #94a3b8; }
 </style>
 </head>
@@ -152,9 +165,9 @@
   <!-- (a) Hero -->
   <div class="hero-wrap">
     <div class="panel-title"><span>(a)</span> Cue-driven memory activation</div>
-    <svg class="hero-svg" viewBox="0 0 520 400" xmlns="http://www.w3.org/2000/svg">
+    <svg class="hero-svg" viewBox="0 0 520 430" xmlns="http://www.w3.org/2000/svg">
       <!-- brain casing -->
-      <ellipse cx="260" cy="205" rx="228" ry="172" fill="#eef2ff" stroke="#cbd5e1" stroke-width="1.5" opacity="0.7"/>
+      <ellipse cx="260" cy="200" rx="220" ry="165" fill="#eef2ff" stroke="#cbd5e1" stroke-width="1.5" opacity="0.7"/>
 
       <defs>
         <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
@@ -162,52 +175,53 @@
         </marker>
       </defs>
 
-      <!-- edges (endpoints offset to circle perimeters) -->
+      <!-- edges -->
       <g stroke="#94a3b8" stroke-width="1.3" fill="none" marker-end="url(#arr)">
-        <line x1="260" y1="92" x2="210" y2="118"/>
-        <line x1="260" y1="92" x2="310" y2="118"/>
-        <line x1="195" y1="158" x2="138" y2="188"/>
-        <line x1="195" y1="158" x2="245" y2="188"/>
-        <line x1="325" y1="158" x2="275" y2="188"/>
-        <line x1="325" y1="158" x2="382" y2="188"/>
-        <line x1="138" y1="232" x2="178" y2="268"/>
-        <line x1="260" y1="232" x2="260" y2="268"/>
-        <line x1="382" y1="232" x2="342" y2="268"/>
-        <line x1="195" y1="312" x2="245" y2="342"/>
-        <line x1="325" y1="312" x2="275" y2="342"/>
+        <line x1="260" y1="88" x2="210" y2="112"/>
+        <line x1="260" y1="88" x2="310" y2="112"/>
+        <line x1="195" y1="152" x2="138" y2="182"/>
+        <line x1="195" y1="152" x2="245" y2="182"/>
+        <line x1="325" y1="152" x2="275" y2="182"/>
+        <line x1="325" y1="152" x2="382" y2="182"/>
+        <line x1="138" y1="228" x2="178" y2="262"/>
+        <line x1="260" y1="228" x2="260" y2="262"/>
+        <line x1="382" y1="228" x2="342" y2="262"/>
+        <line x1="195" y1="302" x2="245" y2="332"/>
+        <line x1="325" y1="302" x2="275" y2="332"/>
       </g>
 
       <!-- nodes -->
       <g font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
-        <circle cx="260" cy="68" r="32" fill="#4c78a8" stroke="#fff" stroke-width="2.5"/>
-        <text x="260" y="73" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">cue</text>
+        <circle cx="260" cy="62" r="30" fill="#4c78a8" stroke="#fff" stroke-width="2.5"/>
+        <text x="260" y="67" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">cue</text>
 
-        <circle cx="195" cy="140" r="28" fill="#72b7b2" stroke="#fff" stroke-width="2.5"/>
-        <text x="195" y="186" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">FTS5 seed</text>
+        <circle cx="195" cy="132" r="26" fill="#72b7b2" stroke="#fff" stroke-width="2.5"/>
+        <text x="195" y="172" text-anchor="middle" font-size="11.5" font-weight="600" fill="#334155">FTS5 seed</text>
 
-        <circle cx="325" cy="140" r="28" fill="#72b7b2" stroke="#fff" stroke-width="2.5"/>
-        <text x="325" y="186" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">HNSW seed</text>
+        <circle cx="325" cy="132" r="26" fill="#72b7b2" stroke="#fff" stroke-width="2.5"/>
+        <text x="325" y="172" text-anchor="middle" font-size="11.5" font-weight="600" fill="#334155">HNSW seed</text>
 
-        <circle cx="115" cy="210" r="26" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
-        <text x="115" y="252" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">engram</text>
+        <circle cx="115" cy="205" r="24" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
+        <text x="115" y="244" text-anchor="middle" font-size="11.5" font-weight="600" fill="#334155">engram</text>
 
-        <circle cx="260" cy="210" r="26" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
-        <text x="260" y="252" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">engram</text>
+        <circle cx="260" cy="205" r="24" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
+        <text x="260" y="244" text-anchor="middle" font-size="11.5" font-weight="600" fill="#334155">engram</text>
 
-        <circle cx="405" cy="210" r="26" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
-        <text x="405" y="252" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">engram</text>
+        <circle cx="405" cy="205" r="24" fill="#9c755f" stroke="#fff" stroke-width="2.5"/>
+        <text x="405" y="244" text-anchor="middle" font-size="11.5" font-weight="600" fill="#334155">engram</text>
 
-        <circle cx="195" cy="290" r="24" fill="#b07aa1" stroke="#fff" stroke-width="2.5"/>
-        <text x="195" y="330" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">graph spread</text>
+        <circle cx="195" cy="282" r="22" fill="#b07aa1" stroke="#fff" stroke-width="2.5"/>
+        <text x="195" y="318" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">graph spread</text>
 
-        <circle cx="325" cy="290" r="24" fill="#b07aa1" stroke="#fff" stroke-width="2.5"/>
-        <text x="325" y="330" text-anchor="middle" font-size="12" font-weight="600" fill="#334155">graph spread</text>
+        <circle cx="325" cy="282" r="22" fill="#b07aa1" stroke="#fff" stroke-width="2.5"/>
+        <text x="325" y="318" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">graph spread</text>
 
-        <circle cx="260" cy="362" r="28" fill="#59a14f" stroke="#fff" stroke-width="2.5"/>
-        <text x="260" y="367" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">fused rank</text>
+        <circle cx="260" cy="352" r="26" fill="#59a14f" stroke="#fff" stroke-width="2.5"/>
+        <text x="260" y="348" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">fused</text>
+        <text x="260" y="362" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">rank</text>
+
+        <text x="28" y="408" font-size="12" fill="#59a14f" font-style="italic">activate(cue)</text>
       </g>
-
-      <text x="24" y="392" font-size="12" fill="#59a14f" font-style="italic">activate(cue)</text>
     </svg>
     <div class="hero-legend">
       <span><span class="dot" style="background:#f28e2b"></span>write path · experience()</span>
@@ -265,15 +279,15 @@ recall_index.sqlite
       <div class="compare-grid">
         <div class="compare-col">
           <h4>Relational</h4>
-          <ul><li>Typed rows</li><li>Predicate match</li><li>No episode graph</li></ul>
+          <ul><li>Typed rows</li><li>Predicate match</li><li>No graph</li></ul>
         </div>
         <div class="compare-col">
           <h4>Vector DB</h4>
-          <ul><li>ANN top-k</li><li>Embedding index</li><li>No provenance recall</li></ul>
+          <ul><li>ANN top-k</li><li>Embedding index</li><li>No provenance</li></ul>
         </div>
         <div class="compare-col hl">
           <h4>FluctlightDB</h4>
-          <ul><li>Engram + graph</li><li>Hybrid FTS5+HNSW</li><li>Agent-native contract</li></ul>
+          <ul><li>Engram + graph</li><li>Hybrid FTS5+HNSW</li><li>Agent contract</li></ul>
         </div>
       </div>
     </div>
