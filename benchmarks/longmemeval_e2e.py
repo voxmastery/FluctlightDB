@@ -36,6 +36,11 @@ READER_TEMPLATE = (
 
 READER_MODEL = "gpt-4o-2024-08-06"
 JUDGE_MODEL = "gpt-4o-2024-08-06"
+CURSOR_MODEL = "auto"
+CURSOR_ENV_CANDIDATES = (
+    Path("/opt/ambugo/serverbrain/.env"),
+    Path.home() / ".cursor" / ".env",
+)
 
 
 def format_history_json(item: dict, session_ids: list[str]) -> str:
@@ -65,6 +70,83 @@ def format_history_json(item: dict, session_ids: list[str]) -> str:
             + json.dumps(sess)
         )
     return "".join(parts)
+
+
+def load_cursor_api_key() -> str:
+    key = os.environ.get("CURSOR_API_KEY", "").strip()
+    if key:
+        return key
+    env_file = os.environ.get("CURSOR_ENV_FILE", "").strip()
+    paths = [Path(env_file)] if env_file else list(CURSOR_ENV_CANDIDATES)
+    for path in paths:
+        if not path.is_file():
+            continue
+        for line in path.read_text().splitlines():
+            if line.startswith("CURSOR_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
+def cursor_chat(
+    prompt: str,
+    *,
+    model: str = CURSOR_MODEL,
+    timeout_s: int = 300,
+    cwd: str | None = None,
+) -> str:
+    """Cursor SDK one-shot (CURSOR_API_KEY + auto model). Not OpenAI chat API."""
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
+    from cursor_sdk import Agent, AgentOptions, LocalAgentOptions
+
+    api_key = load_cursor_api_key()
+    if not api_key:
+        raise RuntimeError(
+            "CURSOR_API_KEY required for --llm-backend cursor "
+            "(export it or set CURSOR_ENV_FILE=/path/to/.env)"
+        )
+    workdir = cwd or os.environ.get("CURSOR_SDK_CWD") or str(REPO)
+    opts = AgentOptions(
+        api_key=api_key,
+        model=model,
+        mode="plan",
+        local=LocalAgentOptions(cwd=workdir, setting_sources=[]),
+    )
+
+    def _run() -> str:
+        result = Agent.prompt(prompt, opts)
+        text = getattr(result, "result", None)
+        if text is None and hasattr(result, "text"):
+            t = result.text
+            text = t() if callable(t) else t
+        return (text or "").strip()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        try:
+            return pool.submit(_run).result(timeout=timeout_s)
+        except FuturesTimeout as e:
+            raise RuntimeError(f"Cursor SDK timed out after {timeout_s}s") from e
+
+
+def llm_chat(
+    prompt: str,
+    *,
+    backend: str,
+    model: str,
+    max_tokens: int = 512,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    cursor_timeout_s: int = 300,
+) -> str:
+    if backend == "cursor":
+        return cursor_chat(prompt, model=model or CURSOR_MODEL, timeout_s=cursor_timeout_s)
+    return openai_chat(
+        prompt,
+        model=model,
+        max_tokens=max_tokens,
+        api_key=api_key,
+        base_url=base_url,
+    )
 
 
 def openai_chat(
@@ -109,7 +191,9 @@ def judge_label(
     hypothesis: str,
     *,
     judge_model: str,
+    llm_backend: str = "openai",
     api_key: str | None = None,
+    cursor_timeout_s: int = 120,
 ) -> bool:
     qtype = str(item.get("question_type") or "")
     qid = str(item.get("question_id") or "")
@@ -120,7 +204,14 @@ def judge_label(
         hypothesis,
         abstention="_abs" in qid,
     )
-    resp = openai_chat(prompt, model=judge_model, max_tokens=10, api_key=api_key)
+    resp = llm_chat(
+        prompt,
+        backend=llm_backend,
+        model=judge_model,
+        max_tokens=10,
+        api_key=api_key,
+        cursor_timeout_s=cursor_timeout_s,
+    )
     return "yes" in resp.lower()
 
 
@@ -152,6 +243,18 @@ def main() -> int:
     ap.add_argument("--top-k", type=int, default=8)
     ap.add_argument("--reader-model", default=READER_MODEL)
     ap.add_argument("--judge-model", default=JUDGE_MODEL)
+    ap.add_argument(
+        "--llm-backend",
+        default=os.environ.get("LONGMEMEVAL_LLM_BACKEND", "openai"),
+        choices=("openai", "cursor"),
+        help="openai = chat/completions API; cursor = Cursor SDK (CURSOR_API_KEY, auto model)",
+    )
+    ap.add_argument(
+        "--cursor-timeout",
+        type=int,
+        default=int(os.environ.get("CURSOR_SDK_TIMEOUT", "300")),
+        help="seconds per Cursor SDK prompt (reader)",
+    )
     ap.add_argument("--granularity", default="session", choices=("session", "turn"))
     ap.add_argument("--dual-key", action="store_true")
     ap.add_argument("--pref-facts-key", action="store_true")
@@ -192,11 +295,23 @@ def main() -> int:
                 done.add(str(qid))
 
     embedder = EmbedCache()
-    api_ok = bool(os.environ.get("OPENAI_API_KEY"))
-    if not args.skip_llm and not api_ok:
-        raise SystemExit(
-            "Set OPENAI_API_KEY for end-to-end QA, or pass --skip-llm to test retrieval only."
+    if args.llm_backend == "cursor":
+        reader_model = args.reader_model if args.reader_model != READER_MODEL else CURSOR_MODEL
+        judge_model = args.judge_model if args.judge_model != JUDGE_MODEL else CURSOR_MODEL
+    else:
+        reader_model = args.reader_model
+        judge_model = args.judge_model
+
+    llm_ok = bool(load_cursor_api_key()) if args.llm_backend == "cursor" else bool(
+        os.environ.get("OPENAI_API_KEY")
+    )
+    if not args.skip_llm and not llm_ok:
+        hint = (
+            "Set CURSOR_API_KEY (or CURSOR_ENV_FILE) for --llm-backend cursor"
+            if args.llm_backend == "cursor"
+            else "Set OPENAI_API_KEY for end-to-end QA"
         )
+        raise SystemExit(f"{hint}, or pass --skip-llm to test retrieval only.")
 
     t0 = time.perf_counter()
     for i, item in enumerate(items):
@@ -225,12 +340,20 @@ def main() -> int:
         hypothesis = ""
         label: Optional[bool] = None
         if not args.skip_llm:
-            hypothesis = openai_chat(
+            hypothesis = llm_chat(
                 reader_prompt,
-                model=args.reader_model,
+                backend=args.llm_backend,
+                model=reader_model,
                 max_tokens=500,
+                cursor_timeout_s=args.cursor_timeout,
             )
-            label = judge_label(item, hypothesis, judge_model=args.judge_model)
+            label = judge_label(
+                item,
+                hypothesis,
+                judge_model=judge_model,
+                llm_backend=args.llm_backend,
+                cursor_timeout_s=min(120, args.cursor_timeout),
+            )
         row = {
             "question_id": item.get("question_id"),
             "question_type": item.get("question_type"),
@@ -239,8 +362,9 @@ def main() -> int:
             "ingested": ingested,
             "hypothesis": hypothesis,
             "autoeval_label": label,
-            "reader_model": args.reader_model if not args.skip_llm else None,
-            "judge_model": args.judge_model if not args.skip_llm else None,
+            "reader_model": reader_model if not args.skip_llm else None,
+            "judge_model": judge_model if not args.skip_llm else None,
+            "llm_backend": args.llm_backend if not args.skip_llm else None,
             "sec": round(time.perf_counter() - t_q, 3),
         }
         rows.append(row)
@@ -267,8 +391,9 @@ def main() -> int:
         "dual_key": args.dual_key,
         "pref_facts_key": args.pref_facts_key,
         "query_expand": args.query_expand,
-        "reader_model": args.reader_model,
-        "judge_model": args.judge_model,
+        "reader_model": reader_model,
+        "judge_model": judge_model,
+        "llm_backend": args.llm_backend,
         "skip_llm": args.skip_llm,
         "questions": len(rows),
         "wall_s": round(wall, 1),

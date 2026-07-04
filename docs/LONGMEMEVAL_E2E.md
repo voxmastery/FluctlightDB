@@ -36,13 +36,11 @@ Wu et al. (ICLR 2025) report **LLM-as-judge** accuracy when the memory module fe
 Colab: `BENCH_PROFILE = "v2"` (500 retrieval + e2e) or `"e2e"` only; set `OPENAI_API_KEY` in Secrets.
 
 ```bash
-export OPENAI_API_KEY=...
-export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8794
-python3 benchmarks/longmemeval_e2e.py \
-  --dual-key --pref-facts-key --query-expand \
-  --limit 50 \
-  --json-out benchmarks/results/longmemeval-e2e-v4-mpnet.json
+# Local — Cursor Auto via SDK (CURSOR_API_KEY / crsr_*, not OpenAI sk-*)
+bash scripts/run-longmemeval-e2e-cursor.sh 50
 ```
+
+Colab E2E still needs a real **OpenAI** `sk-*` key in Secrets (Cursor SDK is local-only).
 
 ## Minimum viable comparison vs Mem0/Zep
 
