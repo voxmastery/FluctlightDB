@@ -19,7 +19,7 @@ cp "$FIGURES/01-brain-architecture.png" "$PUBLIC/assets/brain-architecture.png" 
 cp "$ROOT/benchmarks/results/paper-2026-07-04.json" "$PUBLIC/data/results.json"
 cp "$ROOT/benchmarks/results/paper-2026-07-04.json" "$ROOT/hub/dataset/results.json" 2>/dev/null || true
 cp "$ROOT/benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json" "$PUBLIC/data/longmemeval-preference-v4-mpnet-2026-07-04.json" 2>/dev/null || true
-cp "$ROOT/benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json" "$PUBLIC/data/longmemeval-colab-mpnet-2026-07-03.json" 2>/dev/null || true
+cp "$ROOT/benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json" "$PUBLIC/data/longmemeval-colab-v2-full-2026-07-04.json" 2>/dev/null || true
 
 # index.html — public preprint (no nginx /paper base path)
 cat > "$PUBLIC/index.html" << 'HTML'
@@ -29,9 +29,9 @@ cat > "$PUBLIC/index.html" << 'HTML'
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FluctlightDB — Research Paper (Preprint)</title>
-  <meta name="description" content="FluctlightDB: a brain-native memory engine for AI agents. 98.1% LoCoMo evidence recall, 98.0% LongMemEval-S session recall@8." />
+  <meta name="description" content="FluctlightDB: a brain-native memory engine for AI agents. 98.1% LoCoMo evidence recall, 97.6% LongMemEval-S session recall@8." />
   <meta property="og:title" content="FluctlightDB: A Memory Model of Data for AI Agents" />
-  <meta property="og:description" content="Third data model for agent memory — 98.1% LoCoMo, 98.0% LongMemEval-S, BEIR SciFact parity, FAMB 97–98%." />
+  <meta property="og:description" content="Third data model for agent memory — 98.1% LoCoMo, 97.6% LongMemEval-S, BEIR SciFact parity, FAMB 97–98%." />
   <meta property="og:type" content="article" />
   <link rel="stylesheet" href="assets/style.css" />
 </head>
@@ -55,7 +55,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
       <h2>Frozen metrics</h2>
       <ul id="metrics-sidebar">
         <li>LoCoMo evidence recall <span class="metric">98.1%</span></li>
-        <li>LongMemEval-S session@8 <span class="metric">98.0%</span></li>
+        <li>LongMemEval-S session@8 <span class="metric">97.6%</span></li>
         <li>LongMemEval preference@8 <span class="metric">96.7%</span></li>
         <li>BEIR SciFact nDCG@10 <span class="metric">0.645</span></li>
         <li>FAMB macro (index) <span class="metric">98%</span></li>

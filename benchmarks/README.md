@@ -13,6 +13,9 @@ pip install chromadb pytrec-eval-terrier "fluctlightdb[native]"
 | `agent_memory_bench.py` | Agent-specific: paraphrase, provenance, persistence | Built-in |
 | `locomo_bench.py` | LoCoMo long-dialogue evidence recall | [LoCoMo](https://snap-research.github.io/locomo/) |
 | `longmemeval_bench.py` | LongMemEval session evidence recall | [LongMemEval](https://github.com/xiaowu0162/LongMemEval) |
+| `longmemeval_e2e.py` | LongMemEval E2E (retrieve → Gemini Flash → judge) | Same + `GEMINI_API_KEY` |
+
+E2E full 500: `bash scripts/run-longmemeval-e2e-500.sh` — see **[docs/LONGMEMEVAL_E2E.md](../docs/LONGMEMEVAL_E2E.md)**.
 
 Paper citations and protocol: **[docs/BENCHMARKS.md](../docs/BENCHMARKS.md)**.
 

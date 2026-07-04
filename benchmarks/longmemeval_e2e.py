@@ -7,8 +7,10 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Optional
 
@@ -33,9 +35,11 @@ READER_TEMPLATE = (
 )
 
 from cursor_api import cursor_auto_chat, load_cursor_api_key  # noqa: E402
+from cloud_llm import chat as cloud_chat, load_env_file  # noqa: E402
 
-READER_MODEL = "auto"
-JUDGE_MODEL = "auto"
+READER_MODEL = "gemini-2.5-flash"
+JUDGE_MODEL = "gemini-2.5-flash"
+DEFAULT_LLM_BACKEND = "gemini"
 
 
 def format_history_json(item: dict, session_ids: list[str]) -> str:
@@ -67,16 +71,25 @@ def format_history_json(item: dict, session_ids: list[str]) -> str:
     return "".join(parts)
 
 
-def llm_chat(prompt: str, *, model: str, timeout_s: int = 300) -> str:
-    return cursor_auto_chat(prompt, model=model or "auto", timeout_s=timeout_s)
+def llm_chat(
+    prompt: str,
+    *,
+    backend: str,
+    model: str,
+    timeout_s: int = 120,
+) -> str:
+    if backend == "cursor":
+        return cursor_auto_chat(prompt, model=model or "auto", timeout_s=timeout_s)
+    return cloud_chat(prompt, provider=backend, model=model or None, timeout_s=timeout_s)
 
 
 def judge_label(
     item: dict,
     hypothesis: str,
     *,
+    backend: str,
     judge_model: str,
-    cursor_timeout_s: int = 120,
+    timeout_s: int = 120,
 ) -> bool:
     qtype = str(item.get("question_type") or "")
     qid = str(item.get("question_id") or "")
@@ -87,8 +100,66 @@ def judge_label(
         hypothesis,
         abstention="_abs" in qid,
     )
-    resp = llm_chat(prompt, model=judge_model, timeout_s=cursor_timeout_s)
+    resp = llm_chat(prompt, backend=backend, model=judge_model, timeout_s=timeout_s)
     return "yes" in resp.lower()
+
+
+def process_one_item(
+    item: dict,
+    *,
+    args: argparse.Namespace,
+    embedder: EmbedCache,
+    reader_model: str,
+    judge_model: str,
+) -> dict:
+    t_q = time.perf_counter()
+    recalls, session_hit, ingested = retrieve_item(
+        item,
+        mode="index",
+        top_k=args.top_k,
+        embedder=embedder,
+        fast=args.fast,
+        granularity=args.granularity,
+        query_expand=args.query_expand,
+        dual_key=args.dual_key,
+        pref_facts_key=args.pref_facts_key,
+    )
+    sids = session_ids_from_recalls(recalls, top_k=args.top_k)
+    history = format_history_json(item, sids)
+    reader_prompt = READER_TEMPLATE.format(
+        history=history,
+        question_date=item.get("question_date") or "",
+        question=item.get("question") or "",
+    )
+    hypothesis = ""
+    label: Optional[bool] = None
+    if not args.skip_llm:
+        hypothesis = llm_chat(
+            reader_prompt,
+            backend=args.llm_backend,
+            model=reader_model,
+            timeout_s=args.llm_timeout,
+        )
+        label = judge_label(
+            item,
+            hypothesis,
+            backend=args.llm_backend,
+            judge_model=judge_model,
+            timeout_s=args.llm_timeout,
+        )
+    return {
+        "question_id": item.get("question_id"),
+        "question_type": item.get("question_type"),
+        "session_recall_hit": session_hit,
+        "retrieved_sessions": sids,
+        "ingested": ingested,
+        "hypothesis": hypothesis,
+        "autoeval_label": label,
+        "reader_model": reader_model if not args.skip_llm else None,
+        "judge_model": judge_model if not args.skip_llm else None,
+        "llm_backend": args.llm_backend if not args.skip_llm else None,
+        "sec": round(time.perf_counter() - t_q, 3),
+    }
 
 
 def aggregate_qa(rows: list[dict]) -> dict[str, Any]:
@@ -117,13 +188,25 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--top-k", type=int, default=8)
-    ap.add_argument("--reader-model", default=READER_MODEL)
-    ap.add_argument("--judge-model", default=JUDGE_MODEL)
+    ap.add_argument("--reader-model", default=None)
+    ap.add_argument("--judge-model", default=None)
+    ap.add_argument(
+        "--llm-backend",
+        default=os.environ.get("LONGMEMEVAL_LLM_BACKEND", DEFAULT_LLM_BACKEND),
+        choices=("gemini", "openrouter", "cerebras", "groq", "openai", "cursor"),
+        help="reader/judge API (OpenAI-compatible chat; cursor = slow Cloud Agents API)",
+    )
+    ap.add_argument(
+        "--llm-timeout",
+        type=int,
+        default=int(os.environ.get("LONGMEMEVAL_LLM_TIMEOUT", "180")),
+        help="seconds per reader/judge chat completion",
+    )
     ap.add_argument(
         "--cursor-timeout",
         type=int,
         default=int(os.environ.get("CURSOR_API_TIMEOUT", "300")),
-        help="seconds per Cursor Cloud Agent prompt (reader/judge)",
+        help="alias kept for scripts; used when --llm-backend cursor",
     )
     ap.add_argument("--granularity", default="session", choices=("session", "turn"))
     ap.add_argument("--dual-key", action="store_true")
@@ -134,11 +217,19 @@ def main() -> int:
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument(
+        "--workers",
+        type=int,
+        default=int(os.environ.get("LONGMEMEVAL_E2E_WORKERS", "1")),
+        help="parallel questions (each worker uses its own embed cache)",
+    )
+    ap.add_argument(
         "--type-filter",
         default="",
         help="comma-separated question_type filter",
     )
     args = ap.parse_args()
+    if args.llm_backend == "cursor" and args.llm_timeout == 120 and args.cursor_timeout != 300:
+        args.llm_timeout = args.cursor_timeout
 
     if not args.data.is_file():
         raise SystemExit(f"dataset not found: {args.data}")
@@ -165,78 +256,81 @@ def main() -> int:
                 done.add(str(qid))
 
     embedder = EmbedCache()
-    reader_model = args.reader_model
-    judge_model = args.judge_model
+    backend = args.llm_backend
+    from cloud_llm import PROVIDERS
 
-    if not args.skip_llm and not load_cursor_api_key():
-        raise SystemExit(
-            "Set CURSOR_API_KEY (serverbrain .env or Colab Secrets), or pass --skip-llm."
-        )
+    default_model = (
+        "gpt-4o-2024-08-06"
+        if backend == "openai"
+        else "auto"
+        if backend == "cursor"
+        else PROVIDERS.get(backend, {}).get("default_model")
+    )
+    reader_model = args.reader_model or default_model or READER_MODEL
+    judge_model = args.judge_model or reader_model
 
-    t0 = time.perf_counter()
+    if not args.skip_llm:
+        load_env_file()
+        if backend == "cursor":
+            if not load_cursor_api_key():
+                raise SystemExit("Set CURSOR_API_KEY or pass --skip-llm.")
+        else:
+            try:
+                cloud_chat("ping", provider=backend, max_tokens=5, timeout_s=30)
+            except Exception as e:
+                raise SystemExit(
+                    f"LLM backend {backend!r} failed smoke test: {e}\n"
+                    "Load /home/ambugo/litellm/.env or set Colab Secrets."
+                ) from e
+
+    pending: list[tuple[int, dict]] = []
     for i, item in enumerate(items):
         qid = str(item.get("question_id") or i)
-        if qid in done:
-            continue
-        t_q = time.perf_counter()
-        recalls, session_hit, ingested = retrieve_item(
+        if qid not in done:
+            pending.append((i, item))
+
+    ckpt_lock = threading.Lock()
+    rows_lock = threading.Lock()
+
+    def run_item(_i: int, item: dict) -> dict:
+        local_embedder = embedder if args.workers <= 1 else EmbedCache()
+        return process_one_item(
             item,
-            mode="index",
-            top_k=args.top_k,
-            embedder=embedder,
-            fast=args.fast,
-            granularity=args.granularity,
-            query_expand=args.query_expand,
-            dual_key=args.dual_key,
-            pref_facts_key=args.pref_facts_key,
+            args=args,
+            embedder=local_embedder,
+            reader_model=reader_model,
+            judge_model=judge_model,
         )
-        sids = session_ids_from_recalls(recalls, top_k=args.top_k)
-        history = format_history_json(item, sids)
-        reader_prompt = READER_TEMPLATE.format(
-            history=history,
-            question_date=item.get("question_date") or "",
-            question=item.get("question") or "",
-        )
-        hypothesis = ""
-        label: Optional[bool] = None
-        if not args.skip_llm:
-            hypothesis = llm_chat(
-                reader_prompt,
-                model=reader_model,
-                timeout_s=args.cursor_timeout,
-            )
-            label = judge_label(
-                item,
-                hypothesis,
-                judge_model=judge_model,
-                cursor_timeout_s=min(120, args.cursor_timeout),
-            )
-        row = {
-            "question_id": item.get("question_id"),
-            "question_type": item.get("question_type"),
-            "session_recall_hit": session_hit,
-            "retrieved_sessions": sids,
-            "ingested": ingested,
-            "hypothesis": hypothesis,
-            "autoeval_label": label,
-            "reader_model": reader_model if not args.skip_llm else None,
-            "judge_model": judge_model if not args.skip_llm else None,
-            "llm_backend": "cursor_api" if not args.skip_llm else None,
-            "sec": round(time.perf_counter() - t_q, 3),
-        }
-        rows.append(row)
+
+    def record_row(row: dict) -> None:
+        with rows_lock:
+            rows.append(row)
+            n = len(rows)
+            if n % 5 == 0 or n == len(items):
+                agg = aggregate_qa(rows)
+                print(
+                    f"[{n}/{len(items)}] session@k={agg['session_recall_at_k']:.1%} "
+                    f"e2e={agg['overall_accuracy']:.1%} last_sec={row['sec']}",
+                    flush=True,
+                )
         if args.checkpoint:
             args.checkpoint.parent.mkdir(parents=True, exist_ok=True)
-            with args.checkpoint.open("a") as f:
-                f.write(json.dumps(row) + "\n")
-        n = len(rows)
-        if n % 5 == 0 or (i + 1) == len(items):
-            agg = aggregate_qa(rows)
-            print(
-                f"[{n}] session@k={agg['session_recall_at_k']:.1%} "
-                f"e2e={agg['overall_accuracy']:.1%} last_sec={row['sec']}",
-                flush=True,
-            )
+            with ckpt_lock:
+                with args.checkpoint.open("a") as f:
+                    f.write(json.dumps(row) + "\n")
+
+    t0 = time.perf_counter()
+    if args.workers <= 1:
+        for i, item in pending:
+            record_row(run_item(i, item))
+    else:
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            futures = {pool.submit(run_item, i, item): item for i, item in pending}
+            for fut in as_completed(futures):
+                record_row(fut.result())
+
+    order = {str(it.get("question_id") or idx): idx for idx, it in enumerate(items)}
+    rows.sort(key=lambda r: order.get(str(r.get("question_id")), 10**9))
 
     wall = time.perf_counter() - t0
     summary = {
@@ -250,14 +344,15 @@ def main() -> int:
         "query_expand": args.query_expand,
         "reader_model": reader_model,
         "judge_model": judge_model,
-        "llm_backend": "cursor_api",
-        "cursor_api_base": os.environ.get("CURSOR_API_BASE", "https://api.cursor.com"),
+        "llm_backend": backend,
         "skip_llm": args.skip_llm,
         "questions": len(rows),
         "wall_s": round(wall, 1),
+        "sec_per_question": round(wall / len(rows), 2) if rows else 0.0,
+        "workers": max(1, args.workers),
         **aggregate_qa(rows),
     }
-    out = args.json_out or REPO / "benchmarks/results/longmemeval-e2e-v4.json"
+    out = args.json_out or REPO / "benchmarks/results/longmemeval-e2e-v4-mpnet.json"
     payload = {"summary": summary, "results": rows}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2))

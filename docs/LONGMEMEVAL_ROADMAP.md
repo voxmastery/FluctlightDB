@@ -6,7 +6,7 @@ Research → invent → test loop for FluctlightDB on [LongMemEval-S](https://gi
 
 | Metric | What it measures | SOTA | Fluctlight (session@8) |
 |--------|------------------|------|------------------------|
-| **Session recall@K** | Gold `answer_session_ids` in top-K | **95–98% @5** (gbrain, YourMemory) | **98.0% @8** (composite, mpnet Colab) |
+| **Session recall@K** | Gold `answer_session_ids` in top-K | **95–98% @5** (gbrain, YourMemory) | **97.6% @8** (unified v4, mpnet Colab) |
 | **Answer-in-recall@K** | Answer string tokens in recalled text | N/A (not official) | Deprecated (turn-level was ~40%) |
 | **End-to-end QA (LLJ)** | LLM reads retrieval + answers; GPT judge | **76–90%** (TiMem, PlugMem) | Not run yet |
 
@@ -89,7 +89,7 @@ full 500 + by_type breakdown
 if < 90% session_recall@8 → next hypothesis
 ```
 
-**Status (2026-07-04):** Preference v4 **96.7%** (29/30) on Colab mpnet — **90% target met**. Composite overall **98.0%** (490/500).
+**Status (2026-07-04):** Unified v4 full 500 on Colab GPU: **97.6%** (488/500) session@8. Preference **96.7%** (29/30) — **90% target met**.
 
 ### Next experiments (post-arXiv v1)
 
@@ -107,12 +107,12 @@ See also: `docs/LONGMEMEVAL_E2E.md` for retrieval vs end-to-end metric separatio
 | v1 session (lexical-only embed bug) | session@8 | **93.8%** (469/500) | preference 53.3% |
 | preference v2 (MiniLM + dual-key + expand) | session@8 | **73.3%** (22/30) | +20pp on preference |
 | v2 fast (lexical + dual-key + expand) | session@8 | **~91%** | lexical-only baseline |
-| **Colab GPU mpnet composite** | session@8 | **98.0%** (490/500) | full 470 + v4 preference 29/30 |
+| **Colab GPU mpnet v2 unified 500** | session@8 | **97.6%** (488/500) | full v4 run, pref-facts + dual-key |
 | ↳ knowledge-update | session@8 | **100%** | |
 | ↳ multi-session | session@8 | **98.5%** | |
-| ↳ single-session-user | session@8 | **98.6%** | |
+| ↳ single-session-user | session@8 | **97.1%** | |
 | ↳ single-session-assistant | session@8 | **98.2%** | |
-| ↳ temporal-reasoning | session@8 | **96.2%** | |
+| ↳ temporal-reasoning | session@8 | **95.5%** | |
 | ↳ single-session-preference | session@8 | **96.7%** (29/30) | v4 mpnet Colab 2026-07-04 |
 
 Frozen result: `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json`

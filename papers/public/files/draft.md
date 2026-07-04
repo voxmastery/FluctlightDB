@@ -12,7 +12,7 @@ For fifty years, data systems have answered two questions. The relational model 
 
 We argue that long-term agent memory is not an application built on top of a database — it is a **third data model**, with its own write semantics (encoding, separation, consolidation, provenance) and its own read semantics (cue-driven activation across a linked memory graph). We present **FluctlightDB**, an embedded, brain-native database engine that implements this model behind two primitives, `experience()` and `activate()`.
 
-On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's hybrid index recalls **98.1%** of gold evidence — warm and cold-start identical. On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **98.0%** (490/500 composite), competitive with published hybrid memory systems. Preference questions reach **96.7%** (29/30) with v4 pref-facts indexing. On BEIR SciFact it matches a tuned Chroma + MiniLM baseline on nDCG@10 at equal latency, while agent mode improves Recall@100. On an agent-specific suite (FAMB) it scores 97–98% macro. The engine, harnesses, and frozen metrics are released under MIT.
+On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's hybrid index recalls **98.1%** of gold evidence — warm and cold-start identical. On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. Preference questions reach **96.7%** (29/30) with v4 pref-facts indexing. On BEIR SciFact it matches a tuned Chroma + MiniLM baseline on nDCG@10 at equal latency, while agent mode improves Recall@100. On an agent-specific suite (FAMB) it scores 97–98% macro. The engine, harnesses, and frozen metrics are released under MIT.
 
 ## 1. Introduction
 
@@ -24,7 +24,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 - **A data model.** Agent memory as a first-class model of data, distinct from the relational and vector models.
 - **An engine.** FluctlightDB — embedded Rust, `experience()` / `activate()` / `checkpoint()`, one durable store per agent.
-- **Evidence.** 98.1% evidence recall on full LoCoMo, **98.0%** session recall@8 on LongMemEval-S (composite), **96.7%** on preference (29/30), parity with a tuned vector baseline on BEIR, 97–98% macro on an agent-specific benchmark.
+- **Evidence.** 98.1% evidence recall on full LoCoMo, **97.6%** session recall@8 on LongMemEval-S (unified v4 full 500), **96.7%** on preference (29/30), parity with a tuned vector baseline on BEIR, 97–98% macro on an agent-specific benchmark.
 - **Reproducibility.** Open harnesses and frozen result JSON; every number re-runs with one command.
 
 ## 2. The Third Data Model
@@ -53,7 +53,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 ![Headline benchmark results](../assets/02-benchmark-summary.png)
 
-*Figure 2: LoCoMo 98.1%, LongMemEval-S 98.0%, BEIR nDCG@10 0.645, FAMB 98%.*
+*Figure 2: LoCoMo 98.1%, LongMemEval-S 97.6%, BEIR nDCG@10 0.645, FAMB 98%.*
 
 ![LongMemEval-S by question type](../assets/03-longmemeval-by-type.png)
 
@@ -92,21 +92,21 @@ We separate retrieval from generation. A verbatim answer-in-context proxy sits n
 
 Paraphrase recall@1, provenance top-1, persistence, confusion ingest, determinism. Index macro **98%**, agent macro **97%**.
 
-### 4.4 LongMemEval-S — 98.0% session recall@8 (composite)
+### 4.4 LongMemEval-S — 97.6% session recall@8 (v4 unified 500)
 
-Official retrieval metric: gold `answer_session_ids` in top-8 recalled sessions (500 questions, six ability types). Config: v4 harness — dual-key, pref-facts-key, query-expand; mpnet on Colab GPU. Composite: 470-question full run + 30-question preference slice.
+Official retrieval metric: gold `answer_session_ids` in top-8 recalled sessions (500 questions, six ability types). Config: v4 harness — dual-key, pref-facts-key, query-expand; mpnet on Colab GPU (~73 min, 8.8 s/question).
 
 | Slice | session@8 |
 |-------|----------:|
-| **Overall (composite)** | **98.0%** (490/500) |
+| **Overall (unified v4)** | **97.6%** (488/500) |
 | knowledge-update | 100% |
 | multi-session | 98.5% |
-| single-session-user | 98.6% |
+| single-session-user | 97.1% |
 | single-session-assistant | 98.2% |
-| temporal-reasoning | 96.2% |
+| temporal-reasoning | 95.5% |
 | single-session-preference | **96.7%** (29/30) |
 
-Leaderboard context (different K/embedders): gbrain 97.6% @5, YourMemory 95.8% @5, M3 Memory 96.8% @10. Reproduce: `benchmarks/longmemeval_colab.ipynb`.
+Leaderboard context (different K/embedders): gbrain 97.6% @5, YourMemory 95.8% @5, M3 Memory 96.8% @10. Reproduce: `benchmarks/longmemeval_colab_v2.ipynb`.
 
 ## 5. Discussion
 
@@ -116,7 +116,7 @@ Leaderboard context (different K/embedders): gbrain 97.6% @5, YourMemory 95.8% @
 
 **Hybrid retrieval matters.** Lexical seeds raised LoCoMo recall over vector-only at moderate k — direct evidence the memory model benefits from machinery a pure vector DB lacks.
 
-**Limitations.** Composite 98.0% merges full and preference slices; single 500-question v4 run pending. Temporal reasoning 96.2%. No full end-to-end LLM QA vs Mem0/Zep on LongMemEval yet (their numbers use reader-LLM judges).
+**Limitations.** Temporal reasoning 95.5% is the main remaining gap. End-to-end QA vs Mem0/Zep uses Cursor Auto reader+judge in our harness (baselines cite gpt-4o); full 500-question E2E Colab run pending.
 
 ## 6. Related Work
 
@@ -132,7 +132,7 @@ Leaderboard context (different K/embedders): gbrain 97.6% @5, YourMemory 95.8% @
 | MemGPT / Letta | Agent OS | Context tiers / blocks | — | Session QA |
 | HippoRAG | Graph RAG | Associative retrieval | — | Multi-hop QA |
 | **FluctlightDB** | **Engine** | **`experience()` / `activate()`** | **98.1%** | LoCoMo evidence |
-| **FluctlightDB** | **Engine** | hybrid + session keys | **96.8%** | LongMemEval session@8 |
+| **FluctlightDB** | **Engine** | hybrid + session keys | **97.6%** | LongMemEval session@8 |
 
 Mem0 (arXiv:2504.19413) is the primary reference to cite and differentiate against. Its graph variant and hybrid retrieval overlap in *mechanism* but not in *layer*: Mem0 orchestrates memory over backends; FluctlightDB defines memory as the store contract itself — a third data model peer to rows and vectors.
 
@@ -150,8 +150,8 @@ To our knowledge, no prior work positions long-term agent memory as a third data
 
 ## 7. Conclusion
 
-The relational model gave applications a database for *facts*; the vector model gave search a database for *similarity*. Autonomous agents need a database for *memory*, and it should be as boring to adopt and as rigorous to trust as SQLite. FluctlightDB matches vector baselines where they are strong, wins where memory semantics matter, recalls 98.1% of gold evidence on LoCoMo and 96.8% session recall on LongMemEval-S.
+The relational model gave applications a database for *facts*; the vector model gave search a database for *similarity*. Autonomous agents need a database for *memory*, and it should be as boring to adopt and as rigorous to trust as SQLite. FluctlightDB matches vector baselines where they are strong, wins where memory semantics matter, recalls 98.1% of gold evidence on LoCoMo and 97.6% session recall on LongMemEval-S.
 
 ## Artifacts
 
-Repository: FluctlightDB (MIT). Harnesses: `locomo_eval.py`, `longmemeval_bench.py`, `longmemeval_colab.ipynb`, `beir_bench.py`, `agent_memory_bench.py`. Frozen metrics: `benchmarks/results/paper-2026-07-03.json`. DOI: [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890).
+Repository: FluctlightDB (MIT). Harnesses: `locomo_eval.py`, `longmemeval_bench.py`, `longmemeval_colab_v2.ipynb`, `beir_bench.py`, `agent_memory_bench.py`. Frozen metrics: `benchmarks/results/paper-2026-07-04.json`. DOI: [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890).
