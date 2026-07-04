@@ -20,7 +20,7 @@ NODES = {
     "eR": (405, 205, 24),
     "gsL": (195, 282, 22),
     "gsR": (325, 282, 22),
-    "fused": (260, 352, 26),
+    "fused": (260, 334, 26),
 }
 EDGES = [
     ("cue", "fts5"), ("cue", "hnsw"),
@@ -95,6 +95,27 @@ def audit_svg_arrows(page) -> int:
     return issues
 
 
+def audit_ellipse_containment(page) -> int:
+    """All hero node circles must fit inside the brain casing ellipse."""
+    issues = 0
+    ellipse = {"cx": 260, "cy": 200, "rx": 220, "ry": 172, "pad": 2}
+    cx, cy, rx, ry, pad = ellipse["cx"], ellipse["cy"], ellipse["rx"], ellipse["ry"], ellipse["pad"]
+
+    for name, (nx, ny, nr) in NODES.items():
+        for label, px, py in (
+            ("center", nx, ny),
+            ("top", nx, ny - nr),
+            ("bottom", nx, ny + nr),
+            ("left", nx - nr, ny),
+            ("right", nx + nr, ny),
+        ):
+            val = ((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2
+            if val > 1.0 + pad / min(rx, ry):
+                issues += 1
+                print(f"ELLIPSE OUT: {name} {label} ({px},{py}) val={val:.3f}")
+    return issues
+
+
 def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -146,9 +167,10 @@ def main() -> None:
                     print(f"CROSS-PANEL OVERLAP: {na} ↔ {nb}")
 
         arrow_issues = audit_svg_arrows(page)
+        ellipse_issues = audit_ellipse_containment(page)
 
-        print(f"\nSummary: clip={clip_issues} out_of_body={oob} cross_panel={cross} arrows={arrow_issues}")
-        if clip_issues == 0 and oob == 0 and cross == 0 and arrow_issues == 0:
+        print(f"\nSummary: clip={clip_issues} out_of_body={oob} cross_panel={cross} arrows={arrow_issues} ellipse={ellipse_issues}")
+        if clip_issues == 0 and oob == 0 and cross == 0 and arrow_issues == 0 and ellipse_issues == 0:
             print("PASS — figure ready for paper.")
 
         browser.close()
