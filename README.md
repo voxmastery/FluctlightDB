@@ -85,7 +85,7 @@ That gap shows up as the same pain in every serious agent:
 
 **In one line:** FluctlightDB is a **database engine for what agents learn** — write episodes, recall from cues, hybrid retrieval, evidence ranking, compaction — **embedded on disk**, not a hosted memory SaaS and not a replacement for Postgres.
 
-**Proof:** **98.1%** LoCoMo evidence recall · **96.8%** LongMemEval-S session@8 · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/paper-2026-07-03.json).
+**Proof:** **98.1%** LoCoMo evidence recall · **98.0%** LongMemEval-S session@8 · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/paper-2026-07-04.json).
 
 ---
 
@@ -103,7 +103,7 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 ## Where it is going
 
-- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **96.8% LongMemEval-S** (full retrieval runs), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
+- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **98.0% LongMemEval-S** (composite retrieval runs), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
 - **Next:** full 500 v4 confirmation run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
 - **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
 - **Long-term vision:** **foundational memory infrastructure** for durable, trustworthy autonomy — the persistence layer between a stateless LLM call and agents (or stacks) that must operate over weeks, prefer evidence over chat, and carry identity across tools. We are building the **database for that layer**, not claiming to be AGI. Any serious path toward general, long-horizon autonomy still needs a third data model for *what was learned and what can be trusted*; FluctlightDB is that engine.
@@ -112,7 +112,7 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 ## Benchmarks
 
-Frozen results: [`benchmarks/results/paper-2026-07-03.json`](benchmarks/results/paper-2026-07-03.json)
+Frozen results: [`benchmarks/results/paper-2026-07-04.json`](benchmarks/results/paper-2026-07-04.json)
 
 ### Latest measured results (July 2026)
 

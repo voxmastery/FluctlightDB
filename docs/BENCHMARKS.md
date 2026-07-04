@@ -107,7 +107,7 @@ Config: `connect_index()`, ingest dialog + observations, `--rag-mode all --top-k
 | **Metrics** | Official **session_recall@K** (gold `answer_session_ids` in top-K); end-to-end QA with LLM judge is separate |
 | **Used by** | Mem0, Zep, multiple 2024–2025 memory papers |
 | **Paper** | Wu et al., *LongMemEval: Benchmarking Long-Term Memory in LLM Agents*, ICLR 2025 |
-| **Status** | **Full eval complete** — 96.8% session recall@8 (frozen `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json`) |
+| **Status** | **Eval complete** — **98.0%** session recall@8 composite (frozen `benchmarks/results/paper-2026-07-04.json`) |
 | **In-repo** | `benchmarks/longmemeval_bench.py`, `benchmarks/longmemeval_colab.ipynb`, `docs/LONGMEMEVAL_ROADMAP.md` |
 
 **FluctlightDB results (July 2026, LongMemEval-S v2, session granularity):**
@@ -230,5 +230,5 @@ pip install chromadb pytrec-eval-terrier fluctlightdb[native]
 
 | Date | Change |
 |---|---|
-| 2026-07 | LongMemEval-S: 96.8% session@8 (mpnet, Colab); frozen in `longmemeval-colab-mpnet-2026-07-03.json` |
+| 2026-07 | LongMemEval-S: **98.0%** session@8 composite (490/500); preference v4 **96.7%** (29/30); frozen in `paper-2026-07-04.json` |
 | 2025-06 | Initial BENCHMARKS.md: BEIR harness in-repo, FAMB, Tier-1 citation table, connect vs connect_index |

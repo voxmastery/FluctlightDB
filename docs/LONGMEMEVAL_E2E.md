@@ -1,12 +1,12 @@
 # LongMemEval end-to-end QA (vs Mem0 / Zep)
 
-Retrieval numbers in the paper (96.8% session@8) and Mem0/Zep headline numbers (~92% / ~75% on LoCoMo) measure **different layers**. This doc explains the gap and how to run a fair comparison later.
+Retrieval numbers in the paper (**98.0%** session@8 composite) and Mem0/Zep headline numbers (~92% / ~75% on LoCoMo) measure **different layers**. This doc explains the gap and how to run a fair comparison later.
 
 ## Two evaluation layers
 
 | Layer | What it tests | FluctlightDB today | Mem0 / Zep cited |
 |-------|----------------|-------------------|------------------|
-| **Retrieval** | Gold session/evidence in top-K | **96.8%** LongMemEval session@8 | Often reported internally, not always public |
+| **Retrieval** | Gold session/evidence in top-K | **98.0%** LongMemEval session@8 (composite) | Often reported internally, not always public |
 | **End-to-end QA** | Retrieve → LLM reads → answer → GPT judge | **Not run (full 500)** | LoCoMo ~92% / ~75% LLM-J |
 
 FluctlightDB's contribution is the **engine retrieval layer**. End-to-end QA additionally depends on:
@@ -27,7 +27,7 @@ Wu et al. (ICLR 2025) report **LLM-as-judge** accuracy when the memory module fe
 | PlugMem | Accuracy | ~90% |
 | Mem0 / Zep | LoCoMo LLM-J | ~92% / ~75% (different benchmark) |
 
-**Do not** compare our 96.8% session recall to Mem0's ~92% without labeling retrieval vs end-to-end.
+**Do not** compare our 98.0% session recall to Mem0's ~92% without labeling retrieval vs end-to-end.
 
 ## Planned harness (post-arXiv)
 

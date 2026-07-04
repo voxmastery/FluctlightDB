@@ -4,16 +4,18 @@ Use this after `paper-2026-07-04.json` metrics are frozen and `main.tex` builds 
 
 ## 1. Pre-flight (metrics & reproducibility)
 
-- [ ] `benchmarks/results/paper-2026-07-04.json` — merged frozen numbers
-- [ ] `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json` — LongMemEval full (470 non-pref)
-- [ ] `benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json` — preference v4 (29/30)
-- [ ] `benchmarks/results/2025-06-22.json` — LoCoMo + BEIR + FAMB
-- [ ] Colab notebook runs end-to-end: `benchmarks/longmemeval_colab.ipynb`
-- [ ] `papers/figures/` — all diagrams (PDF + PNG); run `python3 papers/figures/generate_all.py`
+- [x] `benchmarks/results/paper-2026-07-04.json` — merged frozen numbers (98.0% composite)
+- [x] `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json` — LongMemEval full (470 non-pref)
+- [x] `benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json` — preference v4 (29/30)
+- [x] `benchmarks/results/2025-06-22.json` — LoCoMo + BEIR + FAMB
+- [x] Colab notebook runs end-to-end: `benchmarks/longmemeval_colab.ipynb`
+- [x] `papers/figures/` — all diagrams (PDF + PNG); Figure 1 Playwright audit passes
 
 ```bash
-cd papers/arxiv-v1
-pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
+cd papers/figures && python3 render_fig1_playwright.py && python3 audit_fig1_playwright.py
+python3 papers/figures/generate_all.py
+cd papers/arxiv-v1 && bash build.sh
+bash scripts/sync-paper-public.sh
 ```
 
 ## 2. arXiv account & metadata
@@ -25,7 +27,7 @@ pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 | **Title** | FluctlightDB: A Memory Model of Data for AI Agents |
 | **Authors** | Ganesh S (ORCID 0009-0006-7758-4114) |
 | **Abstract** | Copy from `main.tex` abstract block |
-| **Comments** | 12 pages, 5 tables, 3 figures; code and frozen metrics at GitHub + Zenodo |
+| **Comments** | 10 pages, 5 tables, 3 figures; code and frozen metrics at GitHub + Zenodo |
 | **License** | arXiv non-exclusive (repo MIT) |
 
 Register: https://arxiv.org/user/register — use the same email as the paper (`voxmastery@gmail.com`).
@@ -35,7 +37,7 @@ Register: https://arxiv.org/user/register — use the same email as the paper (`
 | Upload | Path |
 |--------|------|
 | PDF | `papers/arxiv-v1/main.pdf` |
-| Source (optional but recommended) | Zip `main.tex`, `references.bib`, `main.bbl` if built |
+| Source (optional but recommended) | Zip `main.tex`, `references.bib`, `main.bbl`, `../figures/*.pdf` |
 
 ```bash
 python3 papers/figures/generate_all.py
@@ -60,7 +62,7 @@ LongMemEval by type: knowledge-update 100%, multi-session 98.5%, user 98.6%, ass
 1. Note the arXiv ID (e.g. `arXiv:2607.xxxxx`).
 2. Update `CITATION.cff` `preferred-citation` with arXiv ID.
 3. Update `README.md`, `hub/paper/README.md`, `papers/public/index.html` — replace "arXiv pending".
-4. New Zenodo version (optional): attach `main.pdf` + `paper-2026-07-03.json`.
+4. New Zenodo version (optional): attach `main.pdf` + `paper-2026-07-04.json`.
 5. Sync Hugging Face:
 
 ```bash
@@ -80,17 +82,18 @@ hf upload Voxiesz/fluctlightdb-benchmarks hub/dataset/README.md README.md
 **Say:**
 - Third data model for agent memory; embedded engine with `experience()` / `activate()`.
 - 98.1% LoCoMo evidence recall (official retrieval metric).
-- 96.8% LongMemEval-S session recall@8 — competitive with published hybrid systems.
+- 98.0% LongMemEval-S session recall@8 (composite 490/500) — competitive with published hybrid systems.
+- 96.7% on preference slice (29/30) with v4 pref-facts harness.
 - Open harnesses + frozen JSON; reproducible via Colab notebook.
 
 **Do not say:**
 - "SOTA on LongMemEval" (gbrain 97.6% @5 uses different K and embedder).
-- "90%+ on all question types" without noting composite methodology
+- "90%+ on all question types" without noting composite methodology.
 - End-to-end QA numbers unless you run the official LLM-judge pipeline.
 
 ## 7. Suggested arXiv abstract (matches main.tex)
 
-Use the `\begin{abstract}...\end{abstract}` block from `main.tex` verbatim after the LongMemEval update.
+Use the `\begin{abstract}...\end{abstract}` block from `main.tex` verbatim.
 
 ## 8. Related submissions
 
