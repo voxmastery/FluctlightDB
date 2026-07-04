@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# LongMemEval E2E via Cursor SDK (CURSOR_API_KEY + auto model).
+# LongMemEval E2E via Cursor Cloud Agents API (Auto + CURSOR_API_KEY from serverbrain).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -13,7 +13,6 @@ if [[ -f "$CURSOR_ENV_FILE" ]]; then
 fi
 
 export FLUCTLIGHT_EMBED_URL="${FLUCTLIGHT_EMBED_URL:-http://127.0.0.1:8794}"
-export CURSOR_SDK_CWD="${CURSOR_SDK_CWD:-/tmp}"
 
 LIMIT="${1:-50}"
 OUT="${2:-benchmarks/results/longmemeval-e2e-cursor-auto-${LIMIT}.json}"
@@ -35,9 +34,8 @@ PYTHONPATH="sdks/python:benchmarks" python3 benchmarks/longmemeval_e2e.py \
   --limit "$LIMIT" \
   --top-k 8 \
   --dual-key --pref-facts-key --query-expand \
-  --llm-backend cursor \
   --reader-model auto \
   --judge-model auto \
-  --cursor-timeout "${CURSOR_SDK_TIMEOUT:-300}" \
+  --cursor-timeout "${CURSOR_API_TIMEOUT:-300}" \
   --checkpoint "$CKPT" \
   --json-out "$OUT"
