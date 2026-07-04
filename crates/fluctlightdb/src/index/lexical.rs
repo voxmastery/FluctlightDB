@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 
 use uuid::Uuid;
 
-use crate::brain::FluctlightBrain;
 use crate::error::Result;
 
 #[derive(Default)]
@@ -15,10 +14,6 @@ pub struct LexicalIndex {
 
 impl LexicalIndex {
     pub fn open_in_memory() -> Result<Self> {
-        Ok(Self::default())
-    }
-
-    pub fn open_path(_path: &std::path::Path) -> Result<Self> {
         Ok(Self::default())
     }
 
@@ -73,13 +68,5 @@ impl LexicalIndex {
         let mut ranked: Vec<(Uuid, usize)> = scores.into_iter().collect();
         ranked.sort_by(|a, b| b.1.cmp(&a.1));
         Ok(ranked.into_iter().take(limit).map(|(id, _)| id).collect())
-    }
-
-    pub fn rebuild(brain: &FluctlightBrain) -> Result<Self> {
-        let mut idx = Self::default();
-        for e in brain.hippocampus.engrams_for_life(brain.life.life_id) {
-            idx.upsert(e.id, &e.episode.content)?;
-        }
-        Ok(idx)
     }
 }

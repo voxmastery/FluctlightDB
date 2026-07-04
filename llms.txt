@@ -1,0 +1,13 @@
+# FluctlightDB
+
+> Embedded memory engine for AI agents: experience() / activate() / checkpoint(). Rust core, Python SDK, MCP server. Not a vector DB — episodes, cue activation, provenance ranking, consolidation.
+
+## Docs
+- [Getting started](docs/GETTING_STARTED.md)
+- [Agent guide](AGENTS.md)
+- [CLI](docs/CLI.md)
+- [Multi-agent project brains](docs/MULTI_AGENT.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [HTTP API](docs/openapi.yaml)
+- [Benchmarks](docs/BENCHMARKS.md)
+- [Design manifesto](docs/Manifesto.md)

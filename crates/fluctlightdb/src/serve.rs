@@ -337,8 +337,14 @@ impl BrainServer {
         enforce_bind_auth(addr, &self.auth)?;
         #[cfg(unix)]
         unsafe {
-            libc::signal(libc::SIGTERM, handle_shutdown_signal as libc::sighandler_t);
-            libc::signal(libc::SIGINT, handle_shutdown_signal as libc::sighandler_t);
+            libc::signal(
+                libc::SIGTERM,
+                handle_shutdown_signal as *const () as libc::sighandler_t,
+            );
+            libc::signal(
+                libc::SIGINT,
+                handle_shutdown_signal as *const () as libc::sighandler_t,
+            );
         }
         let listener = TcpListener::bind(addr).map_err(Error::Io)?;
         listener.set_nonblocking(true).map_err(Error::Io)?;
@@ -1380,8 +1386,4 @@ fn write_text_conn(
     stream.write_all(response.as_bytes()).map_err(Error::Io)?;
     stream.flush().map_err(Error::Io)?;
     Ok(())
-}
-
-fn write_text(stream: &mut TcpStream, status: u16, content_type: &str, body: &str) -> Result<()> {
-    write_text_conn(stream, status, content_type, body, false)
 }
