@@ -53,12 +53,12 @@
   }
 
   /* ── Right stack b,c,d ── */
-  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
   .card {
     border: 1px solid #cbd5e1;
     border-radius: 10px;
-    padding: 14px 16px 14px;
-    flex: 1;
+    padding: 14px 16px 16px;
+    flex: 0 0 auto;
   }
   .card.blue  { background: #f0f5ff; border-color: #93b4e8; }
   .card.purple{ background: #f5f3ff; border-color: #c4b5fd; }
@@ -67,27 +67,41 @@
     font-size: 14px;
     font-weight: 700;
     color: #334155;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
-  .card pre, .card p {
-    font-size: 13px;
-    line-height: 1.55;
+  .tree, .schema {
+    font-family: "SF Mono", "Consolas", monospace;
+    font-size: 12.5px;
+    line-height: 1.65;
     color: #1e293b;
   }
-  .card pre { font-family: "SF Mono", "Consolas", monospace; font-size: 12.5px; }
-  .index-arrow {
+  .tree-row, .schema-row {
+    display: grid;
+    grid-template-columns: 148px 1fr;
+    gap: 8px;
+    align-items: baseline;
+    min-height: 20px;
+  }
+  .tree-row.single { grid-template-columns: 1fr; }
+  .tree-row.indent { padding-left: 18px; grid-template-columns: 1fr; color: #475569; font-size: 12px; }
+  .tree-name, .schema-key { color: #1e293b; font-weight: 600; }
+  .tree-desc, .schema-val { color: #475569; }
+  .tree-arrow { color: #94a3b8; padding: 0 4px; }
+  .schema-row.wide { grid-template-columns: 1fr; }
+  .schema-key.dim { color: #64748b; font-weight: 500; }
+  .flow-connector, .index-arrow {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 600;
     color: #64748b;
     margin: 0;
     line-height: 1.2;
-    padding: 4px 0;
+    padding: 2px 0;
   }
-  .index-arrow svg { flex-shrink: 0; }
+  .flow-connector svg, .index-arrow svg { flex-shrink: 0; }
 
   /* ── Bottom row ── */
   .bottom {
@@ -241,29 +255,40 @@
   <div class="stack">
     <div class="card blue">
       <h3>(b) Agent brain directory</h3>
-      <pre>manifest.json
-hippocampus/   engrams
-graph/         synapses
-recall_index.sqlite
-  FTS5 + vector blobs
-*.wal  →  checkpoint()</pre>
+      <div class="tree">
+        <div class="tree-row single"><span class="tree-name">manifest.json</span></div>
+        <div class="tree-row"><span class="tree-name">hippocampus/</span><span class="tree-desc">engram segments</span></div>
+        <div class="tree-row"><span class="tree-name">graph/</span><span class="tree-desc">synapse edges</span></div>
+        <div class="tree-row single"><span class="tree-name">recall_index.sqlite</span></div>
+        <div class="tree-row indent">FTS5 + vector blobs</div>
+        <div class="tree-row"><span class="tree-name">*.wal</span><span class="tree-desc"><span class="tree-arrow">→</span> checkpoint()</span></div>
+      </div>
+    </div>
+    <div class="flow-connector">
+      <svg width="14" height="18" viewBox="0 0 14 18" aria-hidden="true">
+        <path d="M7 1v12M7 13l-4-4M7 13l4-4" stroke="#64748b" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      </svg>
+      stores engram units
     </div>
     <div class="card purple">
       <h3>(c) Engram (logical unit)</h3>
-      <p>content · context · outcome<br/>
-      provenance: kind, verified<br/>
-      rag: doc_id, chunk_id<br/>
-      semantic_vector (opt.) · graph wiring</p>
+      <div class="schema">
+        <div class="schema-row wide"><span class="schema-key">content</span> · <span class="schema-key">context</span> · <span class="schema-key">outcome</span></div>
+        <div class="schema-row"><span class="schema-key">provenance</span><span class="schema-val">kind, verified</span></div>
+        <div class="schema-row"><span class="schema-key">rag</span><span class="schema-val">doc_id, chunk_id</span></div>
+        <div class="schema-row"><span class="schema-key">semantic_vector</span><span class="schema-val">optional embedding</span></div>
+        <div class="schema-row"><span class="schema-key">graph wiring</span><span class="schema-val">co-activation edges</span></div>
+      </div>
     </div>
     <div class="index-arrow">
       <svg width="14" height="18" viewBox="0 0 14 18" aria-hidden="true">
         <path d="M7 1v12M7 13l-4-4M7 13l4-4" stroke="#64748b" stroke-width="1.6" fill="none" stroke-linecap="round"/>
       </svg>
-      index
+      upsert to sidecar
     </div>
     <div class="card green">
       <h3>(d) Recall sidecar</h3>
-      <p>FTS5 lexical seeds &nbsp;+&nbsp; HNSW semantic seeds</p>
+      <p style="font-size:13px;line-height:1.55;color:#1e293b;">FTS5 lexical seeds &nbsp;+&nbsp; HNSW semantic seeds</p>
     </div>
   </div>
 
