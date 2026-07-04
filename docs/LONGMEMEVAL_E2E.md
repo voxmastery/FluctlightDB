@@ -31,20 +31,18 @@ Wu et al. (ICLR 2025) report **LLM-as-judge** accuracy when the memory module fe
 
 ## Planned harness (post-arXiv)
 
-```
-longmemeval_s question
-    → FluctlightDB activate(cue) top-k sessions
-    → Reader prompt (official LongMemEval template)
-    → LLM completion
-    → GPT-4 judge vs gold answer
-    → accuracy / LLJ
-```
+**Implemented:** `benchmarks/longmemeval_e2e.py` — retrieval + official reader prompt + GPT-4o judge.
 
-Files to add (future PR):
+Colab: `BENCH_PROFILE = "e2e"`, set `OPENAI_API_KEY` in Secrets.
 
-- `benchmarks/longmemeval_e2e.py` — retrieval + reader + judge loop
-- `benchmarks/prompts/longmemeval_reader.txt` — official-style prompt
-- Env: `OPENAI_API_KEY` or compatible API for judge + reader
+```bash
+export OPENAI_API_KEY=...
+export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8794
+python3 benchmarks/longmemeval_e2e.py \
+  --dual-key --pref-facts-key --query-expand \
+  --limit 50 \
+  --json-out benchmarks/results/longmemeval-e2e-v4-mpnet.json
+```
 
 ## Minimum viable comparison vs Mem0/Zep
 

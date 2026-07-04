@@ -457,7 +457,7 @@ def activate_merged(
     return merge_recalls(lists, top_k)
 
 
-def eval_one(
+def retrieve_item(
     item: dict,
     *,
     mode: str,
@@ -465,12 +465,11 @@ def eval_one(
     embedder: EmbedCache,
     fast: bool,
     granularity: str,
-    metric: str,
     query_expand: bool,
     dual_key: bool,
     pref_facts_key: bool,
-) -> dict[str, Any]:
-    t0 = time.perf_counter()
+) -> tuple[list[dict], bool, int]:
+    """Run ingest + activate; return (recalls, session_hit, ingested_n)."""
     if mode == "index":
         brain = connect_index()
     else:
@@ -496,11 +495,65 @@ def eval_one(
         top_k=top_k,
         query_expand=query_expand,
     )
-    answer = item.get("answer") or ""
-    if metric == "session":
-        hit = session_in_recalls(recalls, item.get("answer_session_ids") or [], top_k=top_k)
-    else:
-        hit = answer_in_recalls(recalls, answer, top_k=top_k)
+    hit = session_in_recalls(recalls, item.get("answer_session_ids") or [], top_k=top_k)
+    return recalls, hit, ingested
+
+
+def session_ids_from_recalls(recalls: list[dict], top_k: int = 8) -> list[str]:
+    """Unique gold/session doc_ids from recalls, preferring full session engrams."""
+    ordered: list[str] = []
+    seen: set[str] = set()
+    # Pass 1: session chunk engrams
+    for r in recalls:
+        ep = r.get("episode") or {}
+        rag = ep.get("rag") or {}
+        sid = rag.get("doc_id") or ep.get("doc_id")
+        chunk = (rag.get("chunk_id") or "session").strip()
+        if sid and chunk == "session" and sid not in seen:
+            seen.add(str(sid))
+            ordered.append(str(sid))
+        if len(ordered) >= top_k:
+            return ordered
+    # Pass 2: any engram with doc_id (user_keys / pref_facts)
+    for r in recalls:
+        ep = r.get("episode") or {}
+        rag = ep.get("rag") or {}
+        sid = rag.get("doc_id") or ep.get("doc_id")
+        if sid and str(sid) not in seen:
+            seen.add(str(sid))
+            ordered.append(str(sid))
+        if len(ordered) >= top_k:
+            break
+    return ordered
+
+
+def eval_one(
+    item: dict,
+    *,
+    mode: str,
+    top_k: int,
+    embedder: EmbedCache,
+    fast: bool,
+    granularity: str,
+    metric: str,
+    query_expand: bool,
+    dual_key: bool,
+    pref_facts_key: bool,
+) -> dict[str, Any]:
+    t0 = time.perf_counter()
+    recalls, hit, ingested = retrieve_item(
+        item,
+        mode=mode,
+        top_k=top_k,
+        embedder=embedder,
+        fast=fast,
+        granularity=granularity,
+        query_expand=query_expand,
+        dual_key=dual_key,
+        pref_facts_key=pref_facts_key,
+    )
+    if metric != "session":
+        hit = answer_in_recalls(recalls, item.get("answer") or "", top_k=top_k)
     elapsed = time.perf_counter() - t0
     return {
         "question_id": item.get("question_id"),
