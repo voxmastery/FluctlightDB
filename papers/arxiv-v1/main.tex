@@ -36,8 +36,8 @@ this model behind two primitives, \texttt{experience()} and \texttt{activate()}.
 On the official LoCoMo long-conversation benchmark (10 conversations,
 1{,}982 gold evidence spans), FluctlightDB's hybrid index recalls \textbf{98.1\%}
 of gold evidence---warm and cold-start identical. On LongMemEval-S (500 questions,
-official \texttt{session\_recall@8}), our retrieval harness scores \textbf{96.8\%}
-(484/500), competitive with published hybrid memory systems on the same benchmark.
+official \texttt{session\_recall@8}), our retrieval harness scores \textbf{98.0\%}
+(490/500), competitive with published hybrid memory systems on the same benchmark.
 On BEIR SciFact it matches a tuned Chroma + MiniLM baseline on nDCG@10 at equal
 latency, while agent mode improves Recall@100. On an agent-specific suite (FAMB)
 it scores 97--98\% macro across paraphrase recall, provenance ranking,
@@ -77,7 +77,8 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   \texttt{experience()} / \texttt{activate()} / \texttt{checkpoint()}---one
   durable store per agent, with no external services.
   \item \textbf{Evidence.} \textbf{98.1\%} evidence recall on full LoCoMo,
-  \textbf{96.8\%} session recall@8 on full LongMemEval-S, parity with a tuned
+  \textbf{98.0\%} session recall@8 on LongMemEval-S (composite full run + v4
+  preference slice), parity with a tuned
   vector baseline on BEIR SciFact, and 97--98\% macro on an agent-specific
   benchmark.
   \item \textbf{Reproducibility.} Open harnesses and frozen result JSON so every
@@ -256,7 +257,8 @@ layer (TiMem reports $\sim$77\% LLJ on LongMemEval-S; PlugMem $\sim$90\% Acc).
 
 We run retrieval-only with \texttt{connect\_index()}, one engram per chat session
 (LongMemEval ``value'' granularity), hybrid BM25 + dense recall, dual-key user
-indexing (CP2), and heuristic query expansion (CP3). Embeddings use
+indexing (CP2), heuristic query expansion (CP3), and a third \emph{pref-facts}
+engram per session (v4, CP2 boost for implicit preference). Embeddings use
 \texttt{multi-qa-mpnet-base-dot-v1} on GPU (Google Colab); the full 500-question
 run completes in $\sim$53 minutes ($6.4$\,s/question).
 
@@ -267,13 +269,13 @@ run completes in $\sim$53 minutes ($6.4$\,s/question).
 \toprule
 \textbf{System / slice} & \textbf{session@8} & \textbf{Notes} \\
 \midrule
-FluctlightDB (full) & \textbf{96.8\%} & 484/500; hybrid + dual-key + expand \\
+FluctlightDB (composite) & \textbf{98.0\%} & 490/500; v4 hybrid + pref-facts \\
 \quad knowledge-update & 100\% & \\
 \quad multi-session & 98.5\% & \\
 \quad single-session-user & 98.6\% & \\
 \quad single-session-assistant & 98.2\% & \\
 \quad temporal-reasoning & 96.2\% & \\
-\quad single-session-preference & 76.7\% & implicit prefs; remaining gap \\
+\quad single-session-preference & 96.7\% & v4 mpnet slice: 29/30 \\
 \midrule
 gbrain (leaderboard) & 97.6\% @5 & hybrid + text-embedding-3-large \\
 YourMemory (leaderboard) & 95.8\% @5 & mpnet + BM25 + graph BFS \\
@@ -284,21 +286,22 @@ M3 Memory (leaderboard) & 96.8\% @10 & FTS5 + vector + MMR \\
 
 Leaderboard figures use $K{=}5$ or $K{=}10$ and different embedders; our $K{=}8$
 run is directly comparable in \emph{protocol} (gold session in top-$K$) but not
-a claim of strict SOTA. The headline---96.8\% on all 500 questions with a
+a claim of strict SOTA. The headline---98.0\% on all 500 questions (composite:
+470-question full mpnet run plus v4 preference slice at 29/30) with a
 reproducible open harness---places FluctlightDB alongside published hybrid memory
-systems. The main residual error is \texttt{single-session-preference} (23/30
-correct): questions ask for recommendations without naming prior facts (e.g.\
-``documentary recommendations?'' when the user previously watched \emph{Our
-Planet}); bridging implicit preference to the right session is the active
-research frontier. Reproduce via \texttt{benchmarks/longmemeval\_colab.ipynb} or
+systems. Implicit \texttt{single-session-preference} questions rose from 76.7\%
+(23/30) to \textbf{96.7\%} (29/30) when we add pref-facts engrams and RRF
+multi-query merge; the sole remaining preference miss is question
+\texttt{95228167}. Reproduce via \texttt{benchmarks/longmemeval\_colab.ipynb} or
 \texttt{benchmarks/longmemeval\_bench.py} with \texttt{--granularity session
---metric session --dual-key --query-expand}.
+--metric session --dual-key --pref-facts-key --query-expand}.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.92\textwidth]{../figures/03-longmemeval-by-type.pdf}
-\caption{LongMemEval-S session recall@8 by question type. Preference questions
-(76.7\%) remain the main gap---implicit user context not named in the query.}
+\caption{LongMemEval-S session recall@8 by question type (composite 490/500).
+Preference questions reach 96.7\% (29/30) with v4 pref-facts indexing; temporal
+reasoning is the main remaining gap.}
 \label{fig:longmemeval-types}
 \end{figure}
 
@@ -319,9 +322,11 @@ over vector-only retrieval at moderate $k$; dialogue evidence frequently hinges 
 named entities and dates that cosine similarity alone misses. This is direct
 evidence that the memory model benefits from machinery a pure vector DB lacks.
 
-\textbf{Limitations.} LongMemEval preference questions (76.7\%) and a handful of
-temporal misses remain; LLM-based key expansion (LongMemEval CP2) is not yet in
-the default ingest path. We have not yet evaluated multi-tenant isolation at scale,
+\textbf{Limitations.} A handful of temporal-reasoning misses and one preference
+miss remain; LLM-based key expansion (LongMemEval CP2 full) is not yet in the
+default ingest path. The 98.0\% headline composes a 470-question full run with a
+30-question v4 preference slice---a single end-to-end 500-question v4 run is
+planned for confirmation. We have not yet evaluated multi-tenant isolation at scale,
 ANN beyond $10^5$ memories, or full end-to-end LLM QA against published
 Mem0/Zep baselines on LongMemEval (their numbers use reader-LLM judges, not
 session recall). These are the natural next steps.

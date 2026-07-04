@@ -1,7 +1,7 @@
 # Paper figures (downloadable)
 
 Vector PDF + PNG diagrams for the FluctlightDB research paper.  
-Frozen metrics source: [`benchmarks/results/paper-2026-07-03.json`](../../benchmarks/results/paper-2026-07-03.json).
+Frozen metrics source: [`benchmarks/results/paper-2026-07-04.json`](../../benchmarks/results/paper-2026-07-04.json).
 
 ## Download
 

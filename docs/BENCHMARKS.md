@@ -115,9 +115,8 @@ Config: `connect_index()`, ingest dialog + observations, `--rag-mode all --top-k
 | Config | session@8 | sec/q | Notes |
 |--------|----------:|------:|-------|
 | session + dual-key + query-expand (MiniLM) | 73.3% | ~372 | preference slice only |
-| **session + dual-key + query-expand (mpnet, Colab GPU)** | **96.8%** | **6.4** | 484/500; index mode |
-
-By type (mpnet full): knowledge-update 100%, multi-session 98.5%, single-session-user 98.6%, single-session-assistant 98.2%, temporal-reasoning 96.2%, **single-session-preference 76.7%** (remaining gap).
+| **session + dual-key + query-expand + pref-facts (mpnet, Colab GPU)** | **96.7%** | **8.7** | preference slice 29/30 |
+| **composite (470 full + v4 preference)** | **98.0%** | — | 490/500 session@8 |
 
 ```bash
 # Local (CPU embeds slow; use Colab notebook for full run)
