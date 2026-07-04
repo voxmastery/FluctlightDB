@@ -6,7 +6,7 @@ Research → invent → test loop for FluctlightDB on [LongMemEval-S](https://gi
 
 | Metric | What it measures | SOTA | Fluctlight (session@8) |
 |--------|------------------|------|------------------------|
-| **Session recall@K** | Gold `answer_session_ids` in top-K | **95–98% @5** (gbrain, YourMemory) | **96.8% @8** (mpnet, Colab GPU) |
+| **Session recall@K** | Gold `answer_session_ids` in top-K | **95–98% @5** (gbrain, YourMemory) | **98.0% @8** (composite, mpnet Colab) |
 | **Answer-in-recall@K** | Answer string tokens in recalled text | N/A (not official) | Deprecated (turn-level was ~40%) |
 | **End-to-end QA (LLJ)** | LLM reads retrieval + answers; GPT judge | **76–90%** (TiMem, PlugMem) | Not run yet |
 
