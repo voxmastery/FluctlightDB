@@ -58,9 +58,11 @@ Files to add (future PR):
 - 500 questions × (~2k input + ~200 output tokens) × 2 calls (reader + judge) ≈ **$15–40** on GPT-4o-mini (prices vary).
 - Run on a 50-question slice first (~$2).
 
-## Preference slice (76.7% → 90%+)
+## Preference slice — **96.7% (29/30)** ✓
 
 Preference failures are **retrieval** failures: the question is generic ("documentary recommendations?") but the gold session mentions specific prior facts ("Our Planet", mixology class, etc.).
+
+**v4 harness result (2026-07-04):** mpnet + dual-key + pref-facts-key + query-expand on Colab GPU → **29/30** session@8. Sole miss: `95228167`. Frozen: `benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json`.
 
 **v4 harness** (in `longmemeval_bench.py`):
 
@@ -82,14 +84,14 @@ python3 benchmarks/longmemeval_bench.py \
   --json-out benchmarks/results/longmemeval-preference-v4-mpnet.json
 ```
 
-**Baselines:** lexical v4 = **86.7%** (26/30); mpnet without v4 = **76.7%** (23/30). Target: **≥90%** with mpnet + v4 on Colab.
+**Baselines:** lexical v4 = **86.7%** (26/30); mpnet without v4 = **76.7%** (23/30). **Achieved: 96.7%** mpnet + v4 (29/30).
 
 ## arXiv positioning
 
 Submit now with:
 
-- Strong retrieval evidence (LoCoMo + LongMemEval)
-- Honest limitation: preference 76.7%, e2e QA deferred
+- Strong retrieval evidence (LoCoMo + LongMemEval 98% composite)
+- Honest limitation: e2e QA deferred; composite 500 from full + preference slice
 - This doc + roadmap for post-preprint work
 
-Upgrade preprint on arXiv v2 when preference ≥90% and/or e2e table is complete.
+Upgrade preprint on arXiv v2 when full 500 v4 run confirms composite and/or e2e table is complete.

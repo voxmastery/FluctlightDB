@@ -31,7 +31,7 @@ Official frozen metrics for the FluctlightDB research paper (July 2026).
 | Benchmark | Metric | Score |
 |-----------|--------|------:|
 | LoCoMo | Evidence recall | **98.1%** (1925/1982, k=150) |
-| LongMemEval-S | session_recall@8 | **96.8%** (484/500) |
+| LongMemEval-S | session_recall@8 | **98.0%** (490/500) |
 | BEIR SciFact | nDCG@10 | **0.645** (index, ties Chroma) |
 | FAMB | Macro | **98%** index / **97%** agent |
 
@@ -44,7 +44,7 @@ Official frozen metrics for the FluctlightDB research paper (July 2026).
 | single-session-user | 98.6% |
 | single-session-assistant | 98.2% |
 | temporal-reasoning | 96.2% |
-| single-session-preference | 76.7% |
+| single-session-preference | 96.7% |
 
 ## Reproduce
 

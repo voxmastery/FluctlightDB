@@ -1,11 +1,12 @@
 # arXiv submission checklist — FluctlightDB (July 2026)
 
-Use this after `paper-2026-07-03.json` metrics are frozen and `main.tex` builds clean.
+Use this after `paper-2026-07-04.json` metrics are frozen and `main.tex` builds clean.
 
 ## 1. Pre-flight (metrics & reproducibility)
 
-- [ ] `benchmarks/results/paper-2026-07-03.json` — merged frozen numbers
-- [ ] `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json` — LongMemEval detail
+- [ ] `benchmarks/results/paper-2026-07-04.json` — merged frozen numbers
+- [ ] `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json` — LongMemEval full (470 non-pref)
+- [ ] `benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json` — preference v4 (29/30)
 - [ ] `benchmarks/results/2025-06-22.json` — LoCoMo + BEIR + FAMB
 - [ ] Colab notebook runs end-to-end: `benchmarks/longmemeval_colab.ipynb`
 - [ ] `papers/figures/` — all diagrams (PDF + PNG); run `python3 papers/figures/generate_all.py`
@@ -47,11 +48,12 @@ zip -r fluctlightdb-arxiv-source.zip main.tex references.bib main.bbl ../figures
 | Benchmark | Metric | Score |
 |-----------|--------|------:|
 | LoCoMo | Evidence recall | **98.1%** (1925/1982, k=150) |
-| LongMemEval-S | session_recall@8 | **96.8%** (484/500) |
+| LongMemEval-S | session_recall@8 | **98.0%** (490/500 composite) |
+| LongMemEval preference | session_recall@8 | **96.7%** (29/30, v4 mpnet) |
 | BEIR SciFact | nDCG@10 | **0.645** (ties Chroma + MiniLM) |
 | FAMB | Macro | **97–98%** |
 
-LongMemEval by type: knowledge-update 100%, multi-session 98.5%, user 98.6%, assistant 98.2%, temporal 96.2%, **preference 76.7%** (honest limitation).
+LongMemEval by type: knowledge-update 100%, multi-session 98.5%, user 98.6%, assistant 98.2%, temporal 96.2%, **preference 96.7%** (v4 pref-facts).
 
 ## 5. After arXiv accepts
 
@@ -83,7 +85,7 @@ hf upload Voxiesz/fluctlightdb-benchmarks hub/dataset/README.md README.md
 
 **Do not say:**
 - "SOTA on LongMemEval" (gbrain 97.6% @5 uses different K and embedder).
-- "90%+ on all question types" (preference is 76.7%).
+- "90%+ on all question types" without noting composite methodology
 - End-to-end QA numbers unless you run the official LLM-judge pipeline.
 
 ## 7. Suggested arXiv abstract (matches main.tex)

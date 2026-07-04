@@ -14,7 +14,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Ellipse, FancyArrowPatch, FancyBboxPatch
 
 ROOT = Path(__file__).resolve().parent
-METRICS = ROOT.parents[1] / "benchmarks" / "results" / "paper-2026-07-03.json"
+METRICS = ROOT.parents[1] / "benchmarks" / "results" / "paper-2026-07-04.json"
 
 # Print-safe academic palette
 C_STORAGE = "#4C78A8"
@@ -240,9 +240,9 @@ def fig_hero_standalone() -> None:
 
 def fig_benchmark_summary() -> None:
     labels = ["LoCoMo\nevidence recall", "LongMemEval-S\nsession@8", "BEIR SciFact\nnDCG@10", "FAMB\nmacro (index)"]
-    values = [98.1, 96.8, 64.5, 98.0]
+    values = [98.1, 98.0, 64.5, 98.0]
     colors = ["#4C78A8", "#59A14F", "#E15759", "#B07AA1"]
-    display = ["98.1%", "96.8%", "0.645", "98%"]
+    display = ["98.1%", "98.0%", "0.645", "98%"]
 
     fig, ax = plt.subplots(figsize=(8, 4.5), facecolor="white")
     bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
@@ -278,7 +278,7 @@ def fig_longmemeval_by_type() -> None:
     bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
     ax.set_ylim(0, 105)
     ax.set_ylabel("session_recall@8 (%)")
-    ax.set_title("Figure 3 — LongMemEval-S by question type (484/500 overall = 96.8%)")
+    ax.set_title("Figure 3 — LongMemEval-S by question type (490/500 overall = 98.0%)")
     ax.axhline(90, color="#888", linestyle="--", linewidth=0.8)
     for bar, v in zip(bars, values):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,

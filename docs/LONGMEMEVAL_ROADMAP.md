@@ -89,7 +89,7 @@ full 500 + by_type breakdown
 if < 90% session_recall@8 → next hypothesis
 ```
 
-**Status (2026-07-03):** 90%+ session recall target **met** — 96.8% @8 on Colab GPU (mpnet + dual-key + query-expand). Next focus: preference slice (76.7%) and temporal edge cases.
+**Status (2026-07-04):** Preference v4 **96.7%** (29/30) on Colab mpnet — **90% target met**. Composite overall **98.0%** (490/500).
 
 ### Next experiments (post-arXiv v1)
 
@@ -107,13 +107,13 @@ See also: `docs/LONGMEMEVAL_E2E.md` for retrieval vs end-to-end metric separatio
 | v1 session (lexical-only embed bug) | session@8 | **93.8%** (469/500) | preference 53.3% |
 | preference v2 (MiniLM + dual-key + expand) | session@8 | **73.3%** (22/30) | +20pp on preference |
 | v2 fast (lexical + dual-key + expand) | session@8 | **~91%** | lexical-only baseline |
-| **Colab GPU mpnet full** | session@8 | **96.8%** (484/500) | **target met**; 6.41 s/q |
+| **Colab GPU mpnet composite** | session@8 | **98.0%** (490/500) | full 470 + v4 preference 29/30 |
 | ↳ knowledge-update | session@8 | **100%** | |
 | ↳ multi-session | session@8 | **98.5%** | |
 | ↳ single-session-user | session@8 | **98.6%** | |
 | ↳ single-session-assistant | session@8 | **98.2%** | |
 | ↳ temporal-reasoning | session@8 | **96.2%** | |
-| ↳ single-session-preference | session@8 | **76.7%** → **86.7%** lexical v4 | mpnet+v4 Colab run pending (notebook ready) |
+| ↳ single-session-preference | session@8 | **96.7%** (29/30) | v4 mpnet Colab 2026-07-04 |
 
 Frozen result: `benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json`
 

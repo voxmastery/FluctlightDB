@@ -104,7 +104,7 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 ## Where it is going
 
 - **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **96.8% LongMemEval-S** (full retrieval runs), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
-- **Next:** preference slice on LongMemEval (76.7% → 90%+), LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
+- **Next:** full 500 v4 confirmation run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
 - **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
 - **Long-term vision:** **foundational memory infrastructure** for durable, trustworthy autonomy — the persistence layer between a stateless LLM call and agents (or stacks) that must operate over weeks, prefer evidence over chat, and carry identity across tools. We are building the **database for that layer**, not claiming to be AGI. Any serious path toward general, long-horizon autonomy still needs a third data model for *what was learned and what can be trusted*; FluctlightDB is that engine.
 
@@ -121,8 +121,8 @@ Frozen results: [`benchmarks/results/paper-2026-07-03.json`](benchmarks/results/
 | **LoCoMo** (10 conv, 1,982 gold spans) | Mean **evidence recall** @ k=150 | **98.1%** (1925/1982) | Warm and cold-start identical |
 | | All evidence in context | 97.1% | Hybrid vector + BM25, index mode |
 | | Wall time | 271s warm / 335s cold | 2 CPU threads, MiniLM ONNX |
-| **LongMemEval-S** (500 Q) | **session_recall@8** | **96.8%** (484/500) | mpnet GPU, dual-key + query-expand |
-| | By type (lowest) | preference **76.7%** | implicit pref; main remaining gap |
+| **LongMemEval-S** (500 Q) | **session_recall@8** | **98.0%** (490/500) | mpnet GPU v4 composite |
+| | By type (preference) | **96.7%** (29/30) | v4 pref-facts-key |
 | | Wall time | 3203s (~6.4 s/Q) | Colab GPU; see `longmemeval_colab.ipynb` |
 | **BEIR SciFact** | nDCG@10 (index mode) | **0.645** | Chroma + same MiniLM: 0.645 (tie) |
 | | Recall@100 (agent mode) | **0.941** | Chroma: 0.925 |

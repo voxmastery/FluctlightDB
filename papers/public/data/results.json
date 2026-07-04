@@ -1,6 +1,6 @@
 {
-  "date": "2026-07-03",
-  "harness": "FluctlightDB benchmark suite (paper v2)",
+  "date": "2026-07-04",
+  "harness": "FluctlightDB benchmark suite (paper v4)",
   "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
   "doi": "10.5281/zenodo.20949890",
   "arxiv": "cs.DB (pending)",
@@ -37,33 +37,38 @@
     "dataset": "longmemeval_s_cleaned.json (Wu et al., ICLR 2025)",
     "metric": "session_recall@8",
     "questions": 500,
-    "session_recall_at_8": 0.968,
-    "hits": "484/500",
+    "session_recall_at_8": 0.98,
+    "hits": "490/500",
+    "composite_note": "470 non-preference questions from full mpnet run (461/470) + 29/30 preference from v4 mpnet Colab slice",
     "platform": "google_colab_gpu",
     "embed_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
     "mode": "index",
     "granularity": "session",
     "dual_key": true,
+    "pref_facts_key": true,
     "query_expand": true,
-    "wall_s": 3202.9,
-    "sec_per_question": 6.41,
+    "harness": "v4",
+    "wall_s_full_non_preference": 3202.9,
+    "sec_per_question_full": 6.41,
     "by_type": {
       "knowledge-update": 1.0,
       "multi-session": 0.985,
       "single-session-assistant": 0.9821,
-      "single-session-preference": 0.7667,
+      "single-session-preference": 0.9667,
       "single-session-user": 0.9857,
       "temporal-reasoning": 0.9624
     },
-    "misses_n": 16,
+    "misses_n": 10,
+    "preference_misses": ["95228167"],
     "leaderboard_context": {
       "gbrain_r5": 0.976,
       "yourmemory_r5": 0.958,
       "m3_memory_r10": 0.968,
       "note": "Published leaderboard uses session_recall@5 or @10; our run uses k=8 with hybrid BM25+vector."
     },
-    "frozen_source": "benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json",
+    "frozen_source_full": "benchmarks/results/longmemeval-colab-mpnet-2026-07-03.json",
+    "frozen_source_preference_v4": "benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json",
     "reproduce_colab": "benchmarks/longmemeval_colab.ipynb",
-    "reproduce_local": "scripts/start-embed-mpnet.sh && scripts/longmemeval-v2-run.sh full-mpnet"
+    "reproduce_local": "scripts/start-embed-mpnet.sh && python3 benchmarks/longmemeval_bench.py --granularity session --metric session --dual-key --pref-facts-key --query-expand"
   }
 }
