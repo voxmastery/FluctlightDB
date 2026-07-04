@@ -1,0 +1,107 @@
+% FluctlightDB storage + activation figure (TikZ)
+% \input{figures/brain-architecture.tex} from main.tex
+
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  >=Stealth,
+  box/.style={draw, rounded corners=2pt, align=left, inner sep=5pt, fill=white},
+  store/.style={box, fill=blue!4},
+  idx/.style={box, fill=green!6},
+  proc/.style={box, fill=orange!8, minimum width=2.6cm},
+  engram/.style={box, fill=purple!5, minimum width=3.4cm},
+  lbl/.style={font=\footnotesize\itshape, text=gray!60!black},
+  arr/.style={->, thick, gray!70!black},
+]
+
+% --- (a) On-disk brain directory ---
+\node[store, minimum width=4.2cm] (disk) {
+  \textbf{Agent brain path} \texttt{/data/agent/}\\[2pt]
+  \texttt{manifest.json} \hfill (v4 layout)\\
+  \texttt{hippocampus/} \hfill engram segments\\
+  \texttt{graph/} \hfill co-activation synapses\\
+  \texttt{recall\_index.sqlite} \hfill FTS5 + vec blobs\\
+  \texttt{*.wal} \hfill write-ahead log\\
+  \texttt{checkpoint()} $\rightarrow$ durable snapshot
+};
+
+% --- Engram unit ---
+\node[engram, right=1.1cm of disk, yshift=0.6cm] (engram) {
+  \textbf{Engram} (memory unit)\\[2pt]
+  \textit{Episode:} content, context, outcome\\
+  \textit{Provenance:} kind, verified, confidence\\
+  \textit{RAG ref:} doc\_id, chunk\_id (optional)\\
+  \textit{Vector:} semantic embedding (optional)\\
+  \textit{Graph:} sparse neuron ensemble + edges
+};
+
+\node[lbl, above=2pt of engram.north] {(b) logical record};
+
+% --- Sidecar detail ---
+\node[idx, below=0.55cm of engram, minimum width=3.4cm] (sidecar) {
+  \textbf{Recall sidecar} (hybrid index)\\[2pt]
+  FTS5 \texttt{engram\_fts(content)}\\
+  HNSW seeds from \texttt{engram\_vec}\\
+  Rebuilt on \texttt{index rebuild}
+};
+
+\draw[arr] (engram.south) -- (sidecar.north)
+  node[midway, right=1pt, font=\scriptsize] {index};
+
+% --- Write path ---
+\node[proc, below=1.35cm of disk, xshift=-0.2cm] (write) {
+  \textbf{Write}\\[1pt]
+  \texttt{experience()}\\
+  separation gate\\
+  encode episode\\
+  wire graph
+};
+
+\node[lbl, left=2pt of write.west] {(c)};
+
+% --- Read path ---
+\node[proc, right=0.9cm of write] (read) {
+  \textbf{Read}\\[1pt]
+  \texttt{activate(cue)}\\
+  lexical + semantic seeds\\
+  graph spread (0--4 hops)\\
+  fuse + provenance boost
+};
+
+\node[lbl, left=2pt of read.west] {(d)};
+
+\draw[arr] (write.east) -- (read.west)
+  node[midway, above, font=\scriptsize] {same store};
+
+\draw[arr] (write.north) -- ++(0,0.55) -| (disk.south);
+\draw[arr] (read.north) -- ++(0,0.85) -| (sidecar.south);
+
+% --- Agent boundary ---
+\begin{scope}[on background layer]
+  \node[fit=(disk)(engram)(sidecar)(write)(read), draw=gray!50, dashed,
+    rounded corners=4pt, inner sep=10pt, fill=gray!3] (agentbox) {};
+  \node[anchor=south west, font=\footnotesize\bfseries] at (agentbox.south west)
+    {Embedded \texttt{FluctlightBrain} (one directory per agent)};
+\end{scope}
+
+\node[lbl, above=2pt of disk.north west, anchor=south west] {(a) persistence};
+
+% --- Contrast strip ---
+\node[box, below=0.65cm of write.south west, anchor=north west,
+  minimum width=11.8cm, fill=gray!8] (contrast) {
+  \textbf{vs.\ relational / vector stores:} rows lack provenance-weighted recall;
+  ANN lacks episode graph + write-time separation. FluctlightDB keeps
+  \emph{content + trust + associations} in one engine contract.
+};
+
+\end{tikzpicture}
+\caption{FluctlightDB persistence and recall layout. Each agent owns a brain
+directory (a) with segmented engram storage, a co-activation graph, and a hybrid
+recall sidecar (FTS5 + HNSW). The logical engram (b) bundles episode content,
+provenance, optional RAG keys, and graph wiring. \texttt{experience()} (c) gates
+near-duplicates, encodes, and indexes; \texttt{activate()} (d) seeds candidates
+lexically and semantically, spreads through the graph, and ranks by fused score
+with provenance boosts.}
+\label{fig:architecture}
+\end{figure*}

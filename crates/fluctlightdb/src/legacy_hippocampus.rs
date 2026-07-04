@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::engram::Engram;
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::hippocampus::Hippocampus;
 use crate::id::NeuronId;
 use crate::types::{Episode, RagRef};

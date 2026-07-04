@@ -19,6 +19,8 @@ use semantic::{semantic_similarities_for, semantic_top_k};
 use sidecar::SidecarIndex;
 
 pub const DEFAULT_CANDIDATE_CAP: usize = 128;
+/// Absolute ceiling for caller-supplied candidate caps (memory safety valve).
+pub const MAX_CANDIDATE_CAP: usize = 4096;
 pub const LEXICAL_SEED_LIMIT: usize = 64;
 pub const SEMANTIC_SEED_LIMIT: usize = 50;
 
@@ -125,7 +127,9 @@ impl RecallIndex {
         semantic: &SemanticField,
         cap: usize,
     ) -> Result<Vec<Uuid>> {
-        let cap = cap.max(1).min(DEFAULT_CANDIDATE_CAP);
+        // Callers may exceed DEFAULT_CANDIDATE_CAP (e.g. k=150 bench runs), but an
+        // unbounded cap lets one recall allocate the whole store; hard-limit it.
+        let cap = cap.max(1).min(MAX_CANDIDATE_CAP);
         let mut set = HashSet::new();
 
         let guard = self

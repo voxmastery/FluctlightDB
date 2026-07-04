@@ -28,6 +28,7 @@ impl Table {
         self.rows.push(row);
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
     }
@@ -92,6 +93,7 @@ pub fn yes_no(v: bool) -> &'static str {
     }
 }
 
+#[allow(dead_code)]
 pub fn is_tty() -> bool {
     io::stdout().is_terminal()
 }

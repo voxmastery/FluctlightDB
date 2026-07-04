@@ -7,9 +7,7 @@ use std::time::Duration;
 
 use fluctlightdb::storage;
 use fluctlightdb::store_lock::StoreLock;
-use fluctlightdb::{
-    default_brain_path, migrate_v3_file_to_v4, BrainServer, Episode, FluctlightBrain,
-};
+use fluctlightdb::{default_brain_path, BrainServer, Episode, FluctlightBrain};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -186,7 +184,7 @@ fn parse_flag_path(args: &[String], flag: &str) -> Option<PathBuf> {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
+    if args.len() < 2 || args.iter().any(|a| a == "--help" || a == "-h") {
         print_usage();
         return;
     }
@@ -215,15 +213,24 @@ fn main() {
         let path = parse_path(&args);
         let addr = parse_addr(&args);
         let read_only = args.iter().any(|a| a == "--replica" || a == "--read-only");
-        let server = if read_only {
-            BrainServer::open_replica(path).expect("open replica brain for serve")
+        let server = match if read_only {
+            BrainServer::open_replica(path)
         } else {
-            BrainServer::open(path).expect("open brain for serve")
+            BrainServer::open(path)
+        } {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("fluctlight serve: failed to open brain: {e}");
+                std::process::exit(1);
+            }
         };
         if read_only {
             eprintln!("fluctlight serve: read-only replica mode");
         }
-        server.serve(&addr).expect("serve");
+        if let Err(e) = server.serve(&addr) {
+            eprintln!("fluctlight serve: {e} (addr {addr})");
+            std::process::exit(1);
+        }
         return;
     }
 

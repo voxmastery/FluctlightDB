@@ -6,7 +6,7 @@ use std::time::SystemTime;
 use crate::brain::FluctlightBrain;
 use crate::error::{Error, Result};
 use crate::semantic::SemanticField;
-use crate::storage::{self, StorageFormat};
+use crate::storage::{self};
 use crate::store_lock::{SharedStoreLock, StoreLock};
 use crate::wal;
 

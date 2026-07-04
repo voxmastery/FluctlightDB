@@ -629,7 +629,11 @@ impl FluctlightBrain {
             engram.salience = (engram.salience + salience_boost).clamp(0.0, 1.0);
             engram.replay_count = engram.replay_count.saturating_add(1);
         }
-        if let Some(v) = self.hippocampus.engrams[idx].episode.semantic_vector.clone() {
+        if let Some(v) = self.hippocampus.engrams[idx]
+            .episode
+            .semantic_vector
+            .clone()
+        {
             let eid = self.hippocampus.engrams[idx].id;
             let lid = self.hippocampus.engrams[idx].life_id;
             self.semantic.register_engram(eid, lid, v);

@@ -36,7 +36,10 @@ fn lock_contended(err: &io::Error) -> bool {
     err.kind() == io::ErrorKind::WouldBlock
         || err.kind() == io::ErrorKind::AlreadyExists
         || err.to_string().to_lowercase().contains("would block")
-        || err.to_string().to_lowercase().contains("resource temporarily unavailable")
+        || err
+            .to_string()
+            .to_lowercase()
+            .contains("resource temporarily unavailable")
 }
 
 impl StoreLock {
