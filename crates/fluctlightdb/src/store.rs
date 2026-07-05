@@ -342,6 +342,7 @@ fn load_inner(path: &Path, persist_wal_replay: bool) -> Result<FluctlightBrain> 
             wal::truncate(path)?;
         }
     }
+    brain.warm_fabric_runtime();
     Ok(brain)
 }
 

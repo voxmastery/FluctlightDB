@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -68,10 +69,16 @@ pub struct FluctlightBrain {
     activation_cache: Mutex<ActivationCache>,
     /// Runtime-only temporal/causal index (Recall Fabric). Rebuilt per session, never persisted.
     #[serde(skip)]
-    chronos: crate::chronos::Chronos,
+    pub(crate) chronos: crate::chronos::Chronos,
     /// Runtime-only consolidated cortical map (Recall Fabric). Rebuilt per session, never persisted.
     #[serde(skip)]
-    crystallizer: crate::crystallize::Crystallizer,
+    pub(crate) crystallizer: crate::crystallize::Crystallizer,
+    /// Runtime-only composed recall index (Photon + Lattice + Phase). Never persisted.
+    #[serde(skip)]
+    pub(crate) fabric: crate::recall_fabric::RecallFabric,
+    /// Runtime-only Ebbinghaus traces keyed by engram id. Never persisted.
+    #[serde(skip)]
+    pub(crate) fabric_traces: Mutex<HashMap<String, crate::forgetting::MemoryTrace>>,
 }
 
 impl Default for FluctlightBrain {
@@ -90,6 +97,7 @@ pub struct ConsolidatedMemory {
 
 impl FluctlightBrain {
     pub fn new() -> Self {
+        let (fabric, fabric_traces) = crate::fabric_runtime::new_fabric_state();
         let mut brain = Self {
             wal_seq: 0,
             life: LifeState::birth(0),
@@ -110,6 +118,8 @@ impl FluctlightBrain {
             activation_cache: Mutex::new(ActivationCache::new()),
             chronos: crate::chronos::Chronos::default(),
             crystallizer: crate::crystallize::Crystallizer::default(),
+            fabric,
+            fabric_traces,
         };
         brain.development.on_tick();
         brain.prefrontal.unlocked = brain.development.pfc_unlocked();
@@ -295,17 +305,13 @@ impl FluctlightBrain {
         self.development.on_experience(salience);
         self.prefrontal.unlocked = self.development.pfc_unlocked();
 
-        // Recall Fabric (opt-in): index this experience on the temporal axis and crystallize a
-        // lattice address for it. Runtime-only state, never persisted → snapshot-neutral.
-        if fabric_enabled() {
-            self.chronos.add_event(engram_id.to_string(), tick);
-            if let Some(vec) = episode.semantic_vector.as_deref() {
-                let scalar = crate::recall_fabric::semantic_scalar(vec);
-                let sig = crate::recall_fabric::structure_signature(&content_for_index);
-                self.crystallizer
-                    .crystallize(engram_id.to_string(), scalar, sig);
-            }
-        }
+        self.fabric_on_experience(
+            engram_id,
+            &content_for_index,
+            salience,
+            tick,
+            vector_for_index.as_deref(),
+        );
 
         if checkpoint {
             self.maybe_checkpoint()?;
@@ -426,20 +432,9 @@ impl FluctlightBrain {
                 recall.activation += 0.15;
             }
         }
-        // Recall Fabric (opt-in): phase-structural rerank + confidence-weighted trust. Order/role
-        // agreement boosts activation; provenance-derived confidence scales it (trusted memories
-        // rise, low-trust ones damp). Off by default → benchmark-neutral.
-        if fabric_enabled() {
-            let fabric_w = std::env::var("FLUCTLIGHT_FABRIC_WEIGHT")
-                .ok()
-                .and_then(|v| v.parse::<f32>().ok())
-                .unwrap_or(0.2);
-            for recall in &mut result.recalls {
-                let s = crate::recall_fabric::structural_boost(cue, &recall.episode.content, 256);
-                recall.activation += s * fabric_w;
-                recall.activation *= recall_confidence_mult(recall);
-            }
-        }
+        // Recall Fabric (opt-in): full Photon → Lattice → Phase composed recall merged into
+        // hybrid activation, then forgetting retention + confidence weighting. Off by default.
+        self.fabric_on_activate(cue, cue_vector, &mut result.recalls);
         result
             .recalls
             .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
@@ -612,6 +607,8 @@ impl FluctlightBrain {
         if self.development.metrics.sleep_cycles % COMPACT_EVERY_N_SLEEPS == 0 {
             let _ = self.compact_internal(false);
         }
+
+        self.fabric_on_sleep();
 
         if checkpoint {
             self.maybe_checkpoint()?;
@@ -958,6 +955,8 @@ impl FluctlightBrain {
             activation_cache: Mutex::new(ActivationCache::new()),
             chronos: crate::chronos::Chronos::default(),
             crystallizer: crate::crystallize::Crystallizer::default(),
+            fabric: crate::recall_fabric::RecallFabric::new(crate::fabric_runtime::fabric_config()),
+            fabric_traces: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -995,28 +994,10 @@ impl Clone for FluctlightBrain {
             activation_cache: Mutex::new(cache),
             chronos: self.chronos.clone(),
             crystallizer: self.crystallizer.clone(),
+            fabric: self.fabric.clone(),
+            fabric_traces: Mutex::new(self.fabric_traces.lock().unwrap().clone()),
         }
     }
-}
-
-/// Recall Fabric master switch (opt-in). Off by default → default behavior is unchanged.
-fn fabric_enabled() -> bool {
-    std::env::var("FLUCTLIGHT_FABRIC").ok().as_deref() == Some("1")
-}
-
-/// Confidence-weighted activation multiplier from a recall's provenance (Recall Fabric).
-fn recall_confidence_mult(recall: &crate::types::RecallResult) -> f32 {
-    use crate::confidence::{activation_multiplier, recall_confidence, Evidence, SourceKind};
-    let kind = match recall.episode.provenance.as_ref().map(|p| &p.kind) {
-        Some(ProvenanceKind::LedgerVerified)
-        | Some(ProvenanceKind::ToolGrounded)
-        | Some(ProvenanceKind::FileObservation) => SourceKind::Verified,
-        Some(ProvenanceKind::UserExplicit) => SourceKind::UserStated,
-        Some(ProvenanceKind::ChatAssertion) => SourceKind::Inferred,
-        None => SourceKind::Unknown,
-    };
-    let conf = recall_confidence(&[Evidence::new(kind, 1.0)]);
-    activation_multiplier(conf)
 }
 
 fn prefer_ledger_truth_on_balance_cue(

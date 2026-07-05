@@ -232,9 +232,11 @@ provenance-derived confidence. Off by default (\texttt{FLUCTLIGHT\_FABRIC}); sna
 Each mechanism is validated on synthetic data with property tests (exact CRT round-trip and
 exponential capacity for the lattice; invertible bind/unbind and order sensitivity for phase
 parsing; Hamming--cosine rank agreement for photon; monotone decay and bounded interference for
-forgetting). Integrating them into the live recall hot path and measuring the effect on
-end-to-end LongMemEval accuracy is ongoing work; the mechanisms ship enabled-by-flag so the
-retrieval numbers in Section~\ref{sec:eval} are unaffected.
+forgetting). Integrating them into the live recall hot path is complete behind
+\texttt{FLUCTLIGHT\_FABRIC=1} (Photon prefilter, lattice coarse/fine, phase/relational
+disambiguation, forgetting retention, confidence weighting, chronos/crystallize on write).
+The frozen retrieval numbers in Section~\ref{sec:eval} were measured with Fabric \emph{off}
+(v4 index path); Fabric-on A/B runs are reported separately when frozen.
 
 \section{Evaluation}
 \label{sec:eval}
