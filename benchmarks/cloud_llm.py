@@ -65,6 +65,11 @@ def _next_key(prefix: str) -> str:
     return keys[i]
 
 
+def _openai_reasoning_model(model: str) -> bool:
+    m = model.lower()
+    return m.startswith("gpt-5") or m.startswith("o1") or m.startswith("o3")
+
+
 def _http_chat(
     url: str,
     *,
@@ -78,9 +83,13 @@ def _http_chat(
     body: dict[str, Any] = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0,
-        "max_tokens": max_tokens,
     }
+    if _openai_reasoning_model(model):
+        # GPT-5 / o-series: max_completion_tokens; no temperature=0.
+        body["max_completion_tokens"] = max(max_tokens, 256)
+    else:
+        body["temperature"] = 0
+        body["max_tokens"] = max_tokens
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -114,6 +123,9 @@ def _http_chat(
         raise RuntimeError(str(data["error"]))
     msg = data["choices"][0]["message"]
     text = msg.get("content") or msg.get("reasoning") or ""
+    if not str(text).strip() and _openai_reasoning_model(model):
+        fr = data["choices"][0].get("finish_reason") or ""
+        raise RuntimeError(f"openai empty text (model={model}, finish_reason={fr})")
     return str(text).strip()
 
 
@@ -252,7 +264,12 @@ def chat(
     )
 
 
-def smoke_test(provider: str) -> str:
-    # Gemini 2.5 Flash needs headroom even for one-word replies if thinking is on.
-    max_t = 128 if provider == "gemini" else 16
-    return chat(f"Reply with exactly: {provider}-ok", provider=provider, max_tokens=max_t, timeout_s=60)
+def smoke_test(provider: str, *, model: str | None = None) -> str:
+    max_t = 128 if provider == "gemini" else 256 if model and _openai_reasoning_model(model) else 16
+    return chat(
+        f"Reply with exactly: {provider}-ok",
+        provider=provider,
+        model=model,
+        max_tokens=max_t,
+        timeout_s=90,
+    )

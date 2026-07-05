@@ -24,6 +24,7 @@ from longmemeval_bench import (  # noqa: E402
     load_dataset,
     retrieve_item,
     session_ids_from_recalls,
+    session_in_recalls,
 )
 from prompts.longmemeval_judge import get_anscheck_prompt  # noqa: E402
 
@@ -33,6 +34,35 @@ READER_TEMPLATE = (
     "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
     "Question: {question}\nAnswer:"
 )
+
+READER_TEMPLATE_COT = (
+    "I will give you several history chats between you and a user. "
+    "Please answer the question based on the relevant chat history. "
+    "Answer the question step by step: first extract all the relevant information, "
+    "and then reason over the information to get the answer.\n\n\n"
+    "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
+    "Question: {question}\nAnswer (step by step):"
+)
+
+# OpenAI "max" profile: Mem0-class reader (GPT-5) + official judge + wider reader context.
+E2E_PROFILES: dict[str, dict[str, Any]] = {
+    "standard": {
+        "reader_model_openai": "gpt-4o-2024-08-06",
+        "judge_model_openai": "gpt-4o-2024-08-06",
+        "reader_cot": False,
+        "reader_top_k": 8,
+        "reader_max_tokens": 1024,
+        "judge_max_tokens": 10,
+    },
+    "max": {
+        "reader_model_openai": "gpt-5",
+        "judge_model_openai": "gpt-4o-2024-08-06",
+        "reader_cot": True,
+        "reader_top_k": 50,
+        "reader_max_tokens": 2048,
+        "judge_max_tokens": 10,
+    },
+}
 
 from cursor_api import cursor_auto_chat, load_cursor_api_key  # noqa: E402
 from cloud_llm import chat as cloud_chat, load_env_file, smoke_test  # noqa: E402
@@ -97,6 +127,7 @@ def judge_label(
     backend: str,
     judge_model: str,
     timeout_s: int = 120,
+    max_tokens: int = 10,
 ) -> bool:
     qtype = str(item.get("question_type") or "")
     qid = str(item.get("question_id") or "")
@@ -108,9 +139,9 @@ def judge_label(
         abstention="_abs" in qid,
     )
     resp = llm_chat(
-        prompt, backend=backend, model=judge_model, timeout_s=timeout_s, max_tokens=64
+        prompt, backend=backend, model=judge_model, timeout_s=timeout_s, max_tokens=max_tokens
     )
-    return "yes" in resp.lower()
+    return resp.strip().lower().startswith("yes") or resp.strip().lower() == "yes"
 
 
 def process_one_item(
@@ -122,10 +153,11 @@ def process_one_item(
     judge_model: str,
 ) -> dict:
     t_q = time.perf_counter()
-    recalls, session_hit, ingested = retrieve_item(
+    recall_k = max(args.top_k, args.reader_top_k)
+    recalls, _, ingested = retrieve_item(
         item,
         mode="index",
-        top_k=args.top_k,
+        top_k=recall_k,
         embedder=embedder,
         fast=args.fast,
         granularity=args.granularity,
@@ -133,9 +165,13 @@ def process_one_item(
         dual_key=args.dual_key,
         pref_facts_key=args.pref_facts_key,
     )
-    sids = session_ids_from_recalls(recalls, top_k=args.top_k)
+    session_hit = session_in_recalls(
+        recalls, item.get("answer_session_ids") or [], top_k=args.top_k
+    )
+    sids = session_ids_from_recalls(recalls, top_k=args.reader_top_k)
     history = format_history_json(item, sids)
-    reader_prompt = READER_TEMPLATE.format(
+    tmpl = READER_TEMPLATE_COT if args.reader_cot else READER_TEMPLATE
+    reader_prompt = tmpl.format(
         history=history,
         question_date=item.get("question_date") or "",
         question=item.get("question") or "",
@@ -148,7 +184,7 @@ def process_one_item(
             backend=args.llm_backend,
             model=reader_model,
             timeout_s=args.llm_timeout,
-            max_tokens=1024,
+            max_tokens=args.reader_max_tokens,
         )
         label = judge_label(
             item,
@@ -156,12 +192,15 @@ def process_one_item(
             backend=args.llm_backend,
             judge_model=judge_model,
             timeout_s=args.llm_timeout,
+            max_tokens=args.judge_max_tokens,
         )
     return {
         "question_id": item.get("question_id"),
         "question_type": item.get("question_type"),
         "session_recall_hit": session_hit,
         "retrieved_sessions": sids,
+        "reader_top_k": args.reader_top_k,
+        "reader_cot": args.reader_cot,
         "ingested": ingested,
         "hypothesis": hypothesis,
         "autoeval_label": label,
@@ -197,7 +236,36 @@ def main() -> int:
     ap.add_argument("--data", type=Path, default=DEFAULT_DATA)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--offset", type=int, default=0)
-    ap.add_argument("--top-k", type=int, default=8)
+    ap.add_argument("--top-k", type=int, default=8, help="session recall@k metric (paper: 8)")
+    ap.add_argument(
+        "--reader-top-k",
+        type=int,
+        default=0,
+        help="sessions fed to reader (0 = use profile/default; max profile uses 50)",
+    )
+    ap.add_argument(
+        "--reader-cot",
+        action="store_true",
+        help="official LongMemEval chain-of-thought reader prompt",
+    )
+    ap.add_argument(
+        "--reader-max-tokens",
+        type=int,
+        default=0,
+        help="reader completion budget (0 = profile default)",
+    )
+    ap.add_argument(
+        "--judge-max-tokens",
+        type=int,
+        default=0,
+        help="judge completion budget (0 = profile default)",
+    )
+    ap.add_argument(
+        "--e2e-profile",
+        default=os.environ.get("LONGMEMEVAL_E2E_PROFILE", "standard"),
+        choices=tuple(E2E_PROFILES),
+        help="standard=gpt-4o; max=GPT-5 reader + CoT + top-50 reader context",
+    )
     ap.add_argument("--reader-model", default=None)
     ap.add_argument("--judge-model", default=None)
     ap.add_argument(
@@ -242,6 +310,18 @@ def main() -> int:
     if args.llm_backend == "cursor" and args.llm_timeout == 120 and args.cursor_timeout != 300:
         args.llm_timeout = args.cursor_timeout
 
+    prof = E2E_PROFILES.get(args.e2e_profile, E2E_PROFILES["standard"])
+    if not args.reader_top_k:
+        args.reader_top_k = int(prof["reader_top_k"])
+    if not args.reader_max_tokens:
+        args.reader_max_tokens = int(prof["reader_max_tokens"])
+    if not args.judge_max_tokens:
+        args.judge_max_tokens = int(prof["judge_max_tokens"])
+    if args.e2e_profile == "max":
+        args.reader_cot = True
+    if args.e2e_profile == "max" and args.llm_timeout == 180:
+        args.llm_timeout = max(args.llm_timeout, 300)
+
     if not args.data.is_file():
         raise SystemExit(f"dataset not found: {args.data}")
 
@@ -281,9 +361,11 @@ def main() -> int:
     if args.judge_model:
         judge_model = args.judge_model
     elif backend == "openai":
-        judge_model = "gpt-4o-mini"
+        judge_model = str(prof.get("judge_model_openai", "gpt-4o-2024-08-06"))
     else:
         judge_model = reader_model
+    if backend == "openai" and args.e2e_profile == "max" and not args.reader_model:
+        reader_model = str(prof.get("reader_model_openai", reader_model))
 
     if not args.skip_llm:
         load_env_file()
@@ -293,7 +375,7 @@ def main() -> int:
         else:
             if not args.skip_smoke_test:
                 try:
-                    smoke_test(backend)
+                    smoke_test(backend, model=reader_model if backend == "openai" else None)
                 except Exception as e:
                     raise SystemExit(
                         f"LLM backend {backend!r} failed smoke test: {e}\n"
@@ -367,6 +449,10 @@ def main() -> int:
         "dataset": str(args.data),
         "granularity": args.granularity,
         "top_k": args.top_k,
+        "reader_top_k": args.reader_top_k,
+        "reader_cot": args.reader_cot,
+        "reader_max_tokens": args.reader_max_tokens,
+        "e2e_profile": args.e2e_profile,
         "dual_key": args.dual_key,
         "pref_facts_key": args.pref_facts_key,
         "query_expand": args.query_expand,
