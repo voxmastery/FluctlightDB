@@ -28,6 +28,11 @@ pub fn fabric_config() -> FabricConfig {
             cfg.prefilter_k = k;
         }
     }
+    if let Ok(v) = std::env::var("FLUCTLIGHT_PHOTON_BITS") {
+        if let Ok(b) = v.parse() {
+            cfg.photon_bits = b;
+        }
+    }
     cfg
 }
 
@@ -90,11 +95,7 @@ impl FluctlightBrain {
             .lock()
             .unwrap()
             .insert(id.clone(), MemoryTrace::new(tick, salience));
-        if let Some(vec) = vector {
-            let scalar = crate::recall_fabric::semantic_scalar(vec);
-            let sig = crate::recall_fabric::structure_signature(content);
-            self.crystallizer.crystallize(id, scalar, sig);
-        }
+        // Crystallize on sleep for salient memories; skip per-write lattice work on hot ingest path.
     }
 
     /// Sleep consolidation: crystallize salient engrams + elastic lattice growth if crowded.
@@ -121,8 +122,33 @@ impl FluctlightBrain {
         }
     }
 
-    /// Read path: full Photon → Lattice → Phase composed recall merged into hybrid activation,
-    /// then forgetting retention + confidence trust weighting.
+    /// Photon LSH candidate ids for the hybrid activation prefilter (fast path).
+    pub(crate) fn fabric_photon_candidates(
+        &self,
+        cue_vector: Option<&[f32]>,
+    ) -> Option<std::collections::HashSet<Uuid>> {
+        if !fabric_enabled() {
+            return None;
+        }
+        let ids = self
+            .fabric
+            .photon_shortlist_ids(cue_vector, fabric_config().prefilter_k);
+        if ids.is_empty() {
+            return None;
+        }
+        let set: std::collections::HashSet<Uuid> = ids
+            .into_iter()
+            .filter_map(|s| Uuid::parse_str(&s).ok())
+            .collect();
+        if set.is_empty() {
+            None
+        } else {
+            Some(set)
+        }
+    }
+
+    /// Read path: Photon prefilter already narrowed candidates; score only the hybrid
+    /// shortlist (O(k)), then forgetting + confidence. No full-store fabric.recall scan.
     pub(crate) fn fabric_on_activate(
         &self,
         cue: &str,
@@ -133,16 +159,12 @@ impl FluctlightBrain {
             return;
         }
         let blend_w = fabric_blend_weight();
-        let top_k = recalls.len().max(32).min(128);
-        let hits = self.fabric.recall(cue, cue_vector, top_k);
-        let scores: HashMap<String, f32> = hits.iter().map(|h| (h.id.clone(), h.score)).collect();
-
         let tick = self.autonomic.total_ticks;
         let mut traces = self.fabric_traces.lock().unwrap();
         for recall in recalls.iter_mut() {
             let id = recall.engram_id.to_string();
-            if let Some(&score) = scores.get(&id) {
-                recall.activation += score * blend_w;
+            if let Some(hit) = self.fabric.score_for_id(&id, cue, cue_vector) {
+                recall.activation += hit.score * blend_w;
             }
             if let Some(trace) = traces.get_mut(&id) {
                 let retention = trace.retention(tick).max(0.08);

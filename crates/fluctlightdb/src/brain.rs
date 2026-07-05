@@ -397,14 +397,25 @@ impl FluctlightBrain {
             return cached;
         }
 
-        let candidate_set: Option<HashSet<uuid::Uuid>> = self
-            .recall_index
-            .as_ref()
-            .and_then(|idx| {
-                idx.hybrid_candidates(cue, cue_vector, &self.semantic, default_candidate_cap())
-                    .ok()
-            })
-            .map(|ids| cap_candidates(ids, default_candidate_cap()));
+        // Recall Fabric: Photon LSH replaces hybrid index candidate generation when enabled —
+        // sub-linear bucket lookup instead of scanning the full sidecar index.
+        let candidate_set: Option<HashSet<uuid::Uuid>> =
+            if let Some(photon) = self.fabric_photon_candidates(cue_vector) {
+                Some(cap_candidates(photon.into_iter().collect(), default_candidate_cap()))
+            } else {
+                self.recall_index
+                    .as_ref()
+                    .and_then(|idx| {
+                        idx.hybrid_candidates(
+                            cue,
+                            cue_vector,
+                            &self.semantic,
+                            default_candidate_cap(),
+                        )
+                        .ok()
+                    })
+                    .map(|ids| cap_candidates(ids, default_candidate_cap()))
+            };
 
         let mut result = activate_from_hybrid(
             cue,
