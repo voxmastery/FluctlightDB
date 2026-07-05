@@ -55,6 +55,29 @@ impl Cortex {
         sum / tokens.len() as f32
     }
 
+    /// Top consolidated lexical facts matching cue tokens (neocortical readout).
+    pub fn top_facts_for_cue(&self, cue: &str, limit: usize) -> Vec<(String, f32)> {
+        let tokens = tokenize(cue);
+        if tokens.is_empty() {
+            return Vec::new();
+        }
+        let mut scored: Vec<(String, f32)> = self
+            .facts
+            .iter()
+            .filter_map(|(fact, strength)| {
+                let hit = tokens.iter().any(|t| fact.contains(t.as_str()) || t == fact);
+                if hit && *strength > 0.0 {
+                    Some((fact.clone(), *strength))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scored.truncate(limit);
+        scored
+    }
+
     pub fn semantic_boost(&self, cue_vector: Option<&[f32]>) -> f32 {
         let Some(cue) = cue_vector else {
             return 0.0;

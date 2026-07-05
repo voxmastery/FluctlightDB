@@ -243,6 +243,32 @@ impl PyBrain {
             .checkpoint()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
+
+    #[pyo3(signature = (cue, limit=None))]
+    fn complete(&self, cue: &str, limit: Option<usize>) -> PyResult<Option<Py<PyAny>>> {
+        let _ = limit;
+        match self.inner.complete(cue) {
+            Some(engram) => Python::with_gil(|py| {
+                let ep = &engram.episode;
+                let dict = PyDict::new(py);
+                dict.set_item("engram_id", engram.id.to_string())?;
+                dict.set_item("content", &ep.content)?;
+                dict.set_item("context", &ep.context)?;
+                dict.set_item("salience", engram.salience)?;
+                dict.set_item("separation_index", engram.separation_index)?;
+                Ok(Some(dict.into()))
+            }),
+            None => Ok(None),
+        }
+    }
+
+    #[pyo3(signature = (cue, limit=None))]
+    fn cortex_facts(&self, py: Python<'_>, cue: &str, limit: Option<usize>) -> PyResult<Py<PyAny>> {
+        let facts = self
+            .inner
+            .cortex_facts_for_cue(cue, limit.unwrap_or(24));
+        json_val_to_py(py, &facts)
+    }
 }
 
 fn json_val_to_py<T: serde::Serialize>(py: Python<'_>, val: &T) -> PyResult<Py<PyAny>> {

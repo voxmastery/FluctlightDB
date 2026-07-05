@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>FluctlightDB · Living Brain</title>
+<meta name="description" content="Real-time 3D visualization of a FluctlightDB brain — engrams, synapses, regions, recall waves." />
+<style>
+  :root{
+    --bg:#04060d; --ink:#e8eefc; --muted:#8ea0c8; --line:rgba(140,170,255,.14);
+    --glass:rgba(16,22,40,.55); --glass2:rgba(10,14,28,.75);
+    --accent:#7c5cff; --accent2:#22d3ee; --good:#37e0a6; --warn:#ffd166; --bad:#ff5d73;
+    --shadow:0 20px 60px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Inter,Roboto,system-ui,sans-serif;overflow:hidden}
+  canvas{display:block}
+  #scene{position:fixed;inset:0}
+  .vignette{position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(120% 90% at 50% 40%,transparent 55%,rgba(0,0,0,.55) 100%);z-index:2}
+  .grain{position:fixed;inset:0;pointer-events:none;opacity:.035;z-index:2;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
+
+  /* ---- top bar ---- */
+  .topbar{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:14px;
+    padding:14px 18px;background:linear-gradient(180deg,rgba(4,6,13,.85),transparent)}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:700;letter-spacing:.3px}
+  .logo{width:26px;height:26px;border-radius:8px;position:relative;
+    background:conic-gradient(from 210deg,var(--accent),var(--accent2),var(--good),var(--accent));
+    box-shadow:0 0 22px rgba(124,92,255,.7);animation:spin 14s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .brand small{display:block;font-weight:500;color:var(--muted);font-size:11px;letter-spacing:.5px}
+  .pill{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 10px currentColor}
+  .dot.live{background:var(--good)}
+  .status-txt{font-size:12px;color:var(--muted)}
+
+  /* ---- HUD panels ---- */
+  .panel{position:fixed;z-index:5;background:var(--glass);backdrop-filter:blur(18px) saturate(140%);
+    -webkit-backdrop-filter:blur(18px) saturate(140%);border:1px solid var(--line);
+    border-radius:18px;box-shadow:var(--shadow)}
+  #stats{left:18px;top:70px;width:260px;padding:16px}
+  .ttl{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin:0 0 12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .metric{background:var(--glass2);border:1px solid var(--line);border-radius:13px;padding:11px 12px}
+  .metric .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;
+    background:linear-gradient(180deg,#fff,#a9b8e6);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .metric .k{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:3px}
+  .stage-wrap{margin-top:13px}
+  .stage-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px}
+  .bar{height:7px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden}
+  .bar > i{display:block;height:100%;width:20%;border-radius:6px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));box-shadow:0 0 14px var(--accent2);transition:width .6s}
+
+  #legend{left:18px;bottom:18px;padding:14px 16px;width:260px}
+  .lg{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);margin:7px 0}
+  .sw{width:12px;height:12px;border-radius:4px;box-shadow:0 0 10px currentColor}
+
+  #console{right:18px;top:70px;width:330px;max-height:calc(100vh - 240px);padding:16px;display:flex;flex-direction:column}
+  .search{display:flex;gap:8px;margin-bottom:12px}
+  .search input{flex:1;background:var(--glass2);border:1px solid var(--line);border-radius:12px;
+    padding:11px 13px;color:var(--ink);font-size:13px;outline:none}
+  .search input:focus{border-color:var(--accent)}
+  .search button,.mini{background:linear-gradient(180deg,var(--accent),#5a3ff0);border:0;color:#fff;
+    border-radius:12px;padding:0 14px;font-weight:600;cursor:pointer;font-size:13px}
+  .search button:active{transform:translateY(1px)}
+  .recalls{overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
+  .rc{background:var(--glass2);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:11px;padding:10px 12px;font-size:12.5px;cursor:pointer;transition:.15s}
+  .rc:hover{border-color:var(--accent2);transform:translateX(-2px)}
+  .rc .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;margin-top:6px}
+  .rc.verified{border-left-color:var(--good)}
+  .tag{font-size:9.5px;padding:2px 7px;border-radius:20px;background:rgba(124,92,255,.16);color:#c6b8ff}
+  .tag.v{background:rgba(55,224,166,.16);color:var(--good)}
+
+  #timeline{right:18px;bottom:18px;left:300px;height:64px;padding:10px 14px;display:flex;align-items:center;gap:2px;overflow:hidden}
+  #timeline .tk{flex:0 0 auto;width:6px;border-radius:3px;background:linear-gradient(180deg,var(--accent2),var(--accent));
+    opacity:.5;transition:.3s}
+  .tl-empty{color:var(--muted);font-size:12px}
+
+  .hint{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:5;color:var(--muted);
+    font-size:11.5px;letter-spacing:.4px;background:var(--glass);border:1px solid var(--line);
+    padding:7px 14px;border-radius:20px;backdrop-filter:blur(10px)}
+  #tooltip{position:fixed;z-index:9;pointer-events:none;max-width:280px;padding:10px 12px;font-size:12px;
+    background:var(--glass2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);
+    opacity:0;transform:translateY(6px);transition:.12s;white-space:pre-line}
+  #tooltip.on{opacity:1;transform:none}
+
+  /* ---- connect modal ---- */
+  #gate{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;
+    background:rgba(4,6,13,.7);backdrop-filter:blur(6px)}
+  #gate.on{display:flex}
+  .card{width:min(420px,92vw);padding:26px;border-radius:22px;background:var(--glass);
+    border:1px solid var(--line);box-shadow:var(--shadow)}
+  .card h2{margin:0 0 4px;font-size:19px}
+  .card p{margin:0 0 18px;color:var(--muted);font-size:13px}
+  .fld{margin-bottom:12px}
+  .fld label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+  .fld input{width:100%;background:var(--glass2);border:1px solid var(--line);border-radius:12px;padding:11px 13px;color:var(--ink);font-size:13px;outline:none}
+  .fld input:focus{border-color:var(--accent)}
+  .card .go{width:100%;margin-top:6px;padding:12px;border:0;border-radius:12px;font-weight:700;font-size:14px;color:#fff;cursor:pointer;
+    background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .foot{margin-top:14px;font-size:11px;color:var(--muted);text-align:center}
+  .foot a{color:var(--accent2);text-decoration:none}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:rgba(140,170,255,.2);border-radius:8px}
+  @media (max-width:820px){#console,#stats,#legend{display:none}#timeline{left:18px}}
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div class="vignette"></div><div class="grain"></div>
+
+  <header class="topbar">
+    <div class="brand"><span class="logo"></span>
+      <span>FluctlightDB <small>Living Brain · real-time connectome</small></span>
+    </div>
+    <div class="pill"><span id="dot" class="dot"></span><span id="status" class="status-txt">offline</span>
+      <button class="mini" id="reconnect" style="margin-left:8px">Connect</button></div>
+  </header>
+
+  <section id="stats" class="panel">
+    <p class="ttl">Vitals</p>
+    <div class="grid">
+      <div class="metric"><div class="v" id="m-eng">0</div><div class="k">Engrams</div></div>
+      <div class="metric"><div class="v" id="m-syn">0</div><div class="k">Synapses</div></div>
+      <div class="metric"><div class="v" id="m-neu">0</div><div class="k">Neurons</div></div>
+      <div class="metric"><div class="v" id="m-cry">0</div><div class="k">Crystals</div></div>
+    </div>
+    <div class="stage-wrap">
+      <div class="stage-lbl"><span id="stage">—</span><span id="tick">tick 0</span></div>
+      <div class="bar"><i id="pressure"></i></div>
+      <div class="stage-lbl" style="margin-top:6px"><span>synapse pressure</span><span id="pr-val">0%</span></div>
+    </div>
+  </section>
+
+  <aside id="console" class="panel">
+    <p class="ttl">Recall probe</p>
+    <div class="search">
+      <input id="cue" placeholder="Ask the brain… (fires an activation wave)" />
+      <button id="fire">Recall</button>
+    </div>
+    <div class="recalls" id="recalls"><div class="tl-empty">Type a cue and hit Recall to light up the engrams that answer it.</div></div>
+  </aside>
+
+  <section id="legend" class="panel">
+    <p class="ttl">Regions</p>
+    <div class="lg"><span class="sw" style="color:#9b5de5;background:#9b5de5"></span>Cognitive region hubs</div>
+    <div class="lg"><span class="sw" style="color:#c8a0ff;background:#c8a0ff"></span>Core memories</div>
+    <div class="lg"><span class="sw" style="color:#70c1b3;background:#70c1b3"></span>Active / salient engrams</div>
+    <div class="lg"><span class="sw" style="color:#5b9bd5;background:#5b9bd5"></span>Episodic engrams</div>
+    <div class="lg"><span class="sw" style="color:#06d6a0;background:#06d6a0"></span>Dentate neurons</div>
+  </section>
+
+  <section id="timeline" class="panel"><span class="tl-empty">Temporal axis — enable FLUCTLIGHT_FABRIC to stream events.</span></section>
+
+  <div class="hint">drag to orbit · scroll to zoom · hover a node for detail</div>
+  <div id="tooltip"></div>
+
+  <div id="gate">
+    <div class="card">
+      <h2>Connect to a brain</h2>
+      <p>Point the viewer at any FluctlightDB server. Everything stays in your browser.</p>
+      <div class="fld"><label>Server URL</label><input id="g-url" placeholder="https://your-host  (blank = this server)" /></div>
+      <div class="fld"><label>API token (optional)</label><input id="g-token" placeholder="Bearer token" /></div>
+      <div class="fld"><label>Tenant (optional)</label><input id="g-tenant" placeholder="default" /></div>
+      <button class="go" id="g-go">Enter the mind</button>
+      <div class="foot">No server handy? <a href="#" id="g-demo">Explore a demo brain →</a></div>
+    </div>
+  </div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ---------- config / persistence ----------
+const LS = 'fluctlight.viewer.cfg';
+const cfg = Object.assign({url:'', token:'', tenant:''}, JSON.parse(localStorage.getItem(LS)||'{}'));
+const $ = s => document.querySelector(s);
+
+// ---------- three.js scene ----------
+const canvas = $('#scene');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x04060d, 0.0016);
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 4000);
+camera.position.set(0, 60, 340);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = .06;
+controls.autoRotate = true; controls.autoRotateSpeed = .35; controls.minDistance=90; controls.maxDistance=900;
+
+scene.add(new THREE.AmbientLight(0x9fb2ff, .5));
+const key = new THREE.PointLight(0x7c5cff, 2.2, 1400); key.position.set(180,220,180); scene.add(key);
+const rim = new THREE.PointLight(0x22d3ee, 1.6, 1400); rim.position.set(-220,-80,-160); scene.add(rim);
+
+// starfield
+(() => {
+  const g = new THREE.BufferGeometry(); const n=1400; const p=new Float32Array(n*3);
+  for(let i=0;i<n;i++){const r=900+Math.random()*1600, t=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    p[i*3]=r*Math.sin(ph)*Math.cos(t); p[i*3+1]=r*Math.cos(ph); p[i*3+2]=r*Math.sin(ph)*Math.sin(t);}
+  g.setAttribute('position', new THREE.BufferAttribute(p,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({color:0x3a4a80,size:1.4,transparent:true,opacity:.7})));
+})();
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), 0.9, 0.7, 0.2);
+composer.addPass(bloom);
+
+// ---------- graph containers ----------
+const nodeGroup = new THREE.Group(); const linkGroup = new THREE.Group();
+scene.add(linkGroup); scene.add(nodeGroup);
+let NODES=[], LINKS=[], byId=new Map();
+const sphereGeo = new THREE.SphereGeometry(1, 20, 20);
+const raycaster = new THREE.Raycaster(); const pointer = new THREE.Vector2(); let hovered=null;
+
+// anatomical anchor seeds (rough brain hull lobes) → 3D positions per region
+const REGION = {
+  'prefrontal-l':[-70,60,120],'frontal-r':[70,70,110],'parietal-l':[-90,90,-30],'parietal-r':[90,85,-30],
+  'temporal-l':[-120,-10,20],'temporal-r':[120,-10,20],'occipital-l':[-40,40,-140],'occipital-r':[40,40,-140],
+  'corpus-callosum':[0,20,0],'brainstem':[0,-80,-30]
+};
+const anchor = r => REGION[r] || [0,0,0];
+
+function clearGraph(){
+  nodeGroup.clear(); linkGroup.clear(); byId.clear(); NODES=[]; LINKS=[];
+}
+
+function buildGraph(data){
+  clearGraph();
+  const nodes = data.nodes||[], links = data.links||[];
+  for(const n of nodes){
+    const [ax,ay,az] = anchor(n.region);
+    const spread = n.kind==='region'?4:(n.kind==='neuron'?55:42);
+    const pos = new THREE.Vector3(ax+(Math.random()-.5)*spread, ay+(Math.random()-.5)*spread, az+(Math.random()-.5)*spread);
+    const col = new THREE.Color(n.color||'#8048ff');
+    const mat = new THREE.MeshStandardMaterial({color:col, emissive:col, emissiveIntensity:.9, roughness:.35, metalness:.2});
+    const m = new THREE.Mesh(sphereGeo, mat);
+    const s = (n.size||3) * (n.kind==='region'?2.4:1.0);
+    m.scale.setScalar(s); m.position.copy(pos);
+    m.userData = {n, base:s, home:pos.clone(), vel:new THREE.Vector3(), pulse:0};
+    nodeGroup.add(m); byId.set(n.id, m); NODES.push(m);
+  }
+  // links
+  const posArr=[], colArr=[];
+  for(const l of links){
+    const a=byId.get(l.source), b=byId.get(l.target); if(!a||!b) continue;
+    LINKS.push({a,b,l});
+    const c = l.kind==='synapse'?new THREE.Color(0x22d3ee):l.kind==='associate'?new THREE.Color(0x7c5cff):new THREE.Color(0x3b5bbf);
+    posArr.push(a.position.x,a.position.y,a.position.z,b.position.x,b.position.y,b.position.z);
+    const al=Math.min(.9,.2+(l.weight||.3)); colArr.push(c.r,c.g,c.b*1,al,c.r,c.g,c.b,al);
+  }
+  const lg=new THREE.BufferGeometry();
+  lg.setAttribute('position',new THREE.Float32BufferAttribute(posArr,3));
+  lg.setAttribute('color',new THREE.Float32BufferAttribute(colArr.filter((_,i)=>i%4!==3),3));
+  const lm=new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.42,blending:THREE.AdditiveBlending});
+  linkGroup.add(new THREE.LineSegments(lg,lm));
+  linkGroup.userData.geo = lg;
+}
+
+// light force relaxation so clusters breathe (cheap, capped)
+function relax(){
+  const k=0.0016;
+  for(const m of NODES){
+    const d=m.userData.home.clone().sub(m.position).multiplyScalar(0.02);
+    m.userData.vel.add(d).multiplyScalar(0.86); m.position.add(m.userData.vel);
+  }
+  // refresh link endpoints
+  const geo=linkGroup.userData.geo; if(geo){const p=geo.attributes.position.array;let i=0;
+    for(const {a,b} of LINKS){p[i++]=a.position.x;p[i++]=a.position.y;p[i++]=a.position.z;p[i++]=b.position.x;p[i++]=b.position.y;p[i++]=b.position.z;}
+    geo.attributes.position.needsUpdate=true;}
+  void k;
+}
+
+// ---------- API ----------
+function base(){ return (cfg.url||'').replace(/\/$/,''); }
+async function api(path, body){
+  const headers={'Content-Type':'application/json'};
+  if(cfg.token) headers['Authorization']='Bearer '+cfg.token;
+  const b=Object.assign({}, body||{}); if(cfg.tenant) b.tenant_id=cfg.tenant;
+  const res=await fetch(base()+path,{method:'POST',headers,body:JSON.stringify(b)});
+  if(!res.ok) throw new Error(path+' → '+res.status);
+  return res.json();
+}
+function setLive(on,txt){ $('#dot').classList.toggle('live',on); $('#status').textContent=txt||(on?'live':'offline'); }
+
+async function refresh(){
+  try{
+    const [g,v] = await Promise.all([api('/api/v1/export-graph'), api('/api/v1/export-viz').catch(()=>null)]);
+    buildGraph(g); paintStats(g.stats, v); setLive(true,'live · '+(g.stats?.engrams||0)+' engrams');
+    if(v) paintTimeline(v);
+  }catch(e){ setLive(false,'connection failed'); openGate(); }
+}
+function paintStats(st, v){
+  st=st||{};
+  $('#m-eng').textContent=fmt(st.engrams); $('#m-syn').textContent=fmt(st.synapses);
+  $('#m-neu').textContent=fmt(st.neurons); $('#m-cry').textContent=fmt((v&&v.engrams)||st.core_memories||0);
+  if(v){ $('#stage').textContent=v.stage||'—'; $('#tick').textContent='tick '+fmt(v.tick);
+    const pr=Math.round((v.synapse_pressure||0)*100); $('#pressure').style.width=Math.max(4,pr)+'%'; $('#pr-val').textContent=pr+'%'; }
+}
+function paintTimeline(v){
+  const el=$('#timeline'); const seps=(v.recent_separations||[]);
+  if(!seps.length){ return; }
+  el.innerHTML=''; const max=32;
+  seps.slice(-max).forEach(s=>{ const t=document.createElement('div'); t.className='tk';
+    const h=10+ (s.separation_index||.3)*44; t.style.height=h+'px'; t.style.opacity=.4+(s.separation_index||.3)*.6; el.appendChild(t); });
+}
+const fmt = n => (n==null?'0':Number(n).toLocaleString());
+
+// ---------- recall probe ----------
+async function fire(){
+  const cue=$('#cue').value.trim(); if(!cue) return;
+  const box=$('#recalls'); box.innerHTML='<div class="tl-empty">firing activation wave…</div>';
+  try{
+    const r=await api('/api/v1/activate',{cue, top_k:8});
+    const rc=r.recalls||[]; box.innerHTML='';
+    if(!rc.length){ box.innerHTML='<div class="tl-empty">no engrams activated.</div>'; return; }
+    rc.forEach(x=>{
+      const ep=x.episode||{}; const div=document.createElement('div');
+      div.className='rc'+(x.verified?' verified':'');
+      div.innerHTML=`<div>${esc((ep.content||'').slice(0,140))}</div>
+        <div class="meta"><span class="tag ${x.verified?'v':''}">${x.verified?'verified':'recall'}</span>
+        <span>act ${(x.activation||0).toFixed(2)}</span></div>`;
+      div.onclick=()=>focusEngram(x.engram_id);
+      box.appendChild(div); pulseEngram(x.engram_id, x.activation||1);
+    });
+  }catch(e){ box.innerHTML='<div class="tl-empty">recall failed — check connection.</div>'; }
+}
+function pulseEngram(id, strength){
+  const m=byId.get('e:'+id)||byId.get(id); if(!m) return; m.userData.pulse=Math.min(3,1+strength);
+}
+function focusEngram(id){
+  const m=byId.get('e:'+id)||byId.get(id); if(!m) return; controls.autoRotate=false;
+  const to=m.position.clone().add(new THREE.Vector3(0,10,70));
+  animateCam(to, m.position.clone()); m.userData.pulse=3;
+}
+let camAnim=null;
+function animateCam(pos,look){ camAnim={pos,look,t:0}; }
+
+// ---------- interaction ----------
+addEventListener('pointermove',e=>{
+  pointer.x=(e.clientX/innerWidth)*2-1; pointer.y=-(e.clientY/innerHeight)*2+1;
+  const tt=$('#tooltip'); tt.style.left=(e.clientX+14)+'px'; tt.style.top=(e.clientY+14)+'px';
+});
+function hover(){
+  raycaster.setFromCamera(pointer,camera);
+  const hit=raycaster.intersectObjects(NODES,false)[0];
+  const tt=$('#tooltip');
+  if(hit){ const n=hit.object.userData.n; tt.classList.add('on');
+    tt.textContent=(n.label||n.id)+(n.desc?('\n\n'+n.desc):'')+'\n['+n.kind+' · '+n.region+']';
+    if(hovered!==hit.object){ hovered=hit.object; } }
+  else { tt.classList.remove('on'); hovered=null; }
+}
+
+// ---------- gate ----------
+function openGate(){ $('#gate').classList.add('on'); $('#g-url').value=cfg.url; $('#g-token').value=cfg.token; $('#g-tenant').value=cfg.tenant; }
+function closeGate(){ $('#gate').classList.remove('on'); }
+$('#g-go').onclick=()=>{ cfg.url=$('#g-url').value.trim(); cfg.token=$('#g-token').value.trim(); cfg.tenant=$('#g-tenant').value.trim();
+  localStorage.setItem(LS,JSON.stringify(cfg)); closeGate(); refresh(); };
+$('#g-demo').onclick=e=>{ e.preventDefault(); closeGate(); demo(); };
+$('#reconnect').onclick=openGate;
+$('#fire').onclick=fire; $('#cue').addEventListener('keydown',e=>{if(e.key==='Enter')fire();});
+
+// ---------- demo brain (offline showcase) ----------
+function demo(){
+  setLive(false,'demo brain');
+  const regions=Object.keys(REGION).filter(r=>r!=='brainstem');
+  const nodes=[], links=[];
+  const hubs=['hub-ec','hub-dg','hub-ca3','hub-amy','hub-pfc','hub-cortex'];
+  hubs.forEach((h,i)=>nodes.push({id:h,label:h,kind:'region',region:regions[i%regions.length],size:7,color:'#9b5de5',desc:'cognitive region hub'}));
+  const topics=['user upgraded plan','payment failed at checkout','prefers window seat','allergic to penicillin','ledger balance 4200','meeting moved to Friday','bought a laptop','cancelled subscription','yoga every morning','commute 40 minutes'];
+  for(let i=0;i<90;i++){
+    const r=regions[i%regions.length]; const sal=Math.random();
+    nodes.push({id:'e:'+i,label:topics[i%topics.length]+' #'+i,kind:'engram',region:r,size:4+sal*5,salience:sal,
+      color:sal>.75?'#70c1b3':'#5b9bd5',desc:'episodic engram\nsalience '+(sal*100|0)+'%'});
+    links.push({source:'e:'+i,target:hubs[i%hubs.length],weight:.3+sal*.4,kind:'region'});
+    if(i>0 && Math.random()<.5) links.push({source:'e:'+i,target:'e:'+(i-1),weight:Math.random()*.6,kind:'associate'});
+    for(let k=0;k<3;k++){const nid='n:'+i+':'+k; nodes.push({id:nid,label:'dg',kind:'neuron',region:r,size:2,color:'#06d6a0'});
+      links.push({source:'e:'+i,target:nid,weight:.5,kind:'ensemble'});}
+  }
+  buildGraph({nodes,links,stats:{engrams:90,synapses:640,neurons:270,core_memories:6}});
+  paintStats({engrams:90,synapses:640,neurons:270},{stage:'adolescent',tick:128456,synapse_pressure:.42,engrams:90,recent_separations:Array.from({length:28},()=>({separation_index:Math.random()}))});
+}
+
+// ---------- loop ----------
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);});
+function tickPulse(){ for(const m of NODES){ if(m.userData.pulse>0){ m.userData.pulse*=0.94;
+  const s=m.userData.base*(1+m.userData.pulse*0.9); m.scale.setScalar(s);
+  m.material.emissiveIntensity=.9+m.userData.pulse*1.6; if(m.userData.pulse<0.02){m.userData.pulse=0;m.scale.setScalar(m.userData.base);m.material.emissiveIntensity=.9;} } } }
+const clock=new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop); const dt=clock.getDelta();
+  relax(); tickPulse(); hover(); controls.update();
+  if(camAnim){ camAnim.t=Math.min(1,camAnim.t+dt*1.2); const e=1-Math.pow(1-camAnim.t,3);
+    camera.position.lerp(camAnim.pos,e*0.12); controls.target.lerp(camAnim.look,e*0.12); if(camAnim.t>=1)camAnim=null; }
+  bloom.strength=0.75+Math.sin(clock.elapsedTime*0.8)*0.12;
+  composer.render();
+}
+const esc = s => s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+loop();
+
+// ---------- boot ----------
+if(cfg.url || location.protocol.startsWith('http')){ refresh().catch(()=>demo()); }
+else { demo(); }
+setInterval(()=>{ if($('#dot').classList.contains('live')) refresh(); }, 5000);
+</script>
+</body>
+</html>

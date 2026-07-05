@@ -44,23 +44,40 @@ READER_TEMPLATE_COT = (
     "Question: {question}\nAnswer (step by step):"
 )
 
-# OpenAI "max" profile: Mem0-class reader (GPT-5) + official judge + wider reader context.
+# OpenAI profiles: standard / max (Mem0-class reader) / brain (CLS + CoN + completion).
 E2E_PROFILES: dict[str, dict[str, Any]] = {
     "standard": {
         "reader_model_openai": "gpt-4o-2024-08-06",
         "judge_model_openai": "gpt-4o-2024-08-06",
         "reader_cot": False,
+        "reader_con": False,
         "reader_top_k": 8,
         "reader_max_tokens": 1024,
         "judge_max_tokens": 10,
+        "bench_mode": "index",
+        "brain_sleep": 0,
     },
     "max": {
         "reader_model_openai": "gpt-5",
         "judge_model_openai": "gpt-4o-2024-08-06",
         "reader_cot": True,
+        "reader_con": False,
         "reader_top_k": 50,
         "reader_max_tokens": 2048,
         "judge_max_tokens": 10,
+        "bench_mode": "index",
+        "brain_sleep": 0,
+    },
+    "brain": {
+        "reader_model_openai": "gpt-5",
+        "judge_model_openai": "gpt-4o-2024-08-06",
+        "reader_cot": False,
+        "reader_con": True,
+        "reader_top_k": 200,
+        "reader_max_tokens": 2048,
+        "judge_max_tokens": 10,
+        "bench_mode": "brain",
+        "brain_sleep": 2,
     },
 }
 
@@ -154,9 +171,9 @@ def process_one_item(
 ) -> dict:
     t_q = time.perf_counter()
     recall_k = max(args.top_k, args.reader_top_k)
-    recalls, _, ingested = retrieve_item(
+    recalls, _, ingested, brain = retrieve_item(
         item,
-        mode="index",
+        mode=args.bench_mode,
         top_k=recall_k,
         embedder=embedder,
         fast=args.fast,
@@ -164,18 +181,31 @@ def process_one_item(
         query_expand=args.query_expand,
         dual_key=args.dual_key,
         pref_facts_key=args.pref_facts_key,
+        brain_sleep=args.brain_sleep,
     )
     session_hit = session_in_recalls(
         recalls, item.get("answer_session_ids") or [], top_k=args.top_k
     )
     sids = session_ids_from_recalls(recalls, top_k=args.reader_top_k)
-    history = format_history_json(item, sids)
-    tmpl = READER_TEMPLATE_COT if args.reader_cot else READER_TEMPLATE
-    reader_prompt = tmpl.format(
-        history=history,
-        question_date=item.get("question_date") or "",
-        question=item.get("question") or "",
-    )
+    if args.reader_con and brain is not None:
+        from brain_memory import READER_TEMPLATE_CON, format_brain_reader_context  # noqa: WPS433
+
+        context = format_brain_reader_context(
+            item, recalls, brain, session_ids=sids, max_notes=56
+        )
+        reader_prompt = READER_TEMPLATE_CON.format(
+            context=context,
+            question_date=item.get("question_date") or "",
+            question=item.get("question") or "",
+        )
+    else:
+        history = format_history_json(item, sids)
+        tmpl = READER_TEMPLATE_COT if args.reader_cot else READER_TEMPLATE
+        reader_prompt = tmpl.format(
+            history=history,
+            question_date=item.get("question_date") or "",
+            question=item.get("question") or "",
+        )
     hypothesis = ""
     label: Optional[bool] = None
     if not args.skip_llm:
@@ -201,6 +231,9 @@ def process_one_item(
         "retrieved_sessions": sids,
         "reader_top_k": args.reader_top_k,
         "reader_cot": args.reader_cot,
+        "reader_con": args.reader_con,
+        "bench_mode": args.bench_mode,
+        "brain_sleep": args.brain_sleep,
         "ingested": ingested,
         "hypothesis": hypothesis,
         "autoeval_label": label,
@@ -249,6 +282,22 @@ def main() -> int:
         help="official LongMemEval chain-of-thought reader prompt",
     )
     ap.add_argument(
+        "--reader-con",
+        action="store_true",
+        help="Chain-of-Note brain reader (cortex facts + hippocampal notes)",
+    )
+    ap.add_argument(
+        "--bench-mode",
+        default="",
+        help="retrieve mode: brain | index | conv (0 = use e2e-profile default)",
+    )
+    ap.add_argument(
+        "--brain-sleep",
+        type=int,
+        default=-1,
+        help="CLS sleep cycles after haystack ingest (brain mode; -1 = profile default)",
+    )
+    ap.add_argument(
         "--reader-max-tokens",
         type=int,
         default=0,
@@ -262,9 +311,9 @@ def main() -> int:
     )
     ap.add_argument(
         "--e2e-profile",
-        default=os.environ.get("LONGMEMEVAL_E2E_PROFILE", "standard"),
+        default=os.environ.get("LONGMEMEVAL_E2E_PROFILE", "brain"),
         choices=tuple(E2E_PROFILES),
-        help="standard=gpt-4o; max=GPT-5 reader + CoT + top-50 reader context",
+        help="standard=gpt-4o; max=GPT-5+CoT+top-50; brain=CLS+CoN+completion (default for agents)",
     )
     ap.add_argument("--reader-model", default=None)
     ap.add_argument("--judge-model", default=None)
@@ -319,7 +368,16 @@ def main() -> int:
         args.judge_max_tokens = int(prof["judge_max_tokens"])
     if args.e2e_profile == "max":
         args.reader_cot = True
-    if args.e2e_profile == "max" and args.llm_timeout == 180:
+    if args.e2e_profile == "brain":
+        args.reader_con = True
+        args.dual_key = True
+        args.pref_facts_key = True
+        args.query_expand = True
+    if not args.bench_mode:
+        args.bench_mode = str(prof.get("bench_mode") or "index")
+    if args.brain_sleep < 0:
+        args.brain_sleep = int(prof.get("brain_sleep") or 0)
+    if args.e2e_profile in ("max", "brain") and args.llm_timeout == 180:
         args.llm_timeout = max(args.llm_timeout, 300)
 
     if not args.data.is_file():
@@ -451,6 +509,9 @@ def main() -> int:
         "top_k": args.top_k,
         "reader_top_k": args.reader_top_k,
         "reader_cot": args.reader_cot,
+        "reader_con": args.reader_con,
+        "bench_mode": args.bench_mode,
+        "brain_sleep": args.brain_sleep,
         "reader_max_tokens": args.reader_max_tokens,
         "e2e_profile": args.e2e_profile,
         "dual_key": args.dual_key,
