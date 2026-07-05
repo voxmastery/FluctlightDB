@@ -213,6 +213,7 @@ def main() -> int:
     ap.add_argument("--pref-facts-key", action="store_true")
     ap.add_argument("--query-expand", action="store_true")
     ap.add_argument("--fast", action="store_true", help="lexical retrieval only")
+    ap.add_argument("--skip-llm", action="store_true", help="retrieval + prompt only")
     ap.add_argument("--skip-smoke-test", action="store_true", help="skip LLM ping at startup")
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument("--checkpoint", type=Path, default=None)
