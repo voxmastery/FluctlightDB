@@ -213,7 +213,7 @@ def main() -> int:
     ap.add_argument("--pref-facts-key", action="store_true")
     ap.add_argument("--query-expand", action="store_true")
     ap.add_argument("--fast", action="store_true", help="lexical retrieval only")
-    ap.add_argument("--skip-llm", action="store_true", help="retrieval + prompt only")
+    ap.add_argument("--skip-smoke-test", action="store_true", help="skip LLM ping at startup")
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument("--checkpoint", type=Path, default=None)
     ap.add_argument(
@@ -275,13 +275,14 @@ def main() -> int:
             if not load_cursor_api_key():
                 raise SystemExit("Set CURSOR_API_KEY or pass --skip-llm.")
         else:
-            try:
-                cloud_chat("ping", provider=backend, max_tokens=5, timeout_s=30)
-            except Exception as e:
-                raise SystemExit(
-                    f"LLM backend {backend!r} failed smoke test: {e}\n"
-                    "Load /home/ambugo/litellm/.env or set Colab Secrets."
-                ) from e
+            if not args.skip_smoke_test:
+                try:
+                    cloud_chat("Reply ok", provider=backend, max_tokens=8, timeout_s=60)
+                except Exception as e:
+                    raise SystemExit(
+                        f"LLM backend {backend!r} failed smoke test: {e}\n"
+                        "Set Colab Secret GEMINI_API_KEY or pass --skip-smoke-test to debug."
+                    ) from e
 
     pending: list[tuple[int, dict]] = []
     for i, item in enumerate(items):
@@ -294,13 +295,24 @@ def main() -> int:
 
     def run_item(_i: int, item: dict) -> dict:
         local_embedder = embedder if args.workers <= 1 else EmbedCache()
-        return process_one_item(
-            item,
-            args=args,
-            embedder=local_embedder,
-            reader_model=reader_model,
-            judge_model=judge_model,
-        )
+        last_err: Exception | None = None
+        for attempt in range(4):
+            try:
+                return process_one_item(
+                    item,
+                    args=args,
+                    embedder=local_embedder,
+                    reader_model=reader_model,
+                    judge_model=judge_model,
+                )
+            except Exception as e:
+                last_err = e
+                if attempt < 3 and ("429" in str(e) or "503" in str(e)):
+                    time.sleep(min(60, 5 * (attempt + 1)))
+                    continue
+                raise
+        assert last_err is not None
+        raise last_err
 
     def record_row(row: dict) -> None:
         with rows_lock:
