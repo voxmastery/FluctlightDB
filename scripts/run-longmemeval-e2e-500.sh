@@ -32,12 +32,21 @@ LOG="${5:-/tmp/longmemeval-e2e-500.log}"
 
 READER_MODEL="${READER_MODEL:-gemini-2.5-flash}"
 JUDGE_MODEL="${JUDGE_MODEL:-gemini-2.5-flash}"
+E2E_PROFILE="${LONGMEMEVAL_E2E_PROFILE:-standard}"
+EXTRA_ARGS=()
 if [[ "$BACKEND" == "cerebras" ]]; then
   READER_MODEL="${READER_MODEL:-gpt-oss-120b}"
   JUDGE_MODEL="${JUDGE_MODEL:-gpt-oss-120b}"
 elif [[ "$BACKEND" == "openai" ]]; then
-  READER_MODEL="${READER_MODEL:-gpt-4o-2024-08-06}"
-  JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o-mini}"
+  EXTRA_ARGS=(--e2e-profile "$E2E_PROFILE")
+  if [[ "$E2E_PROFILE" == "max" ]]; then
+    READER_MODEL="${READER_MODEL:-gpt-5}"
+    JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o-2024-08-06}"
+    export LONGMEMEVAL_LLM_TIMEOUT="${LONGMEMEVAL_LLM_TIMEOUT:-300}"
+  else
+    READER_MODEL="${READER_MODEL:-gpt-4o-2024-08-06}"
+    JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o-2024-08-06}"
+  fi
 fi
 
 DATA="${LONGMEMEVAL_DATA:-/tmp/longmemeval/data/longmemeval_s_cleaned.json}"
@@ -56,6 +65,7 @@ PYTHONPATH="sdks/python:benchmarks" python3 benchmarks/longmemeval_e2e.py \
   --reader-model "$READER_MODEL" \
   --judge-model "$JUDGE_MODEL" \
   --workers "$LONGMEMEVAL_E2E_WORKERS" \
+  "${EXTRA_ARGS[@]}" \
   --checkpoint "$CKPT" \
   --json-out "$OUT" 2>&1 | tee -a "$LOG"
 
