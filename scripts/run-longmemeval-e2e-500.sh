@@ -35,6 +35,9 @@ JUDGE_MODEL="${JUDGE_MODEL:-gemini-2.5-flash}"
 if [[ "$BACKEND" == "cerebras" ]]; then
   READER_MODEL="${READER_MODEL:-gpt-oss-120b}"
   JUDGE_MODEL="${JUDGE_MODEL:-gpt-oss-120b}"
+elif [[ "$BACKEND" == "openai" ]]; then
+  READER_MODEL="${READER_MODEL:-gpt-4o-2024-08-06}"
+  JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o-mini}"
 fi
 
 DATA="${LONGMEMEVAL_DATA:-/tmp/longmemeval/data/longmemeval_s_cleaned.json}"

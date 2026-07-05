@@ -278,7 +278,12 @@ def main() -> int:
         else PROVIDERS.get(backend, {}).get("default_model")
     )
     reader_model = args.reader_model or default_model or READER_MODEL
-    judge_model = args.judge_model or reader_model
+    if args.judge_model:
+        judge_model = args.judge_model
+    elif backend == "openai":
+        judge_model = "gpt-4o-mini"
+    else:
+        judge_model = reader_model
 
     if not args.skip_llm:
         load_env_file()
@@ -292,7 +297,7 @@ def main() -> int:
                 except Exception as e:
                     raise SystemExit(
                         f"LLM backend {backend!r} failed smoke test: {e}\n"
-                        "Set Colab Secret GEMINI_API_KEY or pass --skip-smoke-test to debug."
+                        "Set Colab Secret (GEMINI_API_KEY or OPENAI_API_KEY) or pass --skip-smoke-test."
                     ) from e
 
     pending: list[tuple[int, dict]] = []
