@@ -1,0 +1,106 @@
+{
+  "summary": {
+    "benchmark": "longmemeval_s",
+    "dataset": "/tmp/longmemeval/data/longmemeval_s_cleaned.json",
+    "mode": "brain",
+    "granularity": "session",
+    "metric": "session",
+    "query_expand": false,
+    "dual_key": false,
+    "pref_facts_key": false,
+    "brain_sleep": 1,
+    "top_k": 8,
+    "questions": 10,
+    "session_recall_at_k": 1.0,
+    "hits": "10/10",
+    "wall_s": 422.1,
+    "sec_per_question": 42.21,
+    "embed_cache_size": 6582,
+    "embed_requests": 6582,
+    "by_type": {
+      "single-session-user": 1.0
+    }
+  },
+  "results": [
+    {
+      "question_id": "e47becba",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 686,
+      "recalls": 8,
+      "sec": 37.5
+    },
+    {
+      "question_id": "118b2229",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 609,
+      "recalls": 8,
+      "sec": 30.865
+    },
+    {
+      "question_id": "51a45a95",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 702,
+      "recalls": 8,
+      "sec": 39.996
+    },
+    {
+      "question_id": "58bf7951",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 682,
+      "recalls": 8,
+      "sec": 39.411
+    },
+    {
+      "question_id": "1e043500",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 663,
+      "recalls": 8,
+      "sec": 35.868
+    },
+    {
+      "question_id": "c5e8278d",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 623,
+      "recalls": 8,
+      "sec": 40.673
+    },
+    {
+      "question_id": "6ade9755",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 623,
+      "recalls": 8,
+      "sec": 47.529
+    },
+    {
+      "question_id": "6f9b354f",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 657,
+      "recalls": 8,
+      "sec": 50.795
+    },
+    {
+      "question_id": "58ef2f1c",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 690,
+      "recalls": 8,
+      "sec": 51.944
+    },
+    {
+      "question_id": "f8c5f88b",
+      "question_type": "single-session-user",
+      "hit": true,
+      "ingested": 666,
+      "recalls": 8,
+      "sec": 47.516
+    }
+  ]
+}

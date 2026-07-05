@@ -19,6 +19,7 @@ pub mod confidence;
 pub mod consensus;
 pub mod cortex;
 pub mod crystallize;
+pub mod fabric_runtime;
 pub mod dentate;
 pub mod development;
 pub mod engram;

@@ -109,16 +109,29 @@ impl RecallFabric {
         self.mems.len()
     }
 
+    /// Current lattice addressable capacity (product of co-prime scales).
+    pub fn lattice_capacity(&self) -> u128 {
+        self.lattice.capacity()
+    }
+
+    /// Elastic neurogenesis: add a co-prime scale when load exceeds threshold.
+    pub fn grow_lattice(&mut self, scale: u32) {
+        self.lattice.grow(scale);
+    }
+
     pub fn is_empty(&self) -> bool {
         self.mems.is_empty()
     }
 
     /// Ingest one memory. `vector` (embedding) is optional; without it, only lexical + phase
-    /// signals contribute.
+    /// signals contribute. Uses relational role binding when SVO relations are extractable.
     pub fn insert(&mut self, id: impl Into<String>, text: &str, vector: Option<&[f32]>) {
         let id = id.into();
         let tokens = tokenize(text);
-        let seq = self.parser.encode_sequence(&tokens.iter().map(|s| s.as_str()).collect::<Vec<_>>());
+        let seq = crate::relation::encode_relations(&self.parser, text).unwrap_or_else(|| {
+            self.parser
+                .encode_sequence(&tokens.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+        });
         let (code, sem_scalar) = match vector {
             Some(v) if !v.is_empty() => {
                 let c = self.hasher.encode(v);
@@ -140,7 +153,9 @@ impl RecallFabric {
     pub fn recall(&self, cue: &str, cue_vector: Option<&[f32]>, k: usize) -> Vec<FabricHit> {
         let cue_tokens = tokenize(cue);
         let cue_refs: Vec<&str> = cue_tokens.iter().map(|s| s.as_str()).collect();
-        let cue_seq = self.parser.encode_sequence(&cue_refs);
+        let cue_seq = crate::relation::encode_relations(&self.parser, cue).unwrap_or_else(|| {
+            self.parser.encode_sequence(&cue_refs)
+        });
 
         let cue_code = cue_vector.filter(|v| !v.is_empty()).map(|v| self.hasher.encode(v));
         let cue_scalar = cue_vector.filter(|v| !v.is_empty()).map(project_scalar);
