@@ -149,6 +149,71 @@ impl RecallFabric {
         });
     }
 
+    /// Photon LSH shortlist only — sub-linear, no phase/lattice rerank. Use as recall prefilter.
+    pub fn photon_shortlist_ids(&self, cue_vector: Option<&[f32]>, k: usize) -> Vec<String> {
+        let Some(v) = cue_vector.filter(|v| !v.is_empty()) else {
+            return Vec::new();
+        };
+        let cc = self.hasher.encode(v);
+        self.prefilter
+            .query(&cc, k)
+            .into_iter()
+            .map(|(id, _)| id)
+            .collect()
+    }
+
+    /// Score one memory by id (O(1) lookup) — for reranking an existing shortlist, not full-store scan.
+    pub fn score_for_id(
+        &self,
+        id: &str,
+        cue: &str,
+        cue_vector: Option<&[f32]>,
+    ) -> Option<FabricHit> {
+        let i = self.mems.iter().position(|m| m.id == id)?;
+        let m = &self.mems[i];
+        let cue_tokens = tokenize(cue);
+        let cue_refs: Vec<&str> = cue_tokens.iter().map(|s| s.as_str()).collect();
+        let cue_seq = crate::relation::encode_relations(&self.parser, cue).unwrap_or_else(|| {
+            self.parser.encode_sequence(&cue_refs)
+        });
+        let cue_code = cue_vector.filter(|v| !v.is_empty()).map(|v| self.hasher.encode(v));
+        let cue_scalar = cue_vector.filter(|v| !v.is_empty()).map(project_scalar);
+        let cue_lattice = cue_scalar.map(|s| {
+            self.lattice
+                .encode_with_semantic_position(s, &[])
+                .axes
+                .remove(&Axis::Semantic)
+        });
+        let lexical = jaccard(&cue_tokens, &m.tokens);
+        let photon = match (&cue_code, &m.code) {
+            (Some(a), Some(b)) => ((a.estimated_cosine(b)) + 1.0) / 2.0,
+            _ => 0.0,
+        };
+        let phase = (cue_seq.similarity(&m.seq) + 1.0) / 2.0;
+        let lattice = match (&cue_lattice, m.sem_scalar) {
+            (Some(Some(cg)), Some(ms)) => {
+                let mg = self
+                    .lattice
+                    .encode_with_semantic_position(ms, &[])
+                    .axes
+                    .remove(&Axis::Semantic)
+                    .unwrap();
+                cg.coarse_similarity(&mg, &self.lattice.scales)
+            }
+            _ => 0.0,
+        };
+        let has_vec = m.code.is_some() && cue_code.is_some();
+        let score = self.blend(lexical, photon, phase, lattice, has_vec);
+        Some(FabricHit {
+            id: m.id.clone(),
+            score,
+            lexical,
+            photon,
+            phase,
+            lattice,
+        })
+    }
+
     /// Composed recall: photon prefilter → lattice + phase rerank → top-k.
     pub fn recall(&self, cue: &str, cue_vector: Option<&[f32]>, k: usize) -> Vec<FabricHit> {
         let cue_tokens = tokenize(cue);
