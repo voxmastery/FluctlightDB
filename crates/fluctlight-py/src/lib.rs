@@ -269,6 +269,56 @@ impl PyBrain {
             .cortex_facts_for_cue(cue, limit.unwrap_or(24));
         json_val_to_py(py, &facts)
     }
+
+    #[pyo3(signature = (session_id, date, body, user_keys=None))]
+    fn muon_imprint(
+        &mut self,
+        session_id: &str,
+        date: &str,
+        body: &str,
+        user_keys: Option<&str>,
+    ) -> PyResult<()> {
+        self.require_writable()?;
+        self.inner
+            .muon_imprint(session_id, date, body, user_keys.unwrap_or(""));
+        Ok(())
+    }
+
+    fn muon_imprint_batch_json(&mut self, batch_json: &str) -> PyResult<usize> {
+        self.require_writable()?;
+        let sessions: Vec<fluctlightdb::MuonImprintInput> =
+            serde_json::from_str(batch_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(self.inner.muon_imprint_batch(&sessions))
+    }
+
+    #[pyo3(signature = (cue, limit=None))]
+    fn muon_recall(&self, py: Python<'_>, cue: &str, limit: Option<usize>) -> PyResult<Py<PyAny>> {
+        let hits = self.inner.muon_recall(cue, limit.unwrap_or(8));
+        json_val_to_py(py, &hits)
+    }
+
+    fn muon_len(&self) -> usize {
+        self.inner.muon_len()
+    }
+
+    #[pyo3(signature = (cue, limit=None))]
+    fn tau_recall(&self, py: Python<'_>, cue: &str, limit: Option<usize>) -> PyResult<Py<PyAny>> {
+        let hits = self.inner.tau_recall(cue, limit.unwrap_or(8));
+        json_val_to_py(py, &hits)
+    }
+
+    fn tau_shard_len(&self) -> usize {
+        self.inner.tau_shard_len()
+    }
+
+    fn tau_crystallize_shard(&mut self, shard_id: &str) -> PyResult<String> {
+        self.require_writable()?;
+        let id = self
+            .inner
+            .tau_crystallize_shard(shard_id)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(id.to_string())
+    }
 }
 
 fn json_val_to_py<T: serde::Serialize>(py: Python<'_>, val: &T) -> PyResult<Py<PyAny>> {

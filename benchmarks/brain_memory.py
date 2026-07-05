@@ -112,6 +112,153 @@ def temporal_session_boost(
     return sorted(session_ids, key=lambda s: score(str(s)))
 
 
+def ingest_muon_haystack(
+    brain: Any,
+    item: dict,
+    *,
+    dual_key: bool = True,
+    pref_facts_key: bool = True,
+) -> int:
+    """Muon Lane: one penetrative imprint per session (0 embed HTTP, 0 per-turn experience)."""
+    from longmemeval_bench import preference_signals  # noqa: WPS433
+
+    session_ids: list[str] = list(item.get("haystack_session_ids") or [])
+    dates: list[str] = list(item.get("haystack_dates") or [])
+    sessions = item.get("haystack_sessions") or []
+    batch: list[dict[str, str]] = []
+
+    for i, session in enumerate(sessions):
+        if not isinstance(session, list):
+            continue
+        sid = session_ids[i] if i < len(session_ids) else f"session_{i}"
+        date = dates[i] if i < len(dates) else ""
+        lines: list[str] = []
+        user_key: list[str] = []
+        for msg in session:
+            if not isinstance(msg, dict):
+                continue
+            role = (msg.get("role") or "user").strip()
+            content = (msg.get("content") or "").strip()
+            if not content:
+                continue
+            lines.append(f"{role}: {content}")
+            if role == "user":
+                user_key.append(content)
+        if not lines:
+            continue
+        pref = preference_signals(user_key)
+        key_block = " ".join(user_key)[:3000]
+        body = "\n".join(lines)
+        prefix = f"[{date}] " if date else ""
+        user_keys = f"{prefix}{pref}\n{key_block}"[:4000]
+        if dual_key and user_key:
+            user_only = f"{prefix}{pref}\n" + "\n".join(
+                f"user: {u}" for u in user_key
+            )[:8000]
+            user_keys = user_only[:4000]
+        full = f"{prefix}{pref}\n{key_block}\n{body}"[:12000]
+        batch.append(
+            {
+                "session_id": str(sid),
+                "date": str(date),
+                "body": full,
+                "user_keys": user_keys,
+            }
+        )
+
+    if not batch:
+        return 0
+
+    if hasattr(brain, "muon_imprint_batch"):
+        if callable(getattr(brain, "muon_imprint_batch", None)):
+            brain.muon_imprint_batch(batch)
+            return len(batch)
+    if hasattr(brain, "_post"):
+        brain.muon_imprint_batch(batch)
+        return len(batch)
+    return 0
+
+
+def tau_hits_to_recalls(hits: list[dict]) -> list[dict]:
+    """Shape Tau episodic hits for LongMemEval session_in_recalls()."""
+    recalls: list[dict] = []
+    for h in hits:
+        sid = h.get("session_id") or ""
+        chunk = h.get("chunk_id") or "session"
+        recalls.append(
+            {
+                "engram_id": h.get("shard_id") or f"tau:{sid}",
+                "activation": float(h.get("score") or 0.0),
+                "episode": {
+                    "content": h.get("content") or h.get("snippet") or "",
+                    "context": h.get("date") or "",
+                    "rag": {"doc_id": sid, "chunk_id": chunk},
+                    "doc_id": sid,
+                },
+                "tau": True,
+            }
+        )
+    return recalls
+
+
+def muon_hits_to_recalls(hits: list[dict]) -> list[dict]:
+    """Shape Muon hits for LongMemEval session_in_recalls()."""
+    recalls: list[dict] = []
+    for h in hits:
+        sid = h.get("session_id") or ""
+        recalls.append(
+            {
+                "engram_id": f"muon:{sid}",
+                "activation": float(h.get("score") or 0.0),
+                "episode": {
+                    "content": h.get("snippet") or "",
+                    "context": h.get("date") or "",
+                    "rag": {"doc_id": sid, "chunk_id": "session"},
+                    "doc_id": sid,
+                },
+                "muon": True,
+            }
+        )
+    return recalls
+
+
+def muon_activate(
+    brain: Any,
+    question: str,
+    *,
+    question_type: Optional[str] = None,
+    top_k: int = 8,
+    query_expand: bool = True,
+) -> list[dict]:
+    """Penetrative episodic recall: Tau fission when available, else Muon sessions."""
+    from longmemeval_bench import expand_queries, merge_recalls  # noqa: WPS433
+
+    pool_k = max(top_k * 2, 16)
+    if question_type == "single-session-preference":
+        pool_k = max(top_k * 3, 24)
+
+    def recall_one(q: str) -> list[dict]:
+        if hasattr(brain, "tau_recall"):
+            try:
+                raw = brain.tau_recall(q, limit=pool_k)
+                if raw:
+                    return tau_hits_to_recalls(raw)
+            except Exception:
+                pass
+        if hasattr(brain, "muon_recall"):
+            raw = brain.muon_recall(q, limit=pool_k)
+            if isinstance(raw, dict):
+                raw = raw.get("hits") or []
+            return muon_hits_to_recalls(raw if isinstance(raw, list) else [])
+        return []
+
+    queries = expand_queries(question, question_type) if query_expand else [question]
+    if len(queries) == 1:
+        return recall_one(queries[0])[: max(top_k * 2, 16)]
+    lists = [recall_one(q) for q in queries]
+    return merge_recalls(lists, top_k)
+
+
 def ingest_brain_haystack(
     brain: Any,
     item: dict,

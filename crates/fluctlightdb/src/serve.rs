@@ -451,6 +451,35 @@ struct ApiRequest {
     steps: Option<u32>,
     #[serde(default)]
     batch: Option<Vec<ActivateBatchItem>>,
+    /// Consensus: claim value for `key`.
+    #[serde(default)]
+    value: Option<String>,
+    /// Chronos: effect event id (engram uuid string).
+    #[serde(default)]
+    effect_id: Option<String>,
+    /// Chronos: focal event id for preceding/ancestors/bucket queries.
+    #[serde(default)]
+    event_id: Option<String>,
+    /// Chronos: other event id for `before` comparison.
+    #[serde(default)]
+    other_id: Option<String>,
+    #[serde(default)]
+    from_tick: Option<u64>,
+    #[serde(default)]
+    to_tick: Option<u64>,
+    #[serde(default)]
+    scale: Option<u64>,
+    /// Consensus: scoped readers (empty = public).
+    #[serde(default)]
+    scope: Option<Vec<String>>,
+    /// Chronos: on experience, link this cause engram/event id → new engram.
+    #[serde(default)]
+    caused_by: Option<String>,
+    /// Muon Lane: bulk session imprints (haystack replacement).
+    #[serde(default)]
+    sessions: Option<Vec<crate::muon::MuonImprintInput>>,
+    #[serde(default)]
+    user_keys: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -702,7 +731,13 @@ fn dispatch(
             };
             let report: ExperienceReport = server.with_brain_write(tenant_id, |b| {
                 enforce_tenant_limits(b, &cfg)?;
-                b.experience(episode)
+                let report = b.experience(episode)?;
+                if let Some(cause) = api_body.caused_by.as_deref() {
+                    if report.engram_id != uuid::Uuid::nil() {
+                        b.chronos_link_cause(cause, &report.engram_id.to_string());
+                    }
+                }
+                Ok(report)
             })?;
             server.metrics.record_experience(timer.elapsed_ms());
             server.metrics.record_tenant_experience(tenant_id);
@@ -903,7 +938,291 @@ fn dispatch(
                 Ok(serde_json::json!({
                     "events": b.timeline(limit),
                     "crystals": b.crystal_count(),
+                    "chronos_len": b.chronos_len(),
+                    "fabric_len": b.fabric_len(),
+                    "muon_len": b.muon_len(),
+                    "tau_shards": b.tau_shard_len(),
                 }))
+            })
+        }
+        "/api/v1/chronos/range" | "/chronos/range" => {
+            require_role(auth, Role::Read)?;
+            let from = api_body.from_tick.unwrap_or(0);
+            let to = api_body.to_tick.unwrap_or(u64::MAX);
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "events": b.chronos_events_in_range(from, to),
+                    "from_tick": from,
+                    "to_tick": to,
+                }))
+            })
+        }
+        "/api/v1/chronos/preceding" | "/chronos/preceding" => {
+            require_role(auth, Role::Read)?;
+            let id = api_body
+                .event_id
+                .as_deref()
+                .or(api_body.engram_id.as_deref())
+                .ok_or_else(|| Error::Store("missing event_id or engram_id".into()))?;
+            let n = api_body.limit.unwrap_or(8).min(64);
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "event_id": id,
+                    "preceding": b.chronos_preceding(id, n),
+                }))
+            })
+        }
+        "/api/v1/chronos/ancestors" | "/chronos/ancestors" => {
+            require_role(auth, Role::Read)?;
+            let id = api_body
+                .event_id
+                .as_deref()
+                .or(api_body.effect_id.as_deref())
+                .ok_or_else(|| Error::Store("missing event_id or effect_id".into()))?;
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "effect_id": id,
+                    "ancestors": b.chronos_causal_ancestors(id),
+                }))
+            })
+        }
+        "/api/v1/chronos/before" | "/chronos/before" => {
+            require_role(auth, Role::Read)?;
+            let a = api_body
+                .event_id
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing event_id (a)".into()))?;
+            let b_id = api_body
+                .other_id
+                .as_deref()
+                .or(api_body.effect_id.as_deref())
+                .ok_or_else(|| Error::Store("missing other_id or effect_id (b)".into()))?;
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "before": b.chronos_before(a, b_id),
+                    "a": a,
+                    "b": b_id,
+                }))
+            })
+        }
+        "/api/v1/chronos/link-cause" | "/chronos/link-cause" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let cause = api_body
+                .cause
+                .as_deref()
+                .or(api_body.event_id.as_deref())
+                .ok_or_else(|| Error::Store("missing cause or event_id".into()))?;
+            let effect = api_body
+                .effect_id
+                .as_deref()
+                .or(api_body.engram_id.as_deref())
+                .ok_or_else(|| Error::Store("missing effect_id or engram_id".into()))?;
+            server.with_brain_write(tenant_id, |b| {
+                b.chronos_link_cause(cause, effect);
+                Ok(serde_json::json!({"ok": true, "cause": cause, "effect": effect}))
+            })
+        }
+        "/api/v1/chronos/bucket" | "/chronos/bucket" => {
+            require_role(auth, Role::Read)?;
+            let id = api_body
+                .event_id
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing event_id".into()))?;
+            let scale = api_body.scale.unwrap_or(1000).max(1);
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "event_id": id,
+                    "scale": scale,
+                    "bucket": b.chronos_bucket(id, scale),
+                }))
+            })
+        }
+        "/api/v1/consensus/assert" | "/consensus/assert" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let key = api_body
+                .key
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing key".into()))?;
+            let value = api_body
+                .value
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing value".into()))?;
+            let agent = api_body
+                .agent_id
+                .clone()
+                .unwrap_or_else(|| "api".into());
+            let conf = api_body.confidence.unwrap_or(0.7);
+            server.with_brain_write(tenant_id, |b| {
+                let tick = b.autonomic.total_ticks;
+                let mut claim = crate::consensus::Claim::public(&agent, value, conf, tick);
+                if let Some(scope) = api_body.scope.clone() {
+                    claim = claim.scoped(scope);
+                }
+                b.consensus_assert_claim(key, claim);
+                Ok(serde_json::json!({"ok": true, "key": key}))
+            })
+        }
+        "/api/v1/consensus/resolve" | "/consensus/resolve" => {
+            require_role(auth, Role::Read)?;
+            let key = api_body
+                .key
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing key".into()))?;
+            let viewer = api_body.agent_id.as_deref();
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "key": key,
+                    "consensus": b.consensus_resolve(key, viewer),
+                    "contested": b.consensus_is_contested(key, viewer),
+                }))
+            })
+        }
+        "/api/v1/consensus/claims" | "/consensus/claims" => {
+            require_role(auth, Role::Read)?;
+            let key = api_body
+                .key
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing key".into()))?;
+            let viewer = api_body.agent_id.as_deref();
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "key": key,
+                    "claims": b.consensus_claims(key, viewer),
+                }))
+            })
+        }
+        "/api/v1/consensus/contested" | "/consensus/contested" => {
+            require_role(auth, Role::Read)?;
+            let key = api_body
+                .key
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing key".into()))?;
+            let viewer = api_body.agent_id.as_deref();
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "key": key,
+                    "contested": b.consensus_is_contested(key, viewer),
+                }))
+            })
+        }
+        "/api/v1/muon/imprint" | "/muon/imprint" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            if !crate::muon_runtime::muon_enabled() {
+                return Err(Error::Store(
+                    "FLUCTLIGHT_MUON=1 required for Muon Lane imprint".into(),
+                ));
+            }
+            let sid = api_body
+                .doc_id
+                .as_deref()
+                .or(api_body.key.as_deref())
+                .ok_or_else(|| Error::Store("missing doc_id (session_id)".into()))?;
+            let body = api_body
+                .content
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing content (session body)".into()))?;
+            let date = api_body.context.as_deref().unwrap_or("");
+            let keys = api_body.user_keys.as_deref().unwrap_or("");
+            server.with_brain_write(tenant_id, |b| {
+                b.muon_imprint(sid, date, body, keys);
+                Ok(serde_json::json!({"ok": true, "session_id": sid, "muon_len": b.muon_len()}))
+            })
+        }
+        "/api/v1/muon/imprint-batch" | "/muon/imprint-batch" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            if !crate::muon_runtime::muon_enabled() {
+                return Err(Error::Store(
+                    "FLUCTLIGHT_MUON=1 required for Muon Lane imprint".into(),
+                ));
+            }
+            let sessions = api_body
+                .sessions
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing sessions array".into()))?;
+            server.with_brain_write(tenant_id, |b| {
+                let imprinted = b.muon_imprint_batch(sessions);
+                Ok(serde_json::json!({
+                    "ok": true,
+                    "imprinted": imprinted,
+                    "muon_len": b.muon_len(),
+                }))
+            })
+        }
+        "/api/v1/muon/recall" | "/muon/recall" => {
+            require_role(auth, Role::Read)?;
+            if !crate::muon_runtime::muon_enabled() {
+                return Err(Error::Store(
+                    "FLUCTLIGHT_MUON=1 required for Muon Lane recall".into(),
+                ));
+            }
+            let cue = api_body
+                .cue
+                .as_deref()
+                .or(api_body.content.as_deref())
+                .ok_or_else(|| Error::Store("missing cue".into()))?;
+            let k = api_body.limit.unwrap_or(8).min(64);
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "hits": b.muon_recall(cue, k),
+                    "muon_len": b.muon_len(),
+                }))
+            })
+        }
+        "/api/v1/muon/reel" | "/muon/reel" => {
+            require_role(auth, Role::Read)?;
+            let sid = api_body
+                .doc_id
+                .as_deref()
+                .or(api_body.event_id.as_deref())
+                .ok_or_else(|| Error::Store("missing doc_id (session_id)".into()))?;
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "session_id": sid,
+                    "reel": b.muon_reel(sid),
+                }))
+            })
+        }
+        "/api/v1/tau/recall" | "/tau/recall" => {
+            require_role(auth, Role::Read)?;
+            if !crate::tau_runtime::tau_enabled() {
+                return Err(Error::Store(
+                    "FLUCTLIGHT_TAU=1 required for Tau Lane recall".into(),
+                ));
+            }
+            let cue = api_body
+                .cue
+                .as_deref()
+                .or(api_body.content.as_deref())
+                .ok_or_else(|| Error::Store("missing cue".into()))?;
+            let k = api_body.limit.unwrap_or(8).min(64);
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "hits": b.tau_recall(cue, k),
+                    "session_len": b.muon_len(),
+                    "shard_len": b.tau_shard_len(),
+                }))
+            })
+        }
+        "/api/v1/tau/crystallize" | "/tau/crystallize" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            if !crate::tau_runtime::tau_enabled() {
+                return Err(Error::Store(
+                    "FLUCTLIGHT_TAU=1 required for Tau crystallize".into(),
+                ));
+            }
+            let shard_id = api_body
+                .key
+                .as_deref()
+                .or(api_body.event_id.as_deref())
+                .ok_or_else(|| Error::Store("missing key (shard_id)".into()))?;
+            server.with_brain_write(tenant_id, |b| {
+                let eid = b.tau_crystallize_shard(shard_id)?;
+                Ok(serde_json::json!({"ok": true, "engram_id": eid.to_string()}))
             })
         }
         "/api/v1/export-graph-lite" | "/export-graph-lite" => {

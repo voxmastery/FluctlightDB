@@ -58,6 +58,14 @@ class FluctlightBrain:
         os.environ.setdefault("FLUCTLIGHT_CORTEX_WEIGHT", "0.35")
 
     @staticmethod
+    def _enable_muon_mode() -> None:
+        """Muon + Tau Lane: penetrative bulk imprint + episodic fission (0 embed HTTP)."""
+        os.environ["FLUCTLIGHT_MUON"] = "1"
+        os.environ["FLUCTLIGHT_TAU"] = "1"
+        os.environ["FLUCTLIGHT_FAST_INGEST"] = "1"
+        os.environ.pop("FLUCTLIGHT_VECTOR_FAST", None)
+
+    @staticmethod
     def _enable_index_mode() -> None:
         """Bulk IR path: fast ingest + vector-fast recall (Chroma-class speed)."""
         os.environ["FLUCTLIGHT_FAST_INGEST"] = "1"
@@ -121,6 +129,18 @@ class FluctlightBrain:
         IR-only path (which disables graph spread for Chroma-class latency).
         """
         cls._enable_brain_mode()
+        native = _require_native()
+        if path:
+            brain = native.Brain.open_readonly(path) if readonly else native.Brain.open(path)
+            obj = cls(brain, readonly=readonly, mode=cls.MODE_BRAIN)
+            obj.brain_path = path
+            return obj
+        return cls(native.Brain.new(), readonly=False, mode=cls.MODE_BRAIN)
+
+    @classmethod
+    def connect_muon(cls, path: Optional[str] = None, *, readonly: bool = False) -> "FluctlightBrain":
+        """Muon Lane: penetrative bulk session imprint — haystack replacement (0 embed HTTP)."""
+        cls._enable_muon_mode()
         native = _require_native()
         if path:
             brain = native.Brain.open_readonly(path) if readonly else native.Brain.open(path)
@@ -313,6 +333,40 @@ class FluctlightBrain:
     def has_sidecar_index(self) -> bool:
         return bool(self._brain.has_sidecar_index())
 
+    def muon_imprint(
+        self,
+        session_id: str,
+        body: str,
+        *,
+        date: str = "",
+        user_keys: str = "",
+    ) -> None:
+        self._brain.muon_imprint(session_id, date, body, user_keys)
+
+    def muon_imprint_batch(self, sessions: list[dict[str, str]]) -> int:
+        return int(self._brain.muon_imprint_batch_json(json.dumps(sessions)))
+
+    def muon_recall(self, cue: str, *, limit: int = 8) -> list[dict[str, Any]]:
+        raw = self._brain.muon_recall(cue, limit)
+        if isinstance(raw, list):
+            return raw
+        return []
+
+    def muon_len(self) -> int:
+        return int(self._brain.muon_len())
+
+    def tau_recall(self, cue: str, *, limit: int = 8) -> list[dict[str, Any]]:
+        raw = self._brain.tau_recall(cue, limit)
+        if isinstance(raw, list):
+            return raw
+        return []
+
+    def tau_shard_len(self) -> int:
+        return int(self._brain.tau_shard_len())
+
+    def tau_crystallize_shard(self, shard_id: str) -> str:
+        return str(self._brain.tau_crystallize_shard(shard_id))
+
 
 def connect(path: str, *, readonly: bool = False) -> FluctlightBrain:
     """Open an agent brain directory (full episodic memory path)."""
@@ -337,3 +391,8 @@ def connect_conv(path: Optional[str] = None, *, readonly: bool = False) -> Fluct
 def connect_agent_fast(path: str, *, readonly: bool = False) -> FluctlightBrain:
     """Agent memory with fast hybrid recall (see :meth:`FluctlightBrain.connect_agent_fast`)."""
     return FluctlightBrain.connect_agent_fast(path, readonly=readonly)
+
+
+def connect_muon(path: Optional[str] = None, *, readonly: bool = False) -> FluctlightBrain:
+    """Muon Lane bulk imprint — session-level haystack ingest without per-turn encode."""
+    return FluctlightBrain.connect_muon(path, readonly=readonly)

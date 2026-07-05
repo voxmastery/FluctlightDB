@@ -11,7 +11,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from .brain import FluctlightBrain, connect, connect_agent_fast, connect_brain, connect_conv, connect_index
+from .brain import FluctlightBrain, connect, connect_agent_fast, connect_brain, connect_conv, connect_index, connect_muon
 from .doctor import run_doctor
 from .handoff import Handoff, detect_agent
 from .project import ProjectBrains, ProjectConfig, connect_project, find_project_root
@@ -30,6 +30,7 @@ __all__ = [
     "connect_brain",
     "connect_conv",
     "connect_index",
+    "connect_muon",
     "connect_project",
     "detect_agent",
     "find_project_root",
@@ -336,3 +337,137 @@ class FluctlightClient:
 
     def inhibit(self, action: str) -> dict[str, Any]:
         return self._post("/api/v1/inhibit", {"action": action[:200]})
+
+    # ---- Chronos (temporal + causal memory) ----
+
+    def timeline(self, limit: int = 64) -> dict[str, Any]:
+        return self._post("/api/v1/timeline", {"limit": int(limit)})
+
+    def chronos_range(self, from_tick: int = 0, to_tick: Optional[int] = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"from_tick": int(from_tick)}
+        if to_tick is not None:
+            payload["to_tick"] = int(to_tick)
+        return self._post("/api/v1/chronos/range", payload)
+
+    def chronos_preceding(
+        self,
+        event_id: str,
+        *,
+        limit: int = 8,
+        engram_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"limit": int(limit)}
+        if event_id:
+            payload["event_id"] = event_id
+        elif engram_id:
+            payload["engram_id"] = engram_id
+        return self._post("/api/v1/chronos/preceding", payload)
+
+    def chronos_ancestors(
+        self,
+        effect_id: str,
+        *,
+        event_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if effect_id:
+            payload["effect_id"] = effect_id
+        if event_id:
+            payload["event_id"] = event_id
+        return self._post("/api/v1/chronos/ancestors", payload)
+
+    def chronos_before(self, a: str, b: str) -> dict[str, Any]:
+        return self._post("/api/v1/chronos/before", {"event_id": a, "other_id": b})
+
+    def chronos_link_cause(
+        self,
+        cause: str,
+        effect: str,
+        *,
+        event_id: Optional[str] = None,
+        engram_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"cause": cause, "effect_id": effect}
+        if event_id:
+            payload["event_id"] = event_id
+        if engram_id:
+            payload["engram_id"] = engram_id
+        return self._post("/api/v1/chronos/link-cause", payload)
+
+    def chronos_bucket(self, event_id: str, scale: int = 1000) -> dict[str, Any]:
+        return self._post("/api/v1/chronos/bucket", {"event_id": event_id, "scale": int(scale)})
+
+    # ---- Consensus (multi-agent shared memory) ----
+
+    def consensus_assert(
+        self,
+        key: str,
+        value: str,
+        *,
+        agent_id: Optional[str] = None,
+        confidence: float = 0.7,
+        scope: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "key": key,
+            "value": value,
+            "confidence": float(confidence),
+        }
+        if agent_id:
+            payload["agent_id"] = agent_id
+        if scope:
+            payload["scope"] = scope
+        return self._post("/api/v1/consensus/assert", payload)
+
+    def consensus_resolve(self, key: str, *, agent_id: Optional[str] = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"key": key}
+        if agent_id:
+            payload["agent_id"] = agent_id
+        return self._post("/api/v1/consensus/resolve", payload)
+
+    def consensus_claims(self, key: str, *, agent_id: Optional[str] = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"key": key}
+        if agent_id:
+            payload["agent_id"] = agent_id
+        return self._post("/api/v1/consensus/claims", payload)
+
+    def consensus_contested(self, key: str, *, agent_id: Optional[str] = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"key": key}
+        if agent_id:
+            payload["agent_id"] = agent_id
+        return self._post("/api/v1/consensus/contested", payload)
+
+    # ---- Muon Lane (penetrative bulk session imprint — haystack replacement) ----
+
+    def muon_imprint(
+        self,
+        session_id: str,
+        body: str,
+        *,
+        date: str = "",
+        user_keys: str = "",
+    ) -> dict[str, Any]:
+        return self._post(
+            "/api/v1/muon/imprint",
+            {
+                "doc_id": session_id,
+                "content": body,
+                "context": date,
+                "user_keys": user_keys,
+            },
+        )
+
+    def muon_imprint_batch(self, sessions: list[dict[str, str]]) -> dict[str, Any]:
+        return self._post("/api/v1/muon/imprint-batch", {"sessions": sessions})
+
+    def muon_recall(self, cue: str, *, limit: int = 8) -> dict[str, Any]:
+        return self._post("/api/v1/muon/recall", {"cue": cue, "limit": int(limit)})
+
+    def muon_reel(self, session_id: str) -> dict[str, Any]:
+        return self._post("/api/v1/muon/reel", {"doc_id": session_id})
+
+    def tau_recall(self, cue: str, *, limit: int = 8) -> dict[str, Any]:
+        return self._post("/api/v1/tau/recall", {"cue": cue, "limit": int(limit)})
+
+    def tau_crystallize(self, shard_id: str) -> dict[str, Any]:
+        return self._post("/api/v1/tau/crystallize", {"key": shard_id})
