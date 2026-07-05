@@ -101,6 +101,57 @@ Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · us
 
 ---
 
+## Recall Fabric — the brain-native mechanisms (opt-in)
+
+Beyond hybrid recall, FluctlightDB ships a set of **foundational memory mechanisms** that push it toward operating like a brain rather than a vector index. Each is a standalone, deterministic, fully-tested Rust module (no ML deps, no network) and is validated on synthetic data. They compose into one recall pipeline gated behind a single environment flag, so **default behavior is unchanged** until you opt in.
+
+| Module | Mechanism | Neuroscience anchor | What it buys agents |
+|--------|-----------|---------------------|---------------------|
+| `photon` | SimHash bitcodes + LSH; similarity via `XOR`+`popcount` | sparse spike coincidence | candidate filtering without float dot-products (sub-linear) |
+| `lattice` | grid-cell coordinates on a multi-scale, co-prime lattice | entorhinal grid cells (Moser; Fiete RNS) | capacity = product of scales, coarse↔fine recall, no bundling crosstalk |
+| `phase_parse` | theta-gamma phase binding (Fourier HRR) | Lisman-Idiart phase code | order & role structure — "user upgraded plan" ≠ "plan upgraded user" |
+| `relation` | SVO / role-filler extraction → phase binding | temporal-pole + PFC | query memory **by grammatical role** |
+| `crystallize` | write-time consolidation into lattice addresses | systems consolidation (CLS) | content-addressable recall without re-embedding |
+| `forgetting` | Ebbinghaus decay + spaced rehearsal + load-driven growth | forgetting curve; neurogenesis | adaptive retention; grow capacity instead of overwriting |
+| `chronos` | multi-scale time buckets + causal DAG | hippocampal time cells | before/after/because reasoning as first-class queries |
+| `confidence` | noisy-OR fusion of provenance + recency + corroboration | prefrontal source monitoring | recall knows **how much to trust** a memory |
+| `consensus` | confidence-weighted arbitration + access scoping | memory reconsolidation | many agents share one brain, conflicts resolved not clobbered |
+
+Turn the composed path on for a session:
+
+```bash
+export FLUCTLIGHT_FABRIC=1            # enable Recall Fabric (off by default)
+export FLUCTLIGHT_FABRIC_WEIGHT=0.2   # phase-structural rerank weight (optional)
+```
+
+When enabled, `experience()` indexes each memory on the temporal axis (`chronos`) and crystallizes a lattice address for it, and `activate()` applies a phase-structural rerank plus a confidence-weighted trust multiplier. All Fabric state is runtime-only — **the on-disk snapshot format is unchanged**.
+
+---
+
+## Living Brain viewer — see the mind think
+
+Every `fluctlight serve` now ships a **built-in real-time 3D connectome viewer** — no build step, no separate deploy. Start a server and open it:
+
+```bash
+fluctlight serve --addr 127.0.0.1:8792 --path /data/my-agent
+# then open http://127.0.0.1:8792/brain
+```
+
+The viewer streams `/api/v1/export-graph`, `/api/v1/export-viz`, and `/api/v1/timeline`, rendering engrams, dentate neurons, synapses, and cognitive-region hubs as a WebGL brain with bloom, orbit controls, and live vitals. A **recall probe** fires an activation wave from a cue and lights up the engrams that answer it. Point it at any brain by URL + token (state stays in your browser), or explore an offline **demo brain** with one click.
+
+Endpoints it uses (all `POST`, `Role::Read`):
+
+| Endpoint | Returns |
+|----------|---------|
+| `/api/v1/export-graph` | nodes + links + stats (full connectome) |
+| `/api/v1/export-viz` | stage, tick, synapse pressure, recent separations |
+| `/api/v1/timeline` | recent temporal-axis events + crystal count (Fabric) |
+| `/api/v1/activate` | recall wave for the probe box |
+
+> Replacing a self-hosted viewer? Point your reverse proxy (e.g. `search.ambugo.help/brain`) at the server's `/brain` route — the viewer is served directly by the engine, so there is nothing extra to host.
+
+---
+
 ## Where it is going
 
 - **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **97.6% LongMemEval-S** (unified v4 full 500 on Colab GPU), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).

@@ -36,6 +36,9 @@ use crate::tenant::{default_tenant_root, TenantConfig};
 use crate::types::{ActivationResult, Episode, ExperienceReport};
 
 const MAX_BODY_BYTES: usize = 1_048_576;
+
+/// The built-in Living Brain viewer (single-file SPA, no build step).
+const VIEWER_HTML: &str = include_str!("viewer.html");
 const MAX_IDEMPOTENCY_KEYS: usize = 10_000;
 const DEFAULT_HOT_TENANTS: usize = 256;
 const DEFAULT_MAX_CONNECTIONS: usize = 500;
@@ -512,6 +515,17 @@ fn serve_one_request(
         return Ok(keep_alive);
     }
 
+    // Built-in Living Brain viewer — the god-tier 3D connectome UI ships with the server.
+    if parsed.method == "GET"
+        && matches!(
+            parsed.path,
+            "/" | "/brain" | "/viewer" | "/brain/" | "/viewer/"
+        )
+    {
+        write_text_conn(stream, 200, "text/html; charset=utf-8", VIEWER_HTML, keep_alive)?;
+        return Ok(keep_alive);
+    }
+
     if parsed.method == "GET"
         && (parsed.path == "/health"
             || parsed.path == "/api/health"
@@ -880,6 +894,16 @@ fn dispatch(
             require_role(auth, Role::Read)?;
             server.with_brain_read(tenant_id, |b| {
                 Ok(serde_json::to_value(b.export_viz()).unwrap())
+            })
+        }
+        "/api/v1/timeline" | "/timeline" => {
+            require_role(auth, Role::Read)?;
+            let limit = api_body.limit.unwrap_or(64).min(512);
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "events": b.timeline(limit),
+                    "crystals": b.crystal_count(),
+                }))
             })
         }
         "/api/v1/export-graph-lite" | "/export-graph-lite" => {

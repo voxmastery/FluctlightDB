@@ -32,14 +32,20 @@ LOG="${5:-/tmp/longmemeval-e2e-500.log}"
 
 READER_MODEL="${READER_MODEL:-gemini-2.5-flash}"
 JUDGE_MODEL="${JUDGE_MODEL:-gemini-2.5-flash}"
-E2E_PROFILE="${LONGMEMEVAL_E2E_PROFILE:-standard}"
+E2E_PROFILE="${LONGMEMEVAL_E2E_PROFILE:-brain}"
 EXTRA_ARGS=()
 if [[ "$BACKEND" == "cerebras" ]]; then
   READER_MODEL="${READER_MODEL:-gpt-oss-120b}"
   JUDGE_MODEL="${JUDGE_MODEL:-gpt-oss-120b}"
 elif [[ "$BACKEND" == "openai" ]]; then
   EXTRA_ARGS=(--e2e-profile "$E2E_PROFILE")
-  if [[ "$E2E_PROFILE" == "max" ]]; then
+  if [[ "$E2E_PROFILE" == "brain" ]]; then
+    READER_MODEL="${READER_MODEL:-gpt-5}"
+    JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o-2024-08-06}"
+    export LONGMEMEVAL_LLM_TIMEOUT="${LONGMEMEVAL_LLM_TIMEOUT:-360}"
+    export LONGMEMEVAL_BRAIN_SLEEP="${LONGMEMEVAL_BRAIN_SLEEP:-2}"
+    EXTRA_ARGS+=(--brain-sleep "$LONGMEMEVAL_BRAIN_SLEEP")
+  elif [[ "$E2E_PROFILE" == "max" ]]; then
     READER_MODEL="${READER_MODEL:-gpt-5}"
     JUDGE_MODEL="${JUDGE_MODEL:-gpt-4o-2024-08-06}"
     export LONGMEMEVAL_LLM_TIMEOUT="${LONGMEMEVAL_LLM_TIMEOUT:-300}"

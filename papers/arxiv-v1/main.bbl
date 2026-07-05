@@ -1,4 +1,9 @@
-\begin{thebibliography}{1}
+\begin{thebibliography}{10}
+
+\bibitem{charikar2002}
+Moses~S. Charikar.
+\newblock Similarity estimation techniques from rounding algorithms.
+\newblock In {\em STOC}, 2002.
 
 \bibitem{chhikara2025mem0}
 Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet Singh, and Deshraj Yadav.
@@ -11,6 +16,16 @@ Edgar~F Codd.
 \newblock A relational model of data for large shared data banks.
 \newblock {\em Communications of the ACM}, 13(6):377--387, 1970.
 
+\bibitem{eichenbaum2014}
+Howard Eichenbaum.
+\newblock Time cells in the hippocampus: a new dimension for mapping memories.
+\newblock {\em Nature Reviews Neuroscience}, 15(11):732--744, 2014.
+
+\bibitem{fiete2008}
+Ila~R. Fiete, Yoram Burak, and Ted Brookings.
+\newblock What grid cells convey about rat location.
+\newblock {\em Journal of Neuroscience}, 28(27):6858--6871, 2008.
+
 \bibitem{gutierrez2024hipporag}
 Bernardo Guti{\'e}rrez, Yiheng Shu, Yu~Gu, Peter Pasupat, Barret Liu, Rishabh
   Shah, Ming-Wei Chang, Ramakanth Pasunuru, Yujia Zhang, Avi Gupta, et~al.
@@ -18,17 +33,45 @@ Bernardo Guti{\'e}rrez, Yiheng Shu, Yu~Gu, Peter Pasupat, Barret Liu, Rishabh
   language models.
 \newblock {\em arXiv preprint arXiv:2405.14831}, 2024.
 
+\bibitem{lisman1995}
+John~E. Lisman and Marco A.~P. Idiart.
+\newblock Storage of $7 \pm 2$ short-term memories in oscillatory subcycles.
+\newblock {\em Science}, 267(5203):1512--1515, 1995.
+
+\bibitem{lisman2013}
+John~E. Lisman and Ole Jensen.
+\newblock The theta-gamma neural code.
+\newblock {\em Neuron}, 77(6):1002--1016, 2013.
+
 \bibitem{maharana2024locomo}
 Adyasha Maharana, Dong-Ho Lee, Sergey Tulyakov, Mohit Bansal, Francesco
   Barbieri, and Yuwei Fang.
 \newblock Evaluating very long-term conversational memory of llm agents.
 \newblock In {\em ACL}, 2024.
 
+\bibitem{mcclelland1995}
+James~L. McClelland, Bruce~L. McNaughton, and Randall~C. O'Reilly.
+\newblock Why there are complementary learning systems in the hippocampus and
+  neocortex: insights from the successes and failures of connectionist models
+  of learning and memory.
+\newblock {\em Psychological Review}, 102(3):419--457, 1995.
+
 \bibitem{packer2023memgpt}
 Charles Packer, Sarah Wooders, Kevin Lin, Vivian Fang, Shishir~G Patil, Ion
   Stoica, and Joseph~E Gonzalez.
 \newblock Memgpt: Towards llms as operating systems.
 \newblock {\em arXiv preprint arXiv:2310.08560}, 2023.
+
+\bibitem{plate1995}
+Tony~A. Plate.
+\newblock Holographic reduced representations.
+\newblock {\em IEEE Transactions on Neural Networks}, 6(3):623--641, 1995.
+
+\bibitem{sreenivasan2011}
+Sameet Sreenivasan and Ila Fiete.
+\newblock Grid cells generate an analog error-correcting code for singularly
+  precise neural computation.
+\newblock {\em Nature Neuroscience}, 14(10):1330--1337, 2011.
 
 \bibitem{thakur2021beir}
 Nandan Thakur, Nils Reimers, Andreas R{\"u}ckl{\'e}, Abhishek Srivastava, and

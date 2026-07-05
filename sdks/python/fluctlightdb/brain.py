@@ -30,6 +30,7 @@ class FluctlightBrain:
 
     MODE_AGENT = "agent"
     MODE_AGENT_FAST = "agent_fast"
+    MODE_BRAIN = "brain"
     MODE_INDEX = "index"
     MODE_CONV = "conv"
 
@@ -44,6 +45,17 @@ class FluctlightBrain:
             self._enable_conv_mode()
         elif mode == self.MODE_AGENT_FAST:
             self._enable_agent_fast_mode()
+        elif mode == self.MODE_BRAIN:
+            self._enable_brain_mode()
+
+    @staticmethod
+    def _enable_brain_mode() -> None:
+        """Brain benchmark + agent recall: hybrid ingest, graph spread, cortex boost, CLS sleep."""
+        os.environ["FLUCTLIGHT_FAST_INGEST"] = "1"
+        os.environ.pop("FLUCTLIGHT_VECTOR_FAST", None)
+        os.environ.pop("FLUCTLIGHT_AGENT_FAST", None)
+        os.environ.setdefault("FLUCTLIGHT_CANDIDATE_CAP", "512")
+        os.environ.setdefault("FLUCTLIGHT_CORTEX_WEIGHT", "0.35")
 
     @staticmethod
     def _enable_index_mode() -> None:
@@ -100,6 +112,22 @@ class FluctlightBrain:
         obj = cls(brain, readonly=readonly, mode=cls.MODE_AGENT_FAST)
         obj.brain_path = path
         return obj
+
+    @classmethod
+    def connect_brain(cls, path: Optional[str] = None, *, readonly: bool = False) -> "FluctlightBrain":
+        """Brain-native agent memory: dentate separation, graph spread, CLS sleep, cortex boost.
+
+        Use for LongMemEval E2E and production agent recall — not the stripped ``connect_index()``
+        IR-only path (which disables graph spread for Chroma-class latency).
+        """
+        cls._enable_brain_mode()
+        native = _require_native()
+        if path:
+            brain = native.Brain.open_readonly(path) if readonly else native.Brain.open(path)
+            obj = cls(brain, readonly=readonly, mode=cls.MODE_BRAIN)
+            obj.brain_path = path
+            return obj
+        return cls(native.Brain.new(), readonly=False, mode=cls.MODE_BRAIN)
 
     @classmethod
     def connect_index(cls, path: Optional[str] = None, *, readonly: bool = False) -> "FluctlightBrain":
@@ -227,6 +255,25 @@ class FluctlightBrain:
     def sleep(self) -> dict[str, Any]:
         return self._brain.sleep()
 
+    def sleep_cycles(self, n: int = 2) -> list[dict[str, Any]]:
+        reports: list[dict[str, Any]] = []
+        for _ in range(max(0, n)):
+            reports.append(self.sleep())
+        return reports
+
+    def complete(self, cue: str, *, limit: Optional[int] = None) -> Optional[dict[str, Any]]:
+        """CA3 pattern completion — best engram for partial cue."""
+        fn = getattr(self._brain, "complete", None)
+        if fn is None:
+            return None
+        return fn(cue, limit)
+
+    def cortex_facts(self, cue: str, *, limit: int = 24) -> list[Any]:
+        fn = getattr(self._brain, "cortex_facts", None)
+        if fn is None:
+            return []
+        return fn(cue, limit)
+
     def tick(self, n: int = 1) -> list[dict[str, Any]]:
         return self._brain.tick(n)
 
@@ -270,6 +317,11 @@ class FluctlightBrain:
 def connect(path: str, *, readonly: bool = False) -> FluctlightBrain:
     """Open an agent brain directory (full episodic memory path)."""
     return FluctlightBrain.connect(path, readonly=readonly)
+
+
+def connect_brain(path: Optional[str] = None, *, readonly: bool = False) -> FluctlightBrain:
+    """Brain-native memory (full episodic path + graph + cortex). Prefer over ``connect_index()`` for agents."""
+    return FluctlightBrain.connect_brain(path, readonly=readonly)
 
 
 def connect_index(path: Optional[str] = None, *, readonly: bool = False) -> FluctlightBrain:

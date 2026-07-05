@@ -172,7 +172,72 @@ write/read contract.}
 \label{fig:architecture}
 \end{figure*}
 
+\section{The Recall Fabric: Brain-Native Mechanisms}
+\label{sec:fabric}
+Hybrid recall (Section~\ref{sec:design}) treats memory as an index. To move from
+index to \emph{brain}, we add a set of foundational mechanisms, each grounded in a
+distinct neuroscience finding and each implemented as a deterministic, dependency-free,
+unit-tested engine module. They compose into a single recall pipeline (Figure~\ref{fig:fabric})
+that is gated behind one runtime flag, leaving the default path and on-disk format unchanged.
+
+\begin{description}
+  \item[Photon Lane (speed).] A SimHash~\cite{charikar2002} projection collapses a float
+  embedding to a compact bitcode; similarity becomes \texttt{popcount(a\,XOR\,b)}. With
+  LSH banding, candidate generation is sub-linear---coincidence detection rather than dense
+  dot-products, analogous to sparse spike coincidence.
+  \item[Manifold Lattice (capacity \& precision).] Memories are addressed by coordinates on a
+  multi-scale, co-prime grid, following the entorhinal grid-cell code, which Fiete
+  \emph{et al.} showed realizes a residue number system~\cite{fiete2008,sreenivasan2011}.
+  Capacity is the \emph{product} of the scales (add a scale, multiply capacity), coarse
+  scales give fuzzy/gist recall and fine scales give exact recall from one code, and distinct
+  memories occupy distinct points---no bundling crosstalk.
+  \item[Phase Parsing (structure).] A theta--gamma phase code~\cite{lisman1995,lisman2013}
+  realized as a Fourier Holographic Reduced Representation~\cite{plate1995} binds roles to
+  fillers invertibly, so order and grammatical role are preserved: ``user upgraded plan''
+  and ``plan upgraded user'' separate even with identical words and embeddings.
+  \item[Crystallization (consolidation).] During consolidation, concepts are re-filed to
+  stable lattice addresses (systems-consolidation / CLS~\cite{mcclelland1995}), making
+  consolidated knowledge content-addressable without episode replay or re-embedding.
+  \item[Adaptive Forgetting.] An Ebbinghaus retention curve with salience- and rehearsal-driven
+  stability governs decay; a load controller grows the lattice (adds a scale) before crowding
+  degrades recall---neurogenesis instead of overwriting.
+  \item[Chronos (time \& causality).] Multi-scale time buckets (hippocampal time
+  cells~\cite{eichenbaum2014}) plus an explicit causal DAG make before/after/because
+  first-class queries.
+  \item[Confidence \& Consensus.] A noisy-OR fusion of provenance, recency, and corroboration
+  yields a calibrated trust score used to weight recall; a confidence-weighted arbitration layer
+  lets many agents share one brain, resolving conflicts rather than clobbering them.
+\end{description}
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.92\columnwidth}{\centering\ttfamily\small
+cue (text + embedding)\\
+$\downarrow$\\
+Photon prefilter \; (XOR+popcount, LSH) \\
+$\downarrow$ shortlist\\
+Manifold Lattice \; (coarse gist / fine exact) \\
+$\downarrow$ addressed\\
+Phase Parsing \; (order + role disambiguation) \\
+$\downarrow$\\
+\textbf{ranked recall} \; (confidence-weighted)
+}}
+\caption{The Recall Fabric pipeline. A fast binary prefilter (Photon) shortlists candidates;
+the Manifold Lattice supplies coarse (gist) and fine (exact) similarity by grid-cell
+coordinates; Phase Parsing disambiguates order and role; the final ranking is scaled by a
+provenance-derived confidence. Off by default (\texttt{FLUCTLIGHT\_FABRIC}); snapshot-neutral.}
+\label{fig:fabric}
+\end{figure}
+
+Each mechanism is validated on synthetic data with property tests (exact CRT round-trip and
+exponential capacity for the lattice; invertible bind/unbind and order sensitivity for phase
+parsing; Hamming--cosine rank agreement for photon; monotone decay and bounded interference for
+forgetting). Integrating them into the live recall hot path and measuring the effect on
+end-to-end LongMemEval accuracy is ongoing work; the mechanisms ship enabled-by-flag so the
+retrieval numbers in Section~\ref{sec:eval} are unaffected.
+
 \section{Evaluation}
+\label{sec:eval}
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
 \texttt{benchmarks/results/paper-2026-07-04.json} (LoCoMo, BEIR, FAMB from

@@ -20,7 +20,7 @@ SDK = REPO / "sdks" / "python"
 if SDK.is_dir() and str(SDK) not in sys.path:
     sys.path.insert(0, str(SDK))
 
-from fluctlightdb import connect_conv, connect_index  # noqa: E402
+from fluctlightdb import connect_brain, connect_conv, connect_index  # noqa: E402
 
 DEFAULT_DATA = Path("/tmp/longmemeval/data/longmemeval_s_cleaned.json")
 
@@ -466,35 +466,69 @@ def retrieve_item(
     query_expand: bool,
     dual_key: bool,
     pref_facts_key: bool,
-) -> tuple[list[dict], bool, int]:
-    """Run ingest + activate; return (recalls, session_hit, ingested_n)."""
-    if mode == "index":
+    brain_sleep: int = 2,
+    brain_turns: bool = True,
+    brain_facts: bool = True,
+) -> tuple[list[dict], bool, int, Any]:
+    """Run ingest + activate; return (recalls, session_hit, ingested_n, brain)."""
+    brain: Any
+    if mode == "brain":
+        brain = connect_brain()
+    elif mode == "index":
         brain = connect_index()
     else:
         brain = connect_conv()
-    ingested = ingest_item(
-        brain,
-        item,
-        embedder,
-        fast=fast,
-        granularity=granularity,
-        dual_key=dual_key,
-        pref_facts_key=pref_facts_key,
-    )
+
+    if mode == "brain":
+        from brain_memory import brain_activate, ingest_brain_haystack  # noqa: WPS433
+
+        ingested = ingest_brain_haystack(
+            brain,
+            item,
+            embedder,
+            fast=fast,
+            dual_key=dual_key,
+            pref_facts_key=pref_facts_key,
+            turn_engrams=brain_turns,
+            fact_engrams=brain_facts,
+            sleep_cycles=brain_sleep,
+        )
+    else:
+        ingested = ingest_item(
+            brain,
+            item,
+            embedder,
+            fast=fast,
+            granularity=granularity,
+            dual_key=dual_key,
+            pref_facts_key=pref_facts_key,
+        )
     question = (item.get("question") or "").strip()
     if item.get("question_type") == "temporal-reasoning" and item.get("question_date"):
         question = f"{question} [{item['question_date']}]"
-    recalls = activate_merged(
-        brain,
-        question,
-        question_type=item.get("question_type"),
-        embedder=embedder,
-        fast=fast,
-        top_k=top_k,
-        query_expand=query_expand,
-    )
+    if mode == "brain":
+        recalls = brain_activate(
+            brain,
+            item,
+            embedder,
+            question=question,
+            question_type=item.get("question_type"),
+            fast=fast,
+            top_k=top_k,
+            query_expand=query_expand,
+        )
+    else:
+        recalls = activate_merged(
+            brain,
+            question,
+            question_type=item.get("question_type"),
+            embedder=embedder,
+            fast=fast,
+            top_k=top_k,
+            query_expand=query_expand,
+        )
     hit = session_in_recalls(recalls, item.get("answer_session_ids") or [], top_k=top_k)
-    return recalls, hit, ingested
+    return recalls, hit, ingested, brain
 
 
 def session_ids_from_recalls(recalls: list[dict], top_k: int = 8) -> list[str]:
@@ -537,9 +571,10 @@ def eval_one(
     query_expand: bool,
     dual_key: bool,
     pref_facts_key: bool,
+    brain_sleep: int = 2,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
-    recalls, hit, ingested = retrieve_item(
+    recalls, hit, ingested, _brain = retrieve_item(
         item,
         mode=mode,
         top_k=top_k,
@@ -549,6 +584,7 @@ def eval_one(
         query_expand=query_expand,
         dual_key=dual_key,
         pref_facts_key=pref_facts_key,
+        brain_sleep=brain_sleep,
     )
     if metric != "session":
         hit = answer_in_recalls(recalls, item.get("answer") or "", top_k=top_k)
@@ -664,7 +700,12 @@ def _ingest_sessions(
 def main() -> int:
     ap = argparse.ArgumentParser(description="FluctlightDB LongMemEval-S benchmark")
     ap.add_argument("--data", type=Path, default=DEFAULT_DATA)
-    ap.add_argument("--mode", choices=("conv", "index"), default="index")
+    ap.add_argument(
+        "--mode",
+        choices=("brain", "conv", "index"),
+        default=os.environ.get("LONGMEMEVAL_MODE", "brain"),
+        help="brain=full agent path (default); index=IR-only vector-fast; conv=hybrid RAG",
+    )
     ap.add_argument("--top-k", type=int, default=8)
     ap.add_argument("--limit", type=int, default=0, help="0 = full dataset")
     ap.add_argument("--offset", type=int, default=0)
@@ -697,6 +738,12 @@ def main() -> int:
         "--pref-facts-key",
         action="store_true",
         help="third engram per session: extracted user facts (preference CP2 boost)",
+    )
+    ap.add_argument(
+        "--brain-sleep",
+        type=int,
+        default=int(os.environ.get("LONGMEMEVAL_BRAIN_SLEEP", "2")),
+        help="CLS sleep cycles after ingest (brain mode)",
     )
     ap.add_argument(
         "--type-filter",
@@ -756,6 +803,7 @@ def main() -> int:
                 query_expand=args.query_expand,
                 dual_key=args.dual_key,
                 pref_facts_key=args.pref_facts_key,
+                brain_sleep=args.brain_sleep,
             )
         except Exception as e:
             row = {
@@ -795,6 +843,7 @@ def main() -> int:
         "query_expand": args.query_expand,
         "dual_key": args.dual_key,
         "pref_facts_key": args.pref_facts_key,
+        "brain_sleep": args.brain_sleep if args.mode == "brain" else 0,
         "top_k": args.top_k,
         "questions": len(results),
         metric_key: round(hits / len(results), 4) if results else 0.0,
