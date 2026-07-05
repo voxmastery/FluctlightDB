@@ -35,7 +35,7 @@ READER_TEMPLATE = (
 )
 
 from cursor_api import cursor_auto_chat, load_cursor_api_key  # noqa: E402
-from cloud_llm import chat as cloud_chat, load_env_file  # noqa: E402
+from cloud_llm import chat as cloud_chat, load_env_file, smoke_test  # noqa: E402
 
 READER_MODEL = "gemini-2.5-flash"
 JUDGE_MODEL = "gemini-2.5-flash"
@@ -77,10 +77,17 @@ def llm_chat(
     backend: str,
     model: str,
     timeout_s: int = 120,
+    max_tokens: int = 512,
 ) -> str:
     if backend == "cursor":
         return cursor_auto_chat(prompt, model=model or "auto", timeout_s=timeout_s)
-    return cloud_chat(prompt, provider=backend, model=model or None, timeout_s=timeout_s)
+    return cloud_chat(
+        prompt,
+        provider=backend,
+        model=model or None,
+        max_tokens=max_tokens,
+        timeout_s=timeout_s,
+    )
 
 
 def judge_label(
@@ -100,7 +107,9 @@ def judge_label(
         hypothesis,
         abstention="_abs" in qid,
     )
-    resp = llm_chat(prompt, backend=backend, model=judge_model, timeout_s=timeout_s)
+    resp = llm_chat(
+        prompt, backend=backend, model=judge_model, timeout_s=timeout_s, max_tokens=64
+    )
     return "yes" in resp.lower()
 
 
@@ -139,6 +148,7 @@ def process_one_item(
             backend=args.llm_backend,
             model=reader_model,
             timeout_s=args.llm_timeout,
+            max_tokens=1024,
         )
         label = judge_label(
             item,
@@ -278,7 +288,7 @@ def main() -> int:
         else:
             if not args.skip_smoke_test:
                 try:
-                    cloud_chat("Reply ok", provider=backend, max_tokens=8, timeout_s=60)
+                    smoke_test(backend)
                 except Exception as e:
                     raise SystemExit(
                         f"LLM backend {backend!r} failed smoke test: {e}\n"
