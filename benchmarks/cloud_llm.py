@@ -117,6 +117,14 @@ def _http_chat(
     return str(text).strip()
 
 
+def _gemini_thinking_config(model: str) -> dict[str, int] | None:
+    """Gemini 2.5+ Flash: thinking tokens consume maxOutputTokens; disable for benchmarks."""
+    m = model.lower()
+    if "2.5" in m and "flash" in m:
+        return {"thinkingBudget": 0}
+    return None
+
+
 def _gemini_chat(
     *,
     api_key: str,
@@ -129,9 +137,13 @@ def _gemini_chat(
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         f"?key={api_key}"
     )
+    gen_cfg: dict[str, Any] = {"temperature": 0, "maxOutputTokens": max_tokens}
+    thinking = _gemini_thinking_config(model)
+    if thinking is not None:
+        gen_cfg["thinkingConfig"] = thinking
     body: dict[str, Any] = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0, "maxOutputTokens": max_tokens},
+        "generationConfig": gen_cfg,
     }
     req = urllib.request.Request(
         url,
@@ -162,7 +174,11 @@ def _gemini_chat(
         pf = data.get("promptFeedback") or {}
         raise RuntimeError(f"gemini blocked/empty: {str(pf)[:300] or str(data)[:300]}")
     parts = (cands[0].get("content") or {}).get("parts") or []
-    text = "".join(str(p.get("text") or "") for p in parts)
+    text = "".join(
+        str(p.get("text") or "")
+        for p in parts
+        if not p.get("thought")  # skip internal reasoning parts if present
+    )
     if not text.strip():
         fr = cands[0].get("finishReason") or ""
         raise RuntimeError(f"gemini empty text (finishReason={fr})")
@@ -237,4 +253,6 @@ def chat(
 
 
 def smoke_test(provider: str) -> str:
-    return chat(f"Reply with exactly: {provider}-ok", provider=provider, max_tokens=16, timeout_s=60)
+    # Gemini 2.5 Flash needs headroom even for one-word replies if thinking is on.
+    max_t = 128 if provider == "gemini" else 16
+    return chat(f"Reply with exactly: {provider}-ok", provider=provider, max_tokens=max_t, timeout_s=60)
