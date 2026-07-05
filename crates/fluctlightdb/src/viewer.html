@@ -188,6 +188,16 @@ const LS = 'fluctlight.viewer.cfg';
 const cfg = Object.assign({url:'', token:'', tenant:''}, JSON.parse(localStorage.getItem(LS)||'{}'));
 const $ = s => document.querySelector(s);
 
+/** When served under a path prefix (e.g. /brain on search.ambugo.help), API calls must stay under it. */
+function mountBase(){
+  const p = location.pathname.replace(/\/$/, '');
+  if (p === '/brain' || p.endsWith('/brain')) return p;
+  if (p.endsWith('/viewer')) return p.replace(/\/viewer$/, '') || '';
+  const i = p.indexOf('/brain/');
+  if (i >= 0) return p.slice(0, i + 6);
+  return '';
+}
+
 // ---------- three.js scene ----------
 const canvas = $('#scene');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, powerPreference:'high-performance'});
@@ -285,7 +295,11 @@ function relax(){
 }
 
 // ---------- API ----------
-function base(){ return (cfg.url||'').replace(/\/$/,''); }
+function base(){
+  const explicit = (cfg.url || '').replace(/\/$/, '');
+  if (explicit) return explicit;
+  return mountBase();
+}
 async function api(path, body){
   const headers={'Content-Type':'application/json'};
   if(cfg.token) headers['Authorization']='Bearer '+cfg.token;
