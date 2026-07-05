@@ -469,17 +469,32 @@ def retrieve_item(
     brain_sleep: int = 2,
     brain_turns: bool = True,
     brain_facts: bool = True,
+    use_muon: bool = False,
 ) -> tuple[list[dict], bool, int, Any]:
     """Run ingest + activate; return (recalls, session_hit, ingested_n, brain)."""
     brain: Any
     if mode == "brain":
-        brain = connect_brain()
+        if use_muon:
+            from fluctlightdb import connect_muon  # noqa: WPS433
+
+            brain = connect_muon()
+        else:
+            brain = connect_brain()
     elif mode == "index":
         brain = connect_index()
     else:
         brain = connect_conv()
 
-    if mode == "brain":
+    if mode == "brain" and use_muon:
+        from brain_memory import ingest_muon_haystack, muon_activate  # noqa: WPS433
+
+        ingested = ingest_muon_haystack(
+            brain,
+            item,
+            dual_key=dual_key or True,
+            pref_facts_key=pref_facts_key,
+        )
+    elif mode == "brain":
         from brain_memory import brain_activate, ingest_brain_haystack  # noqa: WPS433
 
         ingested = ingest_brain_haystack(
@@ -506,7 +521,15 @@ def retrieve_item(
     question = (item.get("question") or "").strip()
     if item.get("question_type") == "temporal-reasoning" and item.get("question_date"):
         question = f"{question} [{item['question_date']}]"
-    if mode == "brain":
+    if mode == "brain" and use_muon:
+        recalls = muon_activate(
+            brain,
+            question,
+            question_type=item.get("question_type"),
+            top_k=top_k,
+            query_expand=query_expand or True,
+        )
+    elif mode == "brain":
         recalls = brain_activate(
             brain,
             item,
@@ -572,6 +595,7 @@ def eval_one(
     dual_key: bool,
     pref_facts_key: bool,
     brain_sleep: int = 2,
+    use_muon: bool = False,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
     recalls, hit, ingested, _brain = retrieve_item(
@@ -585,6 +609,7 @@ def eval_one(
         dual_key=dual_key,
         pref_facts_key=pref_facts_key,
         brain_sleep=brain_sleep,
+        use_muon=use_muon,
     )
     if metric != "session":
         hit = answer_in_recalls(recalls, item.get("answer") or "", top_k=top_k)
@@ -746,6 +771,11 @@ def main() -> int:
         help="CLS sleep cycles after ingest (brain mode)",
     )
     ap.add_argument(
+        "--muon",
+        action="store_true",
+        help="Muon Lane: penetrative bulk session imprint (replaces haystack experience+embed)",
+    )
+    ap.add_argument(
         "--type-filter",
         default="",
         help="comma-separated question_type filter (e.g. single-session-preference)",
@@ -804,6 +834,7 @@ def main() -> int:
                 dual_key=args.dual_key,
                 pref_facts_key=args.pref_facts_key,
                 brain_sleep=args.brain_sleep,
+                use_muon=args.muon,
             )
         except Exception as e:
             row = {
@@ -844,6 +875,8 @@ def main() -> int:
         "dual_key": args.dual_key,
         "pref_facts_key": args.pref_facts_key,
         "brain_sleep": args.brain_sleep if args.mode == "brain" else 0,
+        "muon_lane": args.muon,
+        "tau_lane": args.muon,
         "top_k": args.top_k,
         "questions": len(results),
         metric_key: round(hits / len(results), 4) if results else 0.0,

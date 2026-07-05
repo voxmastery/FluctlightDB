@@ -58,21 +58,24 @@ fn confidence_mult(recall: &RecallResult) -> f32 {
 }
 
 impl FluctlightBrain {
-    /// Rebuild the in-memory Recall Fabric index from all hippocampal engrams (call after load).
+    /// Rebuild the in-memory Recall Fabric index and Chronos timeline from hippocampal engrams
+    /// (call after load). Existing snapshots predate Fabric — this backfills runtime state.
     pub fn warm_fabric_runtime(&mut self) {
         if !fabric_enabled() {
             return;
         }
-        let tick = self.autonomic.total_ticks;
         self.fabric = RecallFabric::new(fabric_config());
         let mut traces = self.fabric_traces.lock().unwrap();
         traces.clear();
+        self.chronos = crate::chronos::Chronos::default();
         for e in &self.hippocampus.engrams {
             let id = e.id.to_string();
+            let tick = e.encoded_at_tick;
             let vec = self.semantic.engram_vectors.get(&e.id);
             self.fabric
                 .insert(&id, &e.episode.content, vec.map(|v| v.as_slice()));
-            traces.insert(id, MemoryTrace::new(tick, e.salience));
+            traces.insert(id.clone(), MemoryTrace::new(tick, e.salience));
+            self.chronos.add_event(id, tick);
         }
     }
 
@@ -186,4 +189,39 @@ pub(crate) fn new_fabric_state() -> (RecallFabric, Mutex<HashMap<String, MemoryT
         RecallFabric::new(fabric_config()),
         Mutex::new(HashMap::new()),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Episode;
+
+    #[test]
+    fn warm_fabric_backfills_chronos_from_engrams() {
+        std::env::set_var("FLUCTLIGHT_FABRIC", "1");
+        let mut brain = FluctlightBrain::new();
+        for content in ["alpha", "beta", "gamma"] {
+            let ep = Episode {
+                content: content.into(),
+                context: "test".into(),
+                outcome: None,
+                salience_hint: 0.5,
+                semantic_vector: None,
+                agent_id: None,
+                tenant_id: None,
+                rag: None,
+                provenance: None,
+            };
+            brain.experience(ep).unwrap();
+        }
+        assert_eq!(brain.chronos_len(), 3);
+        brain.chronos = crate::chronos::Chronos::default();
+        assert_eq!(brain.chronos_len(), 0);
+        brain.warm_fabric_runtime();
+        assert_eq!(brain.chronos_len(), 3);
+        assert_eq!(brain.fabric_len(), 3);
+        let recent = brain.timeline(2);
+        assert_eq!(recent.len(), 2);
+        std::env::remove_var("FLUCTLIGHT_FABRIC");
+    }
 }

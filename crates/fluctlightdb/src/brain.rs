@@ -79,6 +79,15 @@ pub struct FluctlightBrain {
     /// Runtime-only Ebbinghaus traces keyed by engram id. Never persisted.
     #[serde(skip)]
     pub(crate) fabric_traces: Mutex<HashMap<String, crate::forgetting::MemoryTrace>>,
+    /// Runtime-only multi-agent shared claims (Recall Fabric). Never persisted.
+    #[serde(skip)]
+    pub(crate) consensus: crate::consensus::SharedMemory,
+    /// Runtime-only penetrative session imprints (Muon Lane). Never persisted.
+    #[serde(skip)]
+    pub(crate) muon: crate::muon::MuonLane,
+    /// Runtime-only episodic fission shards (Tau Lane). Never persisted.
+    #[serde(skip)]
+    pub(crate) tau: crate::tau::TauLane,
 }
 
 impl Default for FluctlightBrain {
@@ -120,6 +129,9 @@ impl FluctlightBrain {
             crystallizer: crate::crystallize::Crystallizer::default(),
             fabric,
             fabric_traces,
+            consensus: crate::consensus::SharedMemory::default(),
+            muon: crate::muon_runtime::new_muon_lane(),
+            tau: crate::tau_runtime::new_tau_lane(),
         };
         brain.development.on_tick();
         brain.prefrontal.unlocked = brain.development.pfc_unlocked();
@@ -821,6 +833,66 @@ impl FluctlightBrain {
         self.crystallizer.len()
     }
 
+    // ---- Chronos (temporal + causal) user API ----
+
+    pub fn chronos_events_in_range(&self, from_tick: u64, to_tick: u64) -> Vec<crate::chronos::Event> {
+        self.chronos.in_range(from_tick, to_tick)
+    }
+
+    pub fn chronos_preceding(&self, event_id: &str, n: usize) -> Vec<crate::chronos::Event> {
+        self.chronos.preceding(event_id, n)
+    }
+
+    pub fn chronos_link_cause(&mut self, cause_id: &str, effect_id: &str) {
+        self.chronos.link_cause(cause_id, effect_id);
+    }
+
+    pub fn chronos_causal_ancestors(&self, effect_id: &str) -> Vec<String> {
+        self.chronos.causal_ancestors(effect_id)
+    }
+
+    pub fn chronos_before(&self, a: &str, b: &str) -> Option<bool> {
+        self.chronos.before(a, b)
+    }
+
+    pub fn chronos_bucket(&self, event_id: &str, scale: u64) -> Option<u64> {
+        self.chronos.bucket(event_id, scale)
+    }
+
+    pub fn chronos_len(&self) -> usize {
+        self.chronos.len()
+    }
+
+    // ---- Consensus (multi-agent shared memory) user API ----
+
+    pub fn consensus_assert_claim(&mut self, key: &str, claim: crate::consensus::Claim) {
+        self.consensus.assert(key, claim);
+    }
+
+    pub fn consensus_resolve(
+        &self,
+        key: &str,
+        viewer_agent_id: Option<&str>,
+    ) -> Option<crate::consensus::Consensus> {
+        self.consensus.resolve(key, viewer_agent_id)
+    }
+
+    pub fn consensus_claims(
+        &self,
+        key: &str,
+        viewer_agent_id: Option<&str>,
+    ) -> Vec<crate::consensus::Claim> {
+        self.consensus
+            .readable_claims(key, viewer_agent_id)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    pub fn consensus_is_contested(&self, key: &str, viewer_agent_id: Option<&str>) -> bool {
+        self.consensus.is_contested(key, viewer_agent_id)
+    }
+
     pub fn export_graph(&self) -> GraphExport {
         export_graph(&self.hippocampus, &self.graph, &self.core_memories)
     }
@@ -968,6 +1040,9 @@ impl FluctlightBrain {
             crystallizer: crate::crystallize::Crystallizer::default(),
             fabric: crate::recall_fabric::RecallFabric::new(crate::fabric_runtime::fabric_config()),
             fabric_traces: Mutex::new(HashMap::new()),
+            consensus: crate::consensus::SharedMemory::default(),
+            muon: crate::muon_runtime::new_muon_lane(),
+            tau: crate::tau_runtime::new_tau_lane(),
         }
     }
 }
@@ -1007,6 +1082,9 @@ impl Clone for FluctlightBrain {
             crystallizer: self.crystallizer.clone(),
             fabric: self.fabric.clone(),
             fabric_traces: Mutex::new(self.fabric_traces.lock().unwrap().clone()),
+            consensus: self.consensus.clone(),
+            muon: self.muon.clone(),
+            tau: self.tau.clone(),
         }
     }
 }
