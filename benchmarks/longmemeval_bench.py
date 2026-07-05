@@ -32,8 +32,6 @@ def _embed_base_url() -> str:
     return raw.rstrip("/")
 
 
-EMBED_BASE = _embed_base_url()
-
 STOPWORDS = frozenset(
     """
     a an the and or but if then else when at by for with about into through during
@@ -270,7 +268,7 @@ def answer_in_recalls(recalls: list[dict], answer: str, top_k: int = 8) -> bool:
 
 class EmbedCache:
     def __init__(self, base_url: str | None = None):
-        self.base = (base_url or EMBED_BASE).rstrip("/")
+        self.base = (base_url or _embed_base_url()).rstrip("/")
         self.cache: dict[str, list[float]] = {}
         self._requests = 0
 

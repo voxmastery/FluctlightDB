@@ -159,9 +159,13 @@ def _gemini_chat(
         raise RuntimeError(str(data["error"]))
     cands = data.get("candidates") or []
     if not cands:
-        raise RuntimeError(f"gemini empty candidates: {str(data)[:200]}")
+        pf = data.get("promptFeedback") or {}
+        raise RuntimeError(f"gemini blocked/empty: {str(pf)[:300] or str(data)[:300]}")
     parts = (cands[0].get("content") or {}).get("parts") or []
     text = "".join(str(p.get("text") or "") for p in parts)
+    if not text.strip():
+        fr = cands[0].get("finishReason") or ""
+        raise RuntimeError(f"gemini empty text (finishReason={fr})")
     return text.strip()
 
 
