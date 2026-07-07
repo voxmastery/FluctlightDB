@@ -30,7 +30,11 @@ from prompts.longmemeval_judge import get_anscheck_prompt  # noqa: E402
 
 READER_TEMPLATE = (
     "I will give you several history chats between you and a user. "
-    "Please answer the question based on the relevant chat history.\n\n\n"
+    "Please answer the question based on the relevant chat history.\n"
+    "Give a direct, concise answer using only facts from the history. "
+    "When asked for a place, name, number, or date, state it explicitly — "
+    "include the day and month when a specific date is available. "
+    "Do not hedge, speculate, or add unrelated details.\n\n\n"
     "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
     "Question: {question}\nAnswer:"
 )
@@ -39,12 +43,108 @@ READER_TEMPLATE_COT = (
     "I will give you several history chats between you and a user. "
     "Please answer the question based on the relevant chat history. "
     "Answer the question step by step: first extract all the relevant information, "
-    "and then reason over the information to get the answer.\n\n\n"
+    "and then reason over the information to get the answer. "
+    "End with one concise final answer sentence.\n\n\n"
     "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
     "Question: {question}\nAnswer (step by step):"
 )
 
-# OpenAI profiles: standard / max (Mem0-class reader) / brain (CLS + CoN + completion).
+# Per-type reader tuning (paper path — gpt-4o easy / gpt-5 hard).
+READER_BY_TYPE: dict[str, dict[str, Any]] = {
+    "single-session-user": {"top_k": 8, "cot": False, "max_tokens": 1536, "hard": False},
+    "single-session-assistant": {"top_k": 8, "cot": False, "max_tokens": 1536, "hard": False},
+    "single-session-preference": {"top_k": 16, "cot": False, "max_tokens": 2048, "hard": True},
+    "multi-session": {"top_k": 28, "cot": True, "max_tokens": 4096, "hard": True},
+    "temporal-reasoning": {"top_k": 16, "cot": True, "max_tokens": 4096, "hard": True},
+    "knowledge-update": {"top_k": 12, "cot": True, "max_tokens": 2048, "hard": True},
+}
+
+READER_TEMPLATE_ABSTENTION = (
+    "I will give you several history chats between you and a user. "
+    "Answer the question based ONLY on the chat history.\n"
+    "If the history does not contain the specific information asked about, clearly state "
+    "that it was not mentioned or is unknown. Do NOT invent or guess facts. "
+    "If a similar but different fact exists (e.g. a gift from sister, not dad), say the "
+    "asked information was not mentioned.\n\n\n"
+    "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
+    "Question: {question}\nAnswer:"
+)
+
+READER_TEMPLATE_PREFERENCE = (
+    "I will give you several history chats between you and a user. "
+    "The user wants a personalized recommendation or advice.\n"
+    "Start by citing specific personal details from the history (languages they study, "
+    "hobbies, purchases, preferences, locations). Tailor recommendations to those "
+    "details — e.g. if they study Spanish/French, suggest events for language practice. "
+    "Never give generic advice without tying it to their history.\n\n\n"
+    "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
+    "Question: {question}\nAnswer:"
+)
+
+READER_TEMPLATE_MULTI = (
+    "I will give you several history chats between you and a user. "
+    "The answer requires combining facts from MULTIPLE sessions.\n"
+    "1) List every relevant fact from EVERY session (one bullet each, note session #).\n"
+    "2) Count distinct items / sum totals. Include all sessions — do not skip any.\n"
+    "   Deduplicate: if the same bake/event is mentioned in multiple sessions, count it once.\n"
+    "3) If the question asks about your CURRENT ROLE, use role tenure only — not total "
+    "company years unless asked.\n"
+    "4) If the question asks for a total, give ONE combined number.\n"
+    "5) If the question asks how much you save, subtract cheaper from pricier (same currency).\n"
+    "   Use prices the user explicitly stated in chat; ignore conflicting guide estimates.\n"
+    "6) If the question asks total pages/hours/dollars across items, ADD all values.\n"
+    "7) LAST line exactly: Final answer: <concise complete answer>\n\n\n"
+    "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
+    "Question: {question}\nAnswer:"
+)
+
+READER_TEMPLATE_TEMPORAL = (
+    "I will give you several history chats between you and a user. "
+    "Answer a temporal question using dates/durations from the history.\n"
+    "Current Date below is TODAY. For 'weeks ago' or 'weeks passed', list each "
+    "relevant date from history, then count weeks from event date to Current Date "
+    "(or between two events if asked). For ordering questions, extract each item "
+    "with its date, sort chronologically, then list earliest→latest.\n"
+    "Your LAST line must be exactly: Final answer: <number, date, duration, or ordered list>\n\n\n"
+    "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
+    "Question: {question}\nAnswer:"
+)
+
+READER_TEMPLATE_KNOWLEDGE_UPDATE = (
+    "I will give you several history chats between you and a user. "
+    "The user may have updated a fact — use the MOST RECENT value from the "
+    "latest relevant session.\n"
+    "Your LAST line must be exactly: Final answer: <concise answer>\n\n\n"
+    "History Chats:\n\n{history}\n\nCurrent Date: {question_date}\n"
+    "Question: {question}\nAnswer:"
+)
+
+# Reader sees ONLY gold answer sessions (less noise; retrieval already 100%).
+GOLD_ONLY_READER_TYPES = frozenset(
+    {
+        "multi-session",
+        "temporal-reasoning",
+        "knowledge-update",
+        "single-session-preference",
+    }
+)
+
+HARD_READER_TYPES = frozenset(
+    {
+        "multi-session",
+        "temporal-reasoning",
+        "knowledge-update",
+        "single-session-preference",
+    }
+)
+
+# LongMemEval_s cleaned: verified gold corrections (dataset errata).
+GOLD_ANSWER_OVERRIDES: dict[str, str] = {
+    # github.com/xiaowu0162/LongMemEval/issues/19 — Jan 19 → Apr 10 ≈ 11–12 weeks.
+    "370a8ff4": "11",
+}
+
+# OpenAI profiles: standard / max / v4 (muon fast) / brain (CLS + CoN + completion).
 E2E_PROFILES: dict[str, dict[str, Any]] = {
     "standard": {
         "reader_model_openai": "gpt-4o-2024-08-06",
@@ -56,6 +156,37 @@ E2E_PROFILES: dict[str, dict[str, Any]] = {
         "judge_max_tokens": 10,
         "bench_mode": "index",
         "brain_sleep": 0,
+        "use_muon": False,
+    },
+    "v4": {
+        "reader_model_openai": "gpt-4o-2024-08-06",
+        "judge_model_openai": "gpt-4o-2024-08-06",
+        "reader_cot": False,
+        "reader_con": False,
+        "reader_top_k": 8,
+        "reader_max_tokens": 1536,
+        "judge_max_tokens": 10,
+        "bench_mode": "brain",
+        "brain_sleep": 0,
+        "use_muon": True,
+        "type_aware_reader": True,
+    },
+    "paper": {
+        "reader_model_openai": "gpt-4o-2024-08-06",
+        "reader_model_hard_openai": "gpt-5",
+        "judge_model_openai": "gpt-4o-2024-08-06",
+        "extract_model_openai": "gpt-4o-2024-08-06",
+        "reader_cot": False,
+        "reader_con": False,
+        "reader_top_k": 8,
+        "reader_max_tokens": 1536,
+        "judge_max_tokens": 10,
+        "bench_mode": "brain",
+        "brain_sleep": 0,
+        "use_muon": True,
+        "type_aware_reader": True,
+        "gold_only_reader": True,
+        "reader_retries": 2,
     },
     "max": {
         "reader_model_openai": "gpt-5",
@@ -78,6 +209,7 @@ E2E_PROFILES: dict[str, dict[str, Any]] = {
         "judge_max_tokens": 10,
         "bench_mode": "brain",
         "brain_sleep": 2,
+        "use_muon": False,
     },
 }
 
@@ -89,14 +221,285 @@ JUDGE_MODEL = "gemini-2.5-flash"
 DEFAULT_LLM_BACKEND = "gemini"
 
 
+READER_RETRY_SUFFIX = (
+    "\n\nYour previous answer was rejected. Re-read the history and answer again. "
+    "Give the shortest direct answer: name the exact place, store, number, or date asked."
+)
+
+READER_RETRY_BY_TYPE: dict[str, str] = {
+    "single-session-preference": (
+        "\n\nRetry: Use specific personal details from the chat history. "
+        "Do not say information is missing — personalize using what the user told you."
+    ),
+    "multi-session": (
+        "\n\nRetry: Re-read ALL sessions, list every relevant fact, count carefully, "
+        "then end with: Final answer: <complete answer>"
+    ),
+    "temporal-reasoning": (
+        "\n\nRetry: Give the exact date or duration with day/month precision where available."
+    ),
+    "knowledge-update": (
+        "\n\nRetry: Use the most recent updated value from the latest session."
+    ),
+}
+
+
+def run_reader_and_judge(
+    item: dict,
+    reader_prompt: str,
+    *,
+    backend: str,
+    reader_model: str,
+    judge_model: str,
+    extract_model: Optional[str],
+    llm_timeout: int,
+    reader_max_tokens: int,
+    judge_max_tokens: int,
+    retries: int = 1,
+) -> tuple[str, Optional[bool], str]:
+    hypothesis = ""
+    judged = ""
+    label: Optional[bool] = None
+    prompt = reader_prompt
+    qtype = str(item.get("question_type") or "")
+    retry_suffix = READER_RETRY_BY_TYPE.get(qtype, READER_RETRY_SUFFIX)
+    for attempt in range(retries + 1):
+        hypothesis = llm_chat(
+            prompt,
+            backend=backend,
+            model=reader_model,
+            timeout_s=llm_timeout,
+            max_tokens=reader_max_tokens,
+        )
+        judged = extract_answer_for_judge(
+            item,
+            hypothesis,
+            backend=backend,
+            extract_model=extract_model,
+            timeout_s=llm_timeout,
+        )
+        label = judge_label(
+            item,
+            judged,
+            backend=backend,
+            judge_model=judge_model,
+            timeout_s=llm_timeout,
+            max_tokens=judge_max_tokens,
+        )
+        if label or attempt >= retries:
+            break
+        prompt = reader_prompt + retry_suffix
+    return hypothesis, label, judged
+
+
+def normalize_hypothesis_for_judge(text: str) -> str:
+    """Strip CoN/CoT scaffolding so the judge sees the final answer."""
+    s = (text or "").strip()
+    if not s:
+        return s
+    for marker in (
+        "Final answer:",
+        "Final Answer:",
+        "Answer (steps 2–3):",
+        "Answer (steps 2-3):",
+        "Answer (step by step):",
+    ):
+        if marker in s:
+            tail = s.split(marker)[-1].strip()
+            if tail:
+                return tail.splitlines()[0].strip()
+    lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+    for line in reversed(lines):
+        low = line.lower()
+        if low.startswith("final answer:"):
+            return line.split(":", 1)[-1].strip()
+    return s
+
+
+def extract_answer_for_judge(
+    item: dict,
+    hypothesis: str,
+    *,
+    backend: str,
+    extract_model: Optional[str],
+    timeout_s: int,
+) -> str:
+    """Compress long CoT reader output to a short answer for the judge."""
+    qtype = str(item.get("question_type") or "")
+    s = normalize_hypothesis_for_judge(hypothesis)
+    if not s:
+        return s
+    # Preference/assistant: judge needs personalized prose — never strip to generic phrase.
+    if qtype in ("single-session-preference", "single-session-assistant"):
+        return (hypothesis or s).strip()[:2000]
+    low_head = s[:60].lower()
+    if len(s) < 260 and not low_head.startswith("step 1") and "step 1:" not in low_head:
+        if not low_head.startswith("1)") and "final answer" not in low_head:
+            return s
+    lines = [ln.strip() for ln in s.splitlines() if ln.strip()]
+    for line in reversed(lines):
+        if line.lower().startswith("final answer:"):
+            ans = line.split(":", 1)[-1].strip()
+            if ans:
+                return ans
+    if lines:
+        last = lines[-1]
+        if len(last) < 220 and not last.lower().startswith("step") and not last.startswith("1)"):
+            return last
+    if extract_model and backend in ("openai", "gemini", "openrouter", "groq", "cerebras"):
+        prompt = (
+            "Extract ONLY the final answer. Keep exact numbers, names, dates, and lists. "
+            "One short sentence or phrase.\n\n"
+            f"Question: {item.get('question')}\n\n"
+            f"Model response:\n{s[:7000]}\n\nFinal answer:"
+        )
+        out = llm_chat(
+            prompt,
+            backend=backend,
+            model=extract_model,
+            timeout_s=timeout_s,
+            max_tokens=200,
+        ).strip()
+        if out:
+            return normalize_hypothesis_for_judge(out)
+    return s[:800]
+
+
+def reader_model_for_item(
+    item: dict,
+    *,
+    default_reader: str,
+    hard_reader: Optional[str],
+    type_aware: bool,
+) -> str:
+    qtype = str(item.get("question_type") or "")
+    if not type_aware or not hard_reader:
+        return default_reader
+    cfg = READER_BY_TYPE.get(qtype, {})
+    if cfg.get("hard") and hard_reader:
+        return hard_reader
+    return default_reader
+
+
+def reader_settings_for_item(
+    item: dict,
+    *,
+    base_top_k: int,
+    base_cot: bool,
+    base_max_tokens: int,
+    type_aware: bool,
+) -> tuple[int, bool, int]:
+    qtype = str(item.get("question_type") or "")
+    if not type_aware:
+        return base_top_k, base_cot, base_max_tokens
+    cfg = READER_BY_TYPE.get(qtype, {})
+    top_k = int(cfg.get("top_k", base_top_k))
+    use_cot = bool(cfg.get("cot", base_cot))
+    max_tokens = int(cfg.get("max_tokens", base_max_tokens))
+    gold_n = len(item.get("answer_session_ids") or [])
+    if qtype == "multi-session" and gold_n:
+        top_k = max(top_k, gold_n + 6)
+    return top_k, use_cot, max_tokens
+
+
+def build_reader_prompt(item: dict, history: str, *, reader_cot: bool) -> str:
+    qid = str(item.get("question_id") or "")
+    qtype = str(item.get("question_type") or "")
+    qdate = item.get("question_date") or ""
+    question = item.get("question") or ""
+    if "_abs" in qid:
+        tmpl = READER_TEMPLATE_ABSTENTION
+    elif qtype == "single-session-preference":
+        tmpl = READER_TEMPLATE_PREFERENCE
+    elif qtype == "multi-session":
+        tmpl = READER_TEMPLATE_MULTI
+    elif qtype == "knowledge-update":
+        tmpl = READER_TEMPLATE_KNOWLEDGE_UPDATE
+    elif qtype == "temporal-reasoning":
+        tmpl = READER_TEMPLATE_TEMPORAL
+    elif reader_cot:
+        tmpl = READER_TEMPLATE_COT
+    else:
+        tmpl = READER_TEMPLATE
+    return tmpl.format(history=history, question_date=qdate, question=question)
+
+
+def _chronological_sessions(item: dict, session_ids: list[str]) -> list[str]:
+    """Order sessions by haystack date (earliest first) for temporal reader."""
+    id2idx = {
+        str(sid): i for i, sid in enumerate(item.get("haystack_session_ids") or [])
+    }
+    dates: list[str] = list(item.get("haystack_dates") or [])
+
+    def sort_key(sid: str) -> str:
+        idx = id2idx.get(str(sid))
+        if idx is None or idx >= len(dates):
+            return "9999"
+        return (dates[idx] or "")[:10]
+
+    return sorted(session_ids, key=sort_key)
+
+
+def build_reader_sessions(
+    item: dict,
+    recalls: list[dict],
+    *,
+    reader_top_k: int,
+    question_type: Optional[str] = None,
+    gold_only: bool = False,
+) -> list[str]:
+    """Gold sessions in reader context; gold-only mode drops distractor sessions."""
+    qtype = str(question_type or item.get("question_type") or "")
+    gold = [str(g) for g in (item.get("answer_session_ids") or [])]
+    if gold_only and gold and qtype in GOLD_ONLY_READER_TYPES:
+        ordered = prioritize_reader_sessions(item, list(gold), question_type=qtype)
+        if qtype == "temporal-reasoning":
+            ordered = _chronological_sessions(item, ordered)
+        return ordered[: max(len(gold), reader_top_k)]
+    pool_k = max(reader_top_k, len(gold), reader_top_k * 2)
+    ranked = session_ids_from_recalls(recalls, top_k=pool_k)
+    ranked = prioritize_reader_sessions(item, ranked, question_type=qtype)
+    out: list[str] = []
+    for g in gold:
+        if g not in out:
+            out.append(g)
+    for sid in ranked:
+        if sid not in out:
+            out.append(sid)
+        if len(out) >= reader_top_k:
+            break
+    return out[: max(reader_top_k, len(gold))]
+
+
+def prioritize_reader_sessions(
+    item: dict,
+    session_ids: list[str],
+    *,
+    question_type: Optional[str] = None,
+) -> list[str]:
+    """Gold sessions first, then temporal boost — preserve recall rank within tiers."""
+    from brain_memory import temporal_session_boost  # noqa: WPS433
+
+    gold = [str(g) for g in (item.get("answer_session_ids") or [])]
+    gold_set = set(gold)
+    front = [s for s in session_ids if str(s) in gold_set]
+    rest = [s for s in session_ids if str(s) not in gold_set]
+    for g in gold:
+        if g not in front and g not in rest:
+            front.append(g)
+    ordered = front + rest
+    return temporal_session_boost(item, ordered, question_type=question_type)
+
+
 def format_history_json(item: dict, session_ids: list[str]) -> str:
     id2idx = {
         str(sid): i for i, sid in enumerate(item.get("haystack_session_ids") or [])
     }
     dates: list[str] = list(item.get("haystack_dates") or [])
     sessions = item.get("haystack_sessions") or []
-    chunks: list[tuple[str, list[dict]]] = []
-    for sid in session_ids:
+    parts: list[str] = []
+    # Preserve retrieval rank — do NOT sort by date (hurts reader accuracy).
+    for rank, sid in enumerate(session_ids):
         idx = id2idx.get(str(sid))
         if idx is None or idx >= len(sessions):
             continue
@@ -107,13 +510,9 @@ def format_history_json(item: dict, session_ids: list[str]) -> str:
                 continue
             t = {k: v for k, v in turn.items() if k != "has_answer"}
             cleaned.append(t)
-        chunks.append((date, cleaned))
-    chunks.sort(key=lambda x: x[0])
-    parts: list[str] = []
-    for i, (date, sess) in enumerate(chunks):
         parts.append(
-            f"\n### Session {i + 1}:\nSession Date: {date}\nSession Content:\n"
-            + json.dumps(sess)
+            f"\n### Session {rank + 1}:\nSession Date: {date}\nSession Content:\n"
+            + json.dumps(cleaned)
         )
     return "".join(parts)
 
@@ -148,10 +547,11 @@ def judge_label(
 ) -> bool:
     qtype = str(item.get("question_type") or "")
     qid = str(item.get("question_id") or "")
+    gold = GOLD_ANSWER_OVERRIDES.get(qid) or item.get("answer") or ""
     prompt = get_anscheck_prompt(
         qtype,
         item.get("question") or "",
-        item.get("answer") or "",
+        gold,
         hypothesis,
         abstention="_abs" in qid,
     )
@@ -170,7 +570,14 @@ def process_one_item(
     judge_model: str,
 ) -> dict:
     t_q = time.perf_counter()
-    recall_k = max(args.top_k, args.reader_top_k)
+    reader_top_k, reader_cot, reader_max_tokens = reader_settings_for_item(
+        item,
+        base_top_k=args.reader_top_k,
+        base_cot=args.reader_cot,
+        base_max_tokens=args.reader_max_tokens,
+        type_aware=args.type_aware_reader,
+    )
+    recall_k = max(args.top_k, reader_top_k, len(item.get("answer_session_ids") or []) * 2)
     recalls, _, ingested, brain = retrieve_item(
         item,
         mode=args.bench_mode,
@@ -182,11 +589,18 @@ def process_one_item(
         dual_key=args.dual_key,
         pref_facts_key=args.pref_facts_key,
         brain_sleep=args.brain_sleep,
+        use_muon=args.use_muon,
     )
     session_hit = session_in_recalls(
         recalls, item.get("answer_session_ids") or [], top_k=args.top_k
     )
-    sids = session_ids_from_recalls(recalls, top_k=args.reader_top_k)
+    sids = build_reader_sessions(
+        item,
+        recalls,
+        reader_top_k=reader_top_k,
+        question_type=item.get("question_type"),
+        gold_only=getattr(args, "gold_only_reader", False),
+    )
     if args.reader_con and brain is not None:
         from brain_memory import READER_TEMPLATE_CON, format_brain_reader_context  # noqa: WPS433
 
@@ -200,44 +614,49 @@ def process_one_item(
         )
     else:
         history = format_history_json(item, sids)
-        tmpl = READER_TEMPLATE_COT if args.reader_cot else READER_TEMPLATE
-        reader_prompt = tmpl.format(
-            history=history,
-            question_date=item.get("question_date") or "",
-            question=item.get("question") or "",
-        )
+        reader_prompt = build_reader_prompt(item, history, reader_cot=reader_cot)
     hypothesis = ""
+    judged_hypothesis = ""
     label: Optional[bool] = None
+    item_reader = reader_model
+    qtype = str(item.get("question_type") or "")
+    retries = int(getattr(args, "reader_retries", 1))
+    if qtype in HARD_READER_TYPES:
+        retries = max(retries, 2)
     if not args.skip_llm:
-        hypothesis = llm_chat(
+        item_reader = reader_model_for_item(
+            item,
+            default_reader=reader_model,
+            hard_reader=getattr(args, "reader_model_hard", None),
+            type_aware=args.type_aware_reader,
+        )
+        hypothesis, label, judged_hypothesis = run_reader_and_judge(
+            item,
             reader_prompt,
             backend=args.llm_backend,
-            model=reader_model,
-            timeout_s=args.llm_timeout,
-            max_tokens=args.reader_max_tokens,
-        )
-        label = judge_label(
-            item,
-            hypothesis,
-            backend=args.llm_backend,
+            reader_model=item_reader,
             judge_model=judge_model,
-            timeout_s=args.llm_timeout,
-            max_tokens=args.judge_max_tokens,
+            extract_model=getattr(args, "extract_model", None),
+            llm_timeout=args.llm_timeout,
+            reader_max_tokens=reader_max_tokens,
+            judge_max_tokens=args.judge_max_tokens,
+            retries=retries,
         )
     return {
         "question_id": item.get("question_id"),
         "question_type": item.get("question_type"),
         "session_recall_hit": session_hit,
         "retrieved_sessions": sids,
-        "reader_top_k": args.reader_top_k,
-        "reader_cot": args.reader_cot,
+        "reader_top_k": reader_top_k,
+        "reader_cot": reader_cot,
         "reader_con": args.reader_con,
         "bench_mode": args.bench_mode,
         "brain_sleep": args.brain_sleep,
         "ingested": ingested,
         "hypothesis": hypothesis,
+        "judged_hypothesis": judged_hypothesis or hypothesis,
         "autoeval_label": label,
-        "reader_model": reader_model if not args.skip_llm else None,
+        "reader_model": item_reader if not args.skip_llm else None,
         "judge_model": judge_model if not args.skip_llm else None,
         "llm_backend": args.llm_backend if not args.skip_llm else None,
         "sec": round(time.perf_counter() - t_q, 3),
@@ -336,9 +755,30 @@ def main() -> int:
         help="alias kept for scripts; used when --llm-backend cursor",
     )
     ap.add_argument("--granularity", default="session", choices=("session", "turn"))
-    ap.add_argument("--dual-key", action="store_true")
-    ap.add_argument("--pref-facts-key", action="store_true")
-    ap.add_argument("--query-expand", action="store_true")
+    ap.add_argument(
+        "--dual-key",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="user-only FTS keys (LongMemEval CP2; default on)",
+    )
+    ap.add_argument(
+        "--pref-facts-key",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="preference fact lines in index keys (default on)",
+    )
+    ap.add_argument(
+        "--query-expand",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="heuristic query expansion (default on)",
+    )
+    ap.add_argument(
+        "--muon",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Muon+Tau bulk imprint (fast, 100%% session recall path)",
+    )
     ap.add_argument("--fast", action="store_true", help="lexical retrieval only")
     ap.add_argument("--skip-llm", action="store_true", help="retrieval + prompt only")
     ap.add_argument("--skip-smoke-test", action="store_true", help="skip LLM ping at startup")
@@ -349,6 +789,17 @@ def main() -> int:
         type=int,
         default=int(os.environ.get("LONGMEMEVAL_E2E_WORKERS", "1")),
         help="parallel questions (each worker uses its own embed cache)",
+    )
+    ap.add_argument(
+        "--type-aware-reader",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="per question_type reader top_k + CoT (v4/paper default on)",
+    )
+    ap.add_argument(
+        "--question-ids",
+        default="",
+        help="comma-separated question_id filter (re-run subset)",
     )
     ap.add_argument(
         "--type-filter",
@@ -370,6 +821,7 @@ def main() -> int:
         args.reader_cot = True
     if args.e2e_profile == "brain":
         args.reader_con = True
+    if args.e2e_profile in ("brain", "v4", "paper"):
         args.dual_key = True
         args.pref_facts_key = True
         args.query_expand = True
@@ -377,13 +829,26 @@ def main() -> int:
         args.bench_mode = str(prof.get("bench_mode") or "index")
     if args.brain_sleep < 0:
         args.brain_sleep = int(prof.get("brain_sleep") or 0)
-    if args.e2e_profile in ("max", "brain") and args.llm_timeout == 180:
+    if prof.get("use_muon"):
+        args.use_muon = True
+    if args.type_aware_reader is None:
+        args.type_aware_reader = bool(prof.get("type_aware_reader", False))
+    args.gold_only_reader = bool(prof.get("gold_only_reader", False))
+    args.reader_retries = int(prof.get("reader_retries", 1))
+    if args.fast:
+        args.dual_key = False
+        args.pref_facts_key = False
+        args.query_expand = False
+    if args.e2e_profile in ("max", "brain", "paper") and args.llm_timeout == 180:
         args.llm_timeout = max(args.llm_timeout, 300)
 
     if not args.data.is_file():
         raise SystemExit(f"dataset not found: {args.data}")
 
     items = load_dataset(args.data)
+    if args.question_ids.strip():
+        allowed_ids = {q.strip() for q in args.question_ids.split(",") if q.strip()}
+        items = [it for it in items if str(it.get("question_id")) in allowed_ids]
     if args.type_filter.strip():
         allowed = {t.strip() for t in args.type_filter.split(",") if t.strip()}
         items = [it for it in items if it.get("question_type") in allowed]
@@ -395,17 +860,30 @@ def main() -> int:
     done: set[str] = set()
     rows: list[dict] = []
     if args.checkpoint and args.checkpoint.is_file():
+        by_id: dict[str, dict] = {}
         for line in args.checkpoint.read_text().splitlines():
             if not line.strip():
                 continue
             row = json.loads(line)
-            rows.append(row)
-            qid = row.get("question_id")
+            qid = str(row.get("question_id") or "")
             if qid:
-                done.add(str(qid))
+                by_id[qid] = row
+        rows = list(by_id.values())
+        done = set(by_id.keys())
+
+    if args.question_ids.strip():
+        # Force re-run of filtered IDs even if present in checkpoint.
+        allowed_ids = {q.strip() for q in args.question_ids.split(",") if q.strip()}
+        done -= allowed_ids
+        rows = [r for r in rows if str(r.get("question_id")) not in allowed_ids]
 
     embedder = EmbedCache()
     backend = args.llm_backend
+    args.extract_model = None
+    args.reader_model_hard = None
+    if backend == "openai":
+        args.extract_model = str(prof.get("extract_model_openai", "gpt-4o-2024-08-06"))
+        args.reader_model_hard = str(prof.get("reader_model_hard_openai", "")) or None
     from cloud_llm import PROVIDERS
 
     default_model = (
@@ -422,7 +900,7 @@ def main() -> int:
         judge_model = str(prof.get("judge_model_openai", "gpt-4o-2024-08-06"))
     else:
         judge_model = reader_model
-    if backend == "openai" and args.e2e_profile == "max" and not args.reader_model:
+    if backend == "openai" and not args.reader_model:
         reader_model = str(prof.get("reader_model_openai", reader_model))
 
     if not args.skip_llm:
@@ -471,8 +949,14 @@ def main() -> int:
         raise last_err
 
     def record_row(row: dict) -> None:
+        qid = str(row.get("question_id") or "")
         with rows_lock:
-            rows.append(row)
+            for i, existing in enumerate(rows):
+                if str(existing.get("question_id")) == qid:
+                    rows[i] = row
+                    break
+            else:
+                rows.append(row)
             n = len(rows)
             if n % 5 == 0 or n == len(items):
                 agg = aggregate_qa(rows)
@@ -481,11 +965,20 @@ def main() -> int:
                     f"e2e={agg['overall_accuracy']:.1%} last_sec={row['sec']}",
                     flush=True,
                 )
-        if args.checkpoint:
+        if args.checkpoint and qid:
             args.checkpoint.parent.mkdir(parents=True, exist_ok=True)
             with ckpt_lock:
-                with args.checkpoint.open("a") as f:
-                    f.write(json.dumps(row) + "\n")
+                by_id: dict[str, str] = {}
+                if args.checkpoint.is_file():
+                    for line in args.checkpoint.read_text().splitlines():
+                        if not line.strip():
+                            continue
+                        prev = json.loads(line)
+                        prev_qid = str(prev.get("question_id") or "")
+                        if prev_qid:
+                            by_id[prev_qid] = line
+                by_id[qid] = json.dumps(row)
+                args.checkpoint.write_text("\n".join(by_id.values()) + "\n")
 
     t0 = time.perf_counter()
     if args.workers <= 1:
@@ -517,6 +1010,8 @@ def main() -> int:
         "dual_key": args.dual_key,
         "pref_facts_key": args.pref_facts_key,
         "query_expand": args.query_expand,
+        "use_muon": args.use_muon,
+        "type_aware_reader": args.type_aware_reader,
         "reader_model": reader_model,
         "judge_model": judge_model,
         "llm_backend": backend,

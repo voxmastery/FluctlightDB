@@ -85,8 +85,9 @@ def _http_chat(
         "messages": [{"role": "user", "content": prompt}],
     }
     if _openai_reasoning_model(model):
-        # GPT-5 / o-series: max_completion_tokens; no temperature=0.
-        body["max_completion_tokens"] = max(max_tokens, 256)
+        # GPT-5 / o-series: budget must cover hidden reasoning + visible output.
+        body["max_completion_tokens"] = max(max_tokens + 12_000, 16_384)
+        body["reasoning_effort"] = "low"
     else:
         body["temperature"] = 0
         body["max_tokens"] = max_tokens
@@ -125,7 +126,21 @@ def _http_chat(
     text = msg.get("content") or msg.get("reasoning") or ""
     if not str(text).strip() and _openai_reasoning_model(model):
         fr = data["choices"][0].get("finish_reason") or ""
-        raise RuntimeError(f"openai empty text (model={model}, finish_reason={fr})")
+        if fr == "length" and body.get("max_completion_tokens", 0) < 32_768:
+            body["max_completion_tokens"] = min(32_768, int(body["max_completion_tokens"]) * 2)
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(body).encode(),
+                headers=headers,
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                data = json.loads(resp.read().decode())
+            msg = data["choices"][0]["message"]
+            text = msg.get("content") or msg.get("reasoning") or ""
+        if not str(text).strip():
+            fr = data["choices"][0].get("finish_reason") or ""
+            raise RuntimeError(f"openai empty text (model={model}, finish_reason={fr})")
     return str(text).strip()
 
 
