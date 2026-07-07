@@ -8,7 +8,7 @@ LaTeX preprint and reproducible benchmarks live in this repository.
 | **Figures (download)** | [`papers/figures/`](figures/) — PDF + PNG |
 | **arXiv checklist** | `papers/arxiv-v1/ARXIV_SUBMISSION.md` |
 | **Static viewer** | `papers/public/` (HF Space source) |
-| **Frozen metrics** | `benchmarks/results/paper-2026-07-04.json` |
+| **Frozen metrics** | `benchmarks/results/paper-2026-07-07.json` |
 | **Cite** | [CITATION.cff](../CITATION.cff) · [Zenodo DOI](https://doi.org/10.5281/zenodo.20949890) |
 
 ## Build PDF

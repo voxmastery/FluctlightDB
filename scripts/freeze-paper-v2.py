@@ -9,7 +9,7 @@ from datetime import date
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-DEFAULT_BASE = REPO / "benchmarks/results/paper-2026-07-04.json"
+DEFAULT_BASE = REPO / "benchmarks/results/paper-2026-07-07.json"
 
 
 def load_json(path: Path) -> dict:

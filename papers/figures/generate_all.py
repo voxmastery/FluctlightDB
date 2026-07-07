@@ -14,7 +14,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Ellipse, FancyArrowPatch, FancyBboxPatch
 
 ROOT = Path(__file__).resolve().parent
-METRICS = ROOT.parents[1] / "benchmarks" / "results" / "paper-2026-07-04.json"
+METRICS = ROOT.parents[1] / "benchmarks" / "results" / "paper-2026-07-07.json"
 
 # Print-safe academic palette
 C_STORAGE = "#4C78A8"
@@ -238,13 +238,37 @@ def fig_hero_standalone() -> None:
     render("01-brain-hero", hero_only=True)
 
 
-def fig_benchmark_summary() -> None:
-    labels = ["LoCoMo\nevidence recall", "LongMemEval-S\nsession@8", "BEIR SciFact\nnDCG@10", "FAMB\nmacro (index)"]
-    values = [98.1, 97.6, 64.5, 98.0]
-    colors = ["#4C78A8", "#59A14F", "#E15759", "#B07AA1"]
-    display = ["98.1%", "97.6%", "0.645", "98%"]
+def _load_metrics() -> dict:
+    return json.loads(METRICS.read_text())
 
-    fig, ax = plt.subplots(figsize=(8, 4.5), facecolor="white")
+
+def fig_benchmark_summary() -> None:
+    m = _load_metrics()
+    lme = m["longmemeval_s"]
+    e2e_pct = lme["e2e"]["overall_accuracy"] * 100
+    retr_pct = lme["session_recall_at_8"] * 100
+    locomo_pct = m["locomo"]["mean_evidence_recall"] * 100
+    beir_ndcg = m["beir_scifact"]["systems"]["fluctlightdb_index"]["ndcg_at_10"]
+    famb_pct = m["famb"]["index_macro"] * 100
+
+    labels = [
+        "LoCoMo\nevidence recall",
+        "LongMemEval-S\nsession@8 (retrieval)",
+        "LongMemEval-S\nE2E QA (OpenAI)",
+        "BEIR SciFact\nnDCG@10",
+        "FAMB\nmacro (index)",
+    ]
+    values = [locomo_pct, retr_pct, e2e_pct, beir_ndcg * 100, famb_pct]
+    colors = ["#4C78A8", "#72B7B2", "#59A14F", "#E15759", "#B07AA1"]
+    display = [
+        f"{locomo_pct:.1f}%",
+        f"{retr_pct:.1f}%",
+        f"{e2e_pct:.1f}%",
+        f"{beir_ndcg:.3f}",
+        f"{famb_pct:.0f}%",
+    ]
+
+    fig, ax = plt.subplots(figsize=(10, 4.5), facecolor="white")
     bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
     ax.set_ylim(0, 105)
     ax.set_ylabel("Score (% scale; BEIR nDCG×100)")
@@ -261,7 +285,10 @@ def fig_benchmark_summary() -> None:
 
 
 def fig_longmemeval_by_type() -> None:
-    data = json.loads(METRICS.read_text())["longmemeval_s"]["by_type"]
+    lme = _load_metrics()["longmemeval_s"]
+    data = lme["by_type"]
+    overall_pct = lme["session_recall_at_8"] * 100
+    hits = lme["hits"]
     order = [
         ("knowledge-update", "knowledge\nupdate"),
         ("multi-session", "multi-\nsession"),
@@ -278,7 +305,9 @@ def fig_longmemeval_by_type() -> None:
     bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
     ax.set_ylim(0, 105)
     ax.set_ylabel("session_recall@8 (%)")
-    ax.set_title("Figure 3 — LongMemEval-S by question type (488/500 overall = 97.6%)")
+    ax.set_title(
+        f"Figure 3 — LongMemEval-S retrieval session@8 by type ({hits} overall = {overall_pct:.1f}%)"
+    )
     ax.axhline(90, color="#888", linestyle="--", linewidth=0.8)
     for bar, v in zip(bars, values):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
@@ -289,12 +318,56 @@ def fig_longmemeval_by_type() -> None:
     save(fig, "03-longmemeval-by-type")
 
 
+def fig_longmemeval_e2e_by_type() -> None:
+    e2e = _load_metrics()["longmemeval_s"]["e2e"]
+    data = e2e["by_type_accuracy"]
+    overall_pct = e2e["overall_accuracy"] * 100
+    n = e2e["questions"]
+    correct = round(overall_pct / 100 * n)
+
+    order = [
+        ("knowledge-update", "knowledge\nupdate"),
+        ("multi-session", "multi-\nsession"),
+        ("single-session-user", "user"),
+        ("single-session-assistant", "assistant"),
+        ("temporal-reasoning", "temporal"),
+        ("single-session-preference", "preference"),
+    ]
+    labels = [o[1] for o in order]
+    values = [data[o[0]] * 100 for o in order]
+    colors = ["#59A14F" if v >= 90 else "#F28E2B" if v >= 80 else "#E15759" for v in values]
+
+    fig, ax = plt.subplots(figsize=(9, 4.5), facecolor="white")
+    bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
+    ax.set_ylim(0, 105)
+    ax.set_ylabel("E2E QA accuracy (%)")
+    ax.set_title(
+        f"Figure 4 — LongMemEval-S E2E QA by type (paper profile; {correct}/{n} = {overall_pct:.1f}%)"
+    )
+    ax.axhline(90, color="#888", linestyle="--", linewidth=0.8)
+    for bar, v in zip(bars, values):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1,
+            f"{v:.1f}%",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    fig.tight_layout()
+    save(fig, "04-longmemeval-e2e-by-type")
+
+
 def main() -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     fig_architecture()
     fig_hero_standalone()
     fig_benchmark_summary()
     fig_longmemeval_by_type()
+    fig_longmemeval_e2e_by_type()
     print(f"All figures in {ROOT}")
 
 

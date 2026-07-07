@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-E2E_JSON="${1:-benchmarks/results/longmemeval-e2e-v4-mpnet.json}"
+E2E_JSON="${1:-benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}"
 FULL_JSON="${2:-benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json}"
-PAPER_JSON="${3:-benchmarks/results/paper-2026-07-04.json}"
+PAPER_JSON="${3:-benchmarks/results/paper-2026-07-07.json}"
 TEX="$ROOT/papers/arxiv-v1/main.tex"
 
 if [[ ! -f "$E2E_JSON" ]]; then
@@ -32,12 +32,12 @@ pct = f"{acc * 100:.1f}\\%"
 tex = Path("$TEX")
 text = tex.read_text()
 new = (
-    f"FluctlightDB (v4) & \\\\textbf{{97.6\\\\%}} & \\\\textbf{{{pct}}} "
-    f"& Gemini 2.5 Flash reader + judge (Wu et al. judge prompts) \\\\"
+    f"FluctlightDB (paper) & \\\\textbf{{100\\\\%}} & \\\\textbf{{{pct}}} "
+    f"& Muon; gpt-4o/5 reader; gpt-4o judge \\\\"
 )
 old = (
-    r"FluctlightDB \(v4\) & \\textbf\{97\.6\\%\} & "
-    r"(?:\(Colab run\)|\(pending\)|\\textbf\{[0-9.]+\%\}) & [^\\\\]+\\\\"
+    r"FluctlightDB \(paper\) & \\textbf\{100\\%\} & "
+    r"\\textbf\{[0-9.]+\%\} & [^\\\\]+\\\\"
 )
 if not re.search(old, text):
     raise SystemExit("Could not find FluctlightDB E2E table row in main.tex")

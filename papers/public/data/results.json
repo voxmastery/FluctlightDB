@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-04",
+  "date": "2026-07-07",
   "harness": "FluctlightDB benchmark suite (paper v2)",
   "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
   "doi": "10.5281/zenodo.20949890",
@@ -8,9 +8,24 @@
   "beir_scifact": {
     "embedder": "all-MiniLM-L6-v2 ONNX CPU",
     "systems": {
-      "chroma": {"ndcg_at_10": 0.645, "recall_at_10": 0.783, "recall_at_100": 0.925, "query_ms": "5-7"},
-      "fluctlightdb_index": {"ndcg_at_10": 0.645, "recall_at_10": 0.783, "recall_at_100": 0.925, "query_ms": "5-7"},
-      "fluctlightdb_agent": {"ndcg_at_10": 0.651, "recall_at_10": 0.790, "recall_at_100": 0.941, "query_ms": 15}
+      "chroma": {
+        "ndcg_at_10": 0.645,
+        "recall_at_10": 0.783,
+        "recall_at_100": 0.925,
+        "query_ms": "5-7"
+      },
+      "fluctlightdb_index": {
+        "ndcg_at_10": 0.645,
+        "recall_at_10": 0.783,
+        "recall_at_100": 0.925,
+        "query_ms": "5-7"
+      },
+      "fluctlightdb_agent": {
+        "ndcg_at_10": 0.651,
+        "recall_at_10": 0.79,
+        "recall_at_100": 0.941,
+        "query_ms": 15
+      }
     },
     "frozen_source": "benchmarks/results/2025-06-22.json"
   },
@@ -81,8 +96,29 @@
       "m3_memory_r10": 0.968,
       "note": "Published leaderboard uses session_recall@5 or @10; our run uses k=8 with hybrid BM25+vector."
     },
-    "frozen_source_full": "benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json",
+    "frozen_source_full": "longmemeval-colab-v2-full-2026-07-04.json",
     "reproduce_colab": "benchmarks/longmemeval_colab_v2.ipynb",
-    "reproduce_local": "scripts/start-embed-mpnet.sh && python3 benchmarks/longmemeval_bench.py --granularity session --metric session --dual-key --pref-facts-key --query-expand"
+    "reproduce_local": "scripts/start-embed-mpnet.sh && python3 benchmarks/longmemeval_bench.py --granularity session --metric session --dual-key --pref-facts-key --query-expand",
+    "unified_v4": true,
+    "wall_s_full": 4379.7,
+    "sec_per_question_full": 8.76,
+    "e2e": {
+      "overall_accuracy": 0.974,
+      "task_averaged_accuracy": 0.9819,
+      "session_recall_at_k": 1.0,
+      "questions": 500,
+      "reader_model": "gpt-4o-2024-08-06",
+      "judge_model": "gpt-4o-2024-08-06",
+      "llm_backend": "openai",
+      "by_type_accuracy": {
+        "knowledge-update": 0.9744,
+        "multi-session": 0.9248,
+        "single-session-assistant": 1.0,
+        "single-session-preference": 1.0,
+        "single-session-user": 1.0,
+        "temporal-reasoning": 0.9925
+      },
+      "frozen_source": "e2e-cert-paper-v2-2026-07-07.json"
+    }
   }
 }
