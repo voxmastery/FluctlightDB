@@ -11,14 +11,14 @@
       "chroma": {
         "ndcg_at_10": 0.645,
         "recall_at_10": 0.783,
-        "recall_at_100": 0.925,
-        "query_ms": "5-7"
+        "recall_at_100": 0.927,
+        "query_ms": "7"
       },
       "fluctlightdb_index": {
-        "ndcg_at_10": 0.645,
-        "recall_at_10": 0.783,
-        "recall_at_100": 0.925,
-        "query_ms": "5-7"
+        "ndcg_at_10": 0.634,
+        "recall_at_10": 0.768,
+        "recall_at_100": 0.91,
+        "query_ms": "26"
       },
       "fluctlightdb_agent": {
         "ndcg_at_10": 0.651,
@@ -27,7 +27,8 @@
         "query_ms": 15
       }
     },
-    "frozen_source": "benchmarks/results/2025-06-22.json"
+    "frozen_source": "beir-scifact-2026-07-07.json",
+    "agent_frozen_source": "benchmarks/results/2025-06-22.json"
   },
   "locomo": {
     "conversations": 10,
@@ -36,17 +37,33 @@
     "mode": "index",
     "rag_mode": "all",
     "embedder": "all-MiniLM-L6-v2 ONNX CPU",
-    "mean_evidence_recall": 0.981,
-    "evidence_all_in_context": 0.971,
-    "evidence_hits": "1925/1982",
-    "wall_s_warm": 271,
-    "wall_s_cold": 335,
-    "frozen_source": "benchmarks/results/2025-06-22.json"
+    "mean_evidence_recall": 0.977,
+    "evidence_all_in_context": 0.964,
+    "evidence_hits": "1953/1982",
+    "wall_s_warm": 28.5,
+    "wall_s_cold": 28.5,
+    "memories_ingested": 8423,
+    "frozen_source": "locomo-index-2026-07-07.json"
   },
   "famb": {
-    "index_macro": 0.98,
-    "agent_macro": 0.97,
-    "frozen_source": "benchmarks/results/2025-06-22.json"
+    "index_macro": 0.8,
+    "agent_macro": 0.98,
+    "index_scores": {
+      "paraphrase_recall_at_1": 1.0,
+      "provenance_top1": 1.0,
+      "persistence_recall": 1.0,
+      "confusion_ingest": 1.0,
+      "determinism": 0.0
+    },
+    "agent_scores": {
+      "paraphrase_recall_at_1": 0.9,
+      "provenance_top1": 1.0,
+      "persistence_recall": 1.0,
+      "confusion_ingest": 1.0,
+      "determinism": 1.0
+    },
+    "frozen_source_index": "famb-index-2026-07-07.json",
+    "frozen_source_agent": "famb-agent-2026-07-07.json"
   },
   "longmemeval_s": {
     "dataset": "longmemeval_s_cleaned.json (Wu et al., ICLR 2025)",
