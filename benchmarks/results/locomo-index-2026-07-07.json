@@ -1,0 +1,17 @@
+{
+  "benchmark": "locomo",
+  "dataset": "/tmp/locomo/locomo10.json",
+  "mode": "index",
+  "rag_mode": "all",
+  "top_k": 150,
+  "embedder": "all-MiniLM-L6-v2 ONNX CPU",
+  "conversations": 10,
+  "memories_ingested": 8423,
+  "embed_cache_hits": 10405,
+  "embed_cache_misses": 0,
+  "wall_s": 28.5,
+  "questions": 1982,
+  "mean_evidence_recall": 0.9773668356435318,
+  "evidence_all_in_context": 0.963673057517659,
+  "evidence_hits": "1953/1982"
+}

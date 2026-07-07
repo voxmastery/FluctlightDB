@@ -34,17 +34,17 @@ semantics (cue-driven activation across a linked memory graph). We present
 \textbf{FluctlightDB}, an embedded, brain-native database engine that implements
 this model behind two primitives, \texttt{experience()} and \texttt{activate()}.
 On the official LoCoMo long-conversation benchmark (10 conversations,
-1{,}982 gold evidence spans), FluctlightDB's hybrid index recalls \textbf{98.1\%}
-of gold evidence---warm and cold-start identical. On LongMemEval-S (500 questions,
+1{,}982 gold evidence spans), FluctlightDB's hybrid index recalls \textbf{97.7\%}
+of gold evidence on a certified July 2026 rerun. On LongMemEval-S (500 questions,
 official \texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\%}
 (488/500), competitive with published hybrid memory systems on the same benchmark.
 End-to-end QA on the same benchmark---official reader prompts, GPT-4o judge, Muon
 retrieval in the \texttt{paper} profile---scores \textbf{97.4\%} (487/500) with
 \textbf{100\%} session recall@8 in the certified pipeline.
-On BEIR SciFact it matches a tuned Chroma + MiniLM baseline on nDCG@10 at equal
-latency, while agent mode improves Recall@100. On an agent-specific suite (FAMB)
-it scores 97--98\% macro across paraphrase recall, provenance ranking,
-persistence, and write-time separation. The engine, harnesses, and frozen metrics
+On BEIR SciFact (shared MiniLM embeddings) index mode scores nDCG@10
+\textbf{0.634} versus Chroma \textbf{0.645}; agent mode improves Recall@100 to
+\textbf{0.941}. On an agent-specific suite (FAMB) index-mode macro is
+\textbf{80\%} and agent-mode \textbf{98\%} on a July 2026 rerun. The engine, harnesses, and frozen metrics
 are released under the MIT license. We claim no new neuroscience and no new
 transformer; we claim a missing layer of the data stack, and an engine that fills it.
 \end{abstract}
@@ -79,11 +79,11 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   \item \textbf{An engine.} FluctlightDB, an embedded Rust engine exposing
   \texttt{experience()} / \texttt{activate()} / \texttt{checkpoint()}---one
   durable store per agent, with no external services.
-  \item \textbf{Evidence.} \textbf{98.1\%} evidence recall on full LoCoMo,
+  \item \textbf{Evidence.} \textbf{97.7\%} evidence recall on full LoCoMo,
   \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
   \textbf{97.4\%} end-to-end QA on LongMemEval-S (500 questions, official judge),
-  parity with a tuned vector baseline on BEIR SciFact, and 97--98\% macro on an agent-specific
-  benchmark.
+  BEIR SciFact competitive with Chroma on shared embeddings, and
+  \textbf{80\%}/\textbf{98\%} FAMB macro (index/agent) on July 2026 reruns.
   \item \textbf{Reproducibility.} Open harnesses and frozen result JSON so every
   number here can be re-run with one command.
 \end{itemize}
@@ -247,8 +247,8 @@ The frozen retrieval numbers in Section~\ref{sec:eval} were measured with Fabric
 \label{sec:eval}
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-07.json} (LoCoMo, BEIR, FAMB from
-2025-06-22; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
+\texttt{benchmarks/results/paper-2026-07-07.json} (LoCoMo, BEIR, FAMB reruns
+2026-07-07; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
 2026-07-07).
 
 \begin{figure}[t]
@@ -261,46 +261,46 @@ nDCG@10; FAMB reports index-mode macro score.}
 \label{fig:benchmarks}
 \end{figure}
 
-\subsection{BEIR SciFact: parity with a tuned vector baseline}
+\subsection{BEIR SciFact: competitive with a tuned vector baseline}
 We score standard IR metrics via \texttt{pytrec\_eval} against official qrels,
-using identical embeddings for FluctlightDB and Chroma. Index mode is a dead heat
-on quality and latency---meaning the memory engine costs nothing as a plain vector
-store---while agent mode, with graph co-activation, improves deep recall.
+using identical embeddings for FluctlightDB and Chroma. On a certified July 2026
+rerun, index mode trails Chroma slightly on nDCG@10 (0.634 vs.\ 0.645) while
+agent mode, with graph co-activation, improves deep recall (Recall@100 0.941
+vs.\ 0.927; agent metrics from the prior certified agent-mode run).
 
 \begin{table}[h]
 \centering
-\caption{BEIR SciFact (shared MiniLM embeddings).}
+\caption{BEIR SciFact (shared MiniLM embeddings, July 2026 rerun).}
 \begin{tabular}{lrrrr}
 \toprule
 System & nDCG@10 & R@10 & R@100 & Query (ms) \\
 \midrule
-Chroma & 0.645 & 0.783 & 0.925 & 5--7 \\
-FluctlightDB (index) & 0.645 & 0.783 & 0.925 & 5--7 \\
+Chroma & 0.645 & 0.783 & 0.927 & 7 \\
+FluctlightDB (index) & 0.634 & 0.768 & 0.910 & 26 \\
 FluctlightDB (agent) & \textbf{0.651} & \textbf{0.790} & \textbf{0.941} & 15 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{LoCoMo: 98.1\% evidence recall on the full set}
+\subsection{LoCoMo: 97.7\% evidence recall on the full set}
 LoCoMo~\cite{maharana2024locomo} stresses very long, multi-session dialogue. We
 report the official evidence-recall metric: the fraction of gold \texttt{dia\_id}
 evidence spans present in retrieved context. Configuration: \texttt{connect\_index()},
-ingest of dialog \emph{and} observations, $k{=}150$, hybrid vector+BM25, two CPU
-threads. The headline result is robust to cold start---clearing every cache and
-re-ingesting from scratch yields the identical figure---which is the property a
-production memory engine must have.
+ingest of dialog \emph{and} observations, $k{=}150$, hybrid vector+BM25. The
+July 2026 certified rerun (embed cache warm) scores \textbf{97.7\%} mean evidence
+recall.
 
 \begin{table}[h]
 \centering
-\caption{LoCoMo full set: 10 conversations, 1{,}982 gold evidence spans.}
+\caption{LoCoMo full set: 10 conversations, 1{,}982 gold evidence spans (July 2026).}
 \begin{tabular}{lrr}
 \toprule
-Metric & Warm & Cold (caches cleared) \\
+Metric & Value \\
 \midrule
-Mean evidence recall & \textbf{98.1\%} & \textbf{98.1\%} \\
-All evidence in context & 97.1\% & 97.1\% \\
-Evidence hits & 1925/1982 & 1925/1982 \\
-Wall time (s) & 271 & 335 \\
+Mean evidence recall & \textbf{97.7\%} \\
+All evidence in context & 96.4\% \\
+Evidence hits & 1953/1982 \\
+Wall time (s) & 29 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -313,14 +313,15 @@ quoted spans. A 50-question LoCoMo end-to-end pilot with a hosted reader LLM pro
 future work. On LongMemEval-S we report a full 500-question end-to-end certification
 (Table~\ref{tab:longmemeval-e2e}, Figure~\ref{fig:longmemeval-e2e-types}). The
 engine's job is to put the evidence in front of the reader, and at that job it scores
-98.1\% on LoCoMo retrieval.
+97.7\% on LoCoMo retrieval.
 
 \subsection{FAMB: the agent-specific suite}
 Generic IR does not test what agents need. FAMB measures paraphrase recall@1
 (real cues never match stored wording), provenance top-1 (verified ledger beats
 chat claim), persistence (recall survives checkpoint + reopen), confusion ingest
 (near-duplicates do not block new facts), and determinism. Index-mode macro is
-\textbf{98\%}; agent-mode macro is \textbf{97\%}.
+Index-mode macro is \textbf{80\%}; agent-mode macro is \textbf{98\%} (July 2026
+rerun; index-mode determinism is the remaining gap).
 
 \subsection{LongMemEval-S: 97.6\% session recall@8 (v4 unified 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
@@ -427,7 +428,7 @@ same pipeline is 100\% session@8.}
 
 \section{Discussion}
 \textbf{The engine is the contribution, not the reader.} A memory system should be
-judged on whether it surfaces the right evidence; 98.1\% on full LoCoMo says it
+judged on whether it surfaces the right evidence; 97.7\% on full LoCoMo says it
 does. End-to-end QA additionally depends on the language model and the prompt
 budget, and we are careful not to launder a retrieval win into a generation claim.
 
@@ -457,8 +458,8 @@ Systems such as Chroma, Qdrant, and FAISS~\cite{thakur2021beir} optimize approxi
 nearest-neighbor search. They answer \emph{similarity}, not \emph{memory}: there is
 no native episode, provenance-weighted recall, write-time separation, or
 cue-driven spreading activation. FluctlightDB's \texttt{connect\_index()} mode
-deliberately exposes a vector-fast path so we can measure parity on BEIR; agent
-mode adds graph co-activation on top of the same store.
+deliberately exposes a vector-fast path so we can measure IR credibility on BEIR;
+agent mode adds graph co-activation on top of the same store.
 
 \subsection{Agent memory SDKs and layers}
 \textbf{Mem0}~\cite{chhikara2025mem0} is the closest contemporary system: it
@@ -503,7 +504,7 @@ Cognee & Pipeline & Graph + vector ETL & --- & Task-specific \\
 MemGPT / Letta & Agent OS & Context tiers / blocks & --- & Session QA \\
 HippoRAG & Graph RAG & Associative graph retrieval & --- & Multi-hop QA \\
 Chroma / Qdrant & Vector DB & ANN top-$k$ & --- & IR / similarity \\
-FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{98.1\%} & LoCoMo evidence \\
+FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{97.7\%} & LoCoMo evidence \\
 FluctlightDB & Engine & hybrid index + session keys & \textbf{97.6\%} & LongMemEval session@8 \\
 FluctlightDB & Engine & Muon + paper E2E & \textbf{97.4\%} & LongMemEval E2E QA \\
 \bottomrule
@@ -521,7 +522,7 @@ model gave search a database for \emph{similarity}. Autonomous agents need a
 database for \emph{memory}, and it should be as boring to adopt and as rigorous to
 trust as SQLite. FluctlightDB is our argument that this engine can exist today: it
 matches vector baselines where they are strong, wins where memory semantics
-matter, recalls 98.1\% of gold evidence on LoCoMo, 97.6\% session recall on
+matter, recalls 97.7\% of gold evidence on LoCoMo, 97.6\% session recall on
 LongMemEval-S (retrieval-only v4), and 97.4\% end-to-end QA on the same
 benchmark. We release everything needed to reproduce and contest these claims.
 
