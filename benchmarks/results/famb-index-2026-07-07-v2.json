@@ -1,0 +1,14 @@
+{
+  "benchmark": "famb",
+  "mode": "index",
+  "noise_distractors": 200,
+  "scores": {
+    "paraphrase_recall_at_1": 1.0,
+    "provenance_top1": 1.0,
+    "persistence_recall": 1.0,
+    "confusion_ingest": 1.0,
+    "determinism": 1.0
+  },
+  "macro": 1.0,
+  "wall_s": 2.7
+}

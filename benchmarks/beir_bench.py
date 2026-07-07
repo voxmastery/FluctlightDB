@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 """Certified IR benchmark: BEIR + pytrec_eval (nDCG@10, Recall@10/100).
 
-Compares FluctlightDB index mode vs Chroma with the same all-MiniLM-L6-v2 embeddings.
+Compares FluctlightDB index and agent modes vs Chroma with the same all-MiniLM-L6-v2 embeddings.
+
+Agent mode uses ``connect()`` (full episodic ingest) or ``connect_agent_fast()`` via
+``--agent-mode``. Full SciFact agent ingest is supported but slow ($\sim$3h); use
+``--skip-index`` with a prior index JSON to rerun agent only.
 
 Usage:
   BEIR_DATA=/tmp/beir BEIR_DS=scifact \\
   PYTHONPATH=sdks/python python benchmarks/beir_bench.py
+
+  # Agent-only rerun (reuses chroma + index metrics from prior JSON):
+  PYTHONPATH=sdks/python python benchmarks/beir_bench.py \\
+    --skip-chroma --skip-index --chroma-json benchmarks/results/beir-scifact-2026-07-07.json \\
+    --agent-mode agent --json-out benchmarks/results/beir-scifact-agent.json
 """
 
 from __future__ import annotations
@@ -114,23 +123,47 @@ def run_chroma(doc_ids: list[str], doc_texts: list[str], doc_vecs: list[list[flo
     return run, statistics.mean(lats) if lats else 0.0, write_ms
 
 
-def run_fluctlight(doc_ids: list[str], doc_texts: list[str], doc_vecs: list[list[float]], test_qids: list[str], q_texts: list[str], q_vecs: list[list[float]]) -> tuple[dict[str, dict[str, float]], float, float]:
-    os.environ.setdefault("FLUCTLIGHT_FAST_INGEST", "1")
-    os.environ.setdefault("FLUCTLIGHT_VECTOR_FAST", "1")
+def run_fluctlight(
+    doc_ids: list[str],
+    doc_texts: list[str],
+    doc_vecs: list[list[float]],
+    test_qids: list[str],
+    q_texts: list[str],
+    q_vecs: list[list[float]],
+    *,
+    mode: str = "index",
+) -> tuple[dict[str, dict[str, float]], float, float]:
     os.environ.setdefault("FLUCTLIGHT_CHECKPOINT_EVERY_N", "100000")
     os.environ.setdefault("FLUCTLIGHT_WAL", "0")
     os.environ.setdefault("FLUCTLIGHT_SEPARATION_GATE", "0")
     os.environ.setdefault("FLUCTLIGHT_CANDIDATE_CAP", str(max(TOPK, 512)))
-    from fluctlightdb import connect_index
 
-    with tempfile.TemporaryDirectory(prefix="beir-fl-") as tmp:
-        brain = connect_index(os.path.join(tmp, "brain"))
+    if mode == "index":
+        os.environ.setdefault("FLUCTLIGHT_FAST_INGEST", "1")
+        os.environ.setdefault("FLUCTLIGHT_VECTOR_FAST", "1")
+        from fluctlightdb import connect_index
+
+        open_brain = connect_index
+    else:
+        for key in ("FLUCTLIGHT_FAST_INGEST", "FLUCTLIGHT_VECTOR_FAST", "FLUCTLIGHT_AGENT_FAST"):
+            os.environ.pop(key, None)
+        if mode == "agent_fast":
+            from fluctlightdb import connect_agent_fast
+
+            open_brain = lambda p: connect_agent_fast(p)  # type: ignore[assignment]
+        else:
+            from fluctlightdb import connect
+
+            open_brain = connect
+
+    with tempfile.TemporaryDirectory(prefix=f"beir-fl-{mode}-") as tmp:
+        brain = open_brain(os.path.join(tmp, "brain"))
         t0 = time.perf_counter()
         n = len(doc_ids)
         for i, (did, txt, vec) in enumerate(zip(doc_ids, doc_texts, doc_vecs)):
             brain.experience(txt, context=did, salience=0.6, semantic_vector=vec, doc_id=did)
             if (i + 1) % 1000 == 0 or i + 1 == n:
-                print(f"  fluctlight ingest {i + 1}/{n}", flush=True)
+                print(f"  fluctlight {mode} ingest {i + 1}/{n}", flush=True)
         write_ms = (time.perf_counter() - t0) / len(doc_ids) * 1000.0
         run: dict[str, dict[str, float]] = {}
         lats: list[float] = []
@@ -163,6 +196,22 @@ def main() -> int:
         type=Path,
         default=REPO / "benchmarks" / "results" / "beir-scifact-2026-07-06.json",
         help="Prior chroma-only result when --skip-chroma",
+    )
+    ap.add_argument(
+        "--skip-agent",
+        action="store_true",
+        help="Skip FluctlightDB agent-mode run (index + chroma only)",
+    )
+    ap.add_argument(
+        "--skip-index",
+        action="store_true",
+        help="Skip FluctlightDB index-mode run (agent + chroma only)",
+    )
+    ap.add_argument(
+        "--agent-mode",
+        choices=("agent", "agent_fast"),
+        default=os.environ.get("BEIR_AGENT_MODE", "agent"),
+        help="Agent path: full connect() or connect_agent_fast() (default: agent)",
     )
     args = ap.parse_args()
 
@@ -223,12 +272,39 @@ def main() -> int:
         )
         chroma_scores = score_run(chroma_run, qrels)
 
-    print("fluctlight ingest+query...", flush=True)
-    t_fl = time.perf_counter()
-    fl_run, fl_q_ms, fl_w_ms = run_fluctlight(
-        doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs
-    )
-    fl_wall = round(time.perf_counter() - t_fl, 1)
+    fl_idx_block: dict[str, Any] | None = None
+    if not args.skip_index:
+        print("fluctlight index ingest+query...", flush=True)
+        t_fl = time.perf_counter()
+        fl_run, fl_q_ms, fl_w_ms = run_fluctlight(
+            doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs, mode="index"
+        )
+        fl_idx_block = {
+            **score_run(fl_run, qrels),
+            "write_ms_per_doc": round(fl_w_ms, 2),
+            "query_ms": round(fl_q_ms, 2),
+            "wall_s": round(time.perf_counter() - t_fl, 1),
+        }
+    elif args.chroma_json.is_file():
+        prior = json.loads(args.chroma_json.read_text())
+        if "fluctlightdb_index" in prior:
+            fl_idx_block = prior["fluctlightdb_index"]
+            print("index: reusing prior fluctlightdb_index metrics", flush=True)
+
+    fl_agent_block: dict[str, Any] | None = None
+    if not args.skip_agent:
+        print(f"fluctlight {args.agent_mode} ingest+query...", flush=True)
+        t_ag = time.perf_counter()
+        ag_run, ag_q_ms, ag_w_ms = run_fluctlight(
+            doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs, mode=args.agent_mode
+        )
+        fl_agent_block = {
+            **score_run(ag_run, qrels),
+            "write_ms_per_doc": round(ag_w_ms, 2),
+            "query_ms": round(ag_q_ms, 2),
+            "wall_s": round(time.perf_counter() - t_ag, 1),
+            "mode": args.agent_mode,
+        }
 
     out: dict[str, Any] = {
         "benchmark": "beir",
@@ -242,13 +318,10 @@ def main() -> int:
             "write_ms_per_doc": round(chroma_w_ms, 2),
             "query_ms": round(chroma_q_ms, 2),
         },
-        "fluctlightdb_index": {
-            **score_run(fl_run, qrels),
-            "write_ms_per_doc": round(fl_w_ms, 2),
-            "query_ms": round(fl_q_ms, 2),
-            "wall_s": fl_wall,
-        },
+        "fluctlightdb_index": fl_idx_block or {},
     }
+    if fl_agent_block is not None:
+        out["fluctlightdb_agent"] = fl_agent_block
     print(json.dumps(out, indent=2))
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)

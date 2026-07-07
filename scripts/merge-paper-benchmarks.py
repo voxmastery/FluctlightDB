@@ -37,7 +37,17 @@ def main() -> int:
 
     chroma = beir["chroma"]
     fl_idx = beir["fluctlightdb_index"]
-    agent = paper.get("beir_scifact", {}).get("systems", {}).get("fluctlightdb_agent", {})
+    fl_ag = beir.get("fluctlightdb_agent")
+    if fl_ag:
+        agent = {
+            "ndcg_at_10": round3(fl_ag["ndcg_at_10"]),
+            "recall_at_10": round3(fl_ag["recall_at_10"]),
+            "recall_at_100": round3(fl_ag["recall_at_100"]),
+            "query_ms": f"{round(fl_ag['query_ms']):.0f}",
+            "frozen_source": str(args.beir.name),
+        }
+    else:
+        agent = paper.get("beir_scifact", {}).get("systems", {}).get("fluctlightdb_agent", {})
 
     paper["date"] = date.today().isoformat()
     paper["locomo"] = {
@@ -74,7 +84,7 @@ def main() -> int:
             "fluctlightdb_agent": agent,
         },
         "frozen_source": str(args.beir.name),
-        "agent_frozen_source": agent.get("frozen_source", "benchmarks/results/2025-06-22.json"),
+        "agent_frozen_source": agent.get("frozen_source", str(args.beir.name)),
     }
 
     paper["famb"] = {

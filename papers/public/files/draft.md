@@ -12,7 +12,7 @@ For fifty years, data systems have answered two questions. The relational model 
 
 We argue that long-term agent memory is not an application built on top of a database — it is a **third data model**, with its own write semantics (encoding, separation, consolidation, provenance) and its own read semantics (cue-driven activation across a linked memory graph). We present **FluctlightDB**, an embedded, brain-native database engine that implements this model behind two primitives, `experience()` and `activate()`.
 
-On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's hybrid index recalls **97.7%** of gold evidence (July 2026 certified rerun). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. Preference questions reach **96.7%** (29/30) with v4 pref-facts indexing. On BEIR SciFact (shared MiniLM embeddings) index mode scores nDCG@10 **0.634** vs Chroma **0.645**; agent mode improves Recall@100 to **0.941**. On FAMB, index macro is **80%** and agent macro **98%** (July 2026 rerun). The engine, harnesses, and frozen metrics are released under MIT.
+On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's hybrid index recalls **97.7%** of gold evidence (July 2026 certified rerun). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. Preference questions reach **96.7%** (29/30) with v4 pref-facts indexing. On BEIR SciFact (shared MiniLM embeddings) index mode scores nDCG@10 **0.634** vs Chroma **0.645**; agent mode improves Recall@100 to **0.941** (agent row: certified June 2025; harness supports July reruns). On FAMB, index macro is **100%** and agent macro **98%** (July 2026 rerun). The engine, harnesses, and frozen metrics are released under MIT.
 
 ## 1. Introduction
 
@@ -24,7 +24,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 - **A data model.** Agent memory as a first-class model of data, distinct from the relational and vector models.
 - **An engine.** FluctlightDB — embedded Rust, `experience()` / `activate()` / `checkpoint()`, one durable store per agent.
-- **Evidence.** 97.7% evidence recall on full LoCoMo, **97.6%** session recall@8 on LongMemEval-S (unified v4 full 500), **97.4%** end-to-end QA on LongMemEval-S (500 questions), **96.7%** on preference (29/30), BEIR competitive with Chroma, **80%**/ **98%** FAMB macro (index/agent).
+- **Evidence.** 97.7% evidence recall on full LoCoMo, **97.6%** session recall@8 on LongMemEval-S (unified v4 full 500), **97.4%** end-to-end QA on LongMemEval-S (500 questions), **96.7%** on preference (29/30), BEIR competitive with Chroma, **100%**/ **98%** FAMB macro (index/agent).
 - **Reproducibility.** Open harnesses and frozen result JSON; every number re-runs with one command.
 
 ## 2. The Third Data Model
@@ -53,7 +53,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 ![Headline benchmark results](../assets/02-benchmark-summary.png)
 
-*Figure 2: LoCoMo 97.7%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR FluctlightDB index 0.634, FAMB index 80%.*
+*Figure 2: LoCoMo 97.7%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR FluctlightDB index 0.634, FAMB index 100%.*
 
 ![LongMemEval-S retrieval by question type](../assets/03-longmemeval-by-type.png)
 
@@ -77,7 +77,7 @@ All experiments use `all-MiniLM-L6-v2` (ONNX CPU) unless noted. Every number is 
 | FluctlightDB (index) | 0.634 | 0.768 | 0.910 | 26 |
 | FluctlightDB (agent) | **0.651** | **0.790** | **0.941** | 15 |
 
-Index mode trails Chroma slightly on nDCG@10; agent mode improves deep recall (agent row from prior certified run).
+Index mode trails Chroma slightly on nDCG@10; agent mode improves deep recall (agent row from certified June 2025 run; rerun via `beir_bench.py --skip-index --agent-mode agent`).
 
 ### 4.2 LoCoMo — 97.7% evidence recall on the full set
 
@@ -94,7 +94,7 @@ We separate retrieval from generation. A verbatim answer-in-context proxy on LoC
 
 ### 4.3 FAMB — the agent-specific suite
 
-Paraphrase recall@1, provenance top-1, persistence, confusion ingest, determinism. Index macro **80%**, agent macro **98%** (July 2026 rerun; index determinism is the gap).
+Paraphrase recall@1, provenance top-1, persistence, confusion ingest, determinism. Index macro **100%**, agent macro **98%** (July 2026 certified rerun).
 
 ### 4.4 LongMemEval-S — 97.6% session recall@8 (v4 unified 500)
 

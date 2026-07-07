@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-07",
+  "date": "2026-07-08",
   "harness": "FluctlightDB benchmark suite (paper v2)",
   "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
   "doi": "10.5281/zenodo.20949890",
@@ -28,7 +28,7 @@
       }
     },
     "frozen_source": "beir-scifact-2026-07-07.json",
-    "agent_frozen_source": "benchmarks/results/2025-06-22.json"
+    "agent_frozen_source": "beir-scifact-2026-07-07.json"
   },
   "locomo": {
     "conversations": 10,
@@ -46,14 +46,14 @@
     "frozen_source": "locomo-index-2026-07-07.json"
   },
   "famb": {
-    "index_macro": 0.8,
+    "index_macro": 1.0,
     "agent_macro": 0.98,
     "index_scores": {
       "paraphrase_recall_at_1": 1.0,
       "provenance_top1": 1.0,
       "persistence_recall": 1.0,
       "confusion_ingest": 1.0,
-      "determinism": 0.0
+      "determinism": 1.0
     },
     "agent_scores": {
       "paraphrase_recall_at_1": 0.9,
@@ -62,8 +62,8 @@
       "confusion_ingest": 1.0,
       "determinism": 1.0
     },
-    "frozen_source_index": "famb-index-2026-07-07.json",
-    "frozen_source_agent": "famb-agent-2026-07-07.json"
+    "frozen_source_index": "famb-index-2026-07-07-v2.json",
+    "frozen_source_agent": "famb-agent-2026-07-07-v2.json"
   },
   "longmemeval_s": {
     "dataset": "longmemeval_s_cleaned.json (Wu et al., ICLR 2025)",

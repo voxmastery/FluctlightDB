@@ -5,6 +5,8 @@ Tests agent-specific memory behaviors BEIR does not cover:
   paraphrase_recall@1, provenance_top1, persistence_recall,
   confusion_ingest, determinism.
 
+Index-mode determinism on ``connect_index()`` uses MiniLM query vectors (same embedder as BEIR/LoCoMo); agent mode uses lexical+graph recall.
+
 Usage:
   PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode agent
   PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode index
@@ -48,6 +50,17 @@ NOISE_SNIPPETS = [
     "discussion about quarterly sales targets in emea",
     "user booked flights to chicago for a conference",
 ]
+
+DETERMINISM_FACT = "user upgraded postgres to version 15 last tuesday"
+DETERMINISM_CUE = "postgres upgrade version"
+
+
+def _embed_texts(texts: list[str]) -> list[list[float]]:
+    """MiniLM ONNX — index mode needs vectors for hybrid recall."""
+    from chromadb.utils import embedding_functions
+
+    emb = embedding_functions.ONNXMiniLM_L6_V2()
+    return [list(map(float, v)) for v in emb(texts)]
 
 
 def _open_brain(mode: str, path: Optional[str] = None) -> FluctlightBrain:
@@ -161,16 +174,28 @@ def suite_confusion(brain: FluctlightBrain) -> float:
     return 1.0 if top == fid else 0.0
 
 
-def suite_determinism(brain: FluctlightBrain) -> float:
-    brain.experience("user upgraded postgres to version 15 last tuesday", context="db", salience=0.7)
-    a = [
-        str(r.get("engram_id"))
-        for r in (brain.activate("postgres upgrade version", limit=5).get("recalls") or [])
-    ]
-    b = [
-        str(r.get("engram_id"))
-        for r in (brain.activate("postgres upgrade version", limit=5).get("recalls") or [])
-    ]
+def suite_determinism(brain: FluctlightBrain, *, mode: str) -> float:
+    cue_vec: Optional[list[float]] = None
+    if mode == "index":
+        fact_vec, cue_vec = _embed_texts([DETERMINISM_FACT, DETERMINISM_CUE])
+        brain.experience(
+            DETERMINISM_FACT,
+            context="db",
+            salience=0.7,
+            semantic_vector=fact_vec,
+        )
+    else:
+        brain.experience(DETERMINISM_FACT, context="db", salience=0.7)
+
+    def _rank_ids() -> list[str]:
+        raw = brain.activate(DETERMINISM_CUE, semantic_vector=cue_vec, limit=5)
+        return [
+            str(r.get("engram_id"))
+            for r in (raw.get("recalls") or [])
+        ]
+
+    a = _rank_ids()
+    b = _rank_ids()
     return 1.0 if a == b and len(a) > 0 else 0.0
 
 
@@ -182,7 +207,7 @@ def run_famb(mode: str, *, noise: int) -> dict[str, Any]:
         "provenance_top1": suite_provenance(_open_brain(mode)),
         "persistence_recall": suite_persistence(mode),
         "confusion_ingest": suite_confusion(_open_brain(mode)),
-        "determinism": suite_determinism(_open_brain(mode)),
+        "determinism": suite_determinism(_open_brain(mode), mode=mode),
     }
     macro = sum(scores.values()) / len(scores)
     return {
