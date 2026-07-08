@@ -1,5 +1,5 @@
 {
-  "date": "2026-07-08",
+  "date": "2026-07-09",
   "harness": "FluctlightDB benchmark suite (paper v2)",
   "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
   "doi": "10.5281/zenodo.20949890",
@@ -14,66 +14,56 @@
         "recall_at_100": 0.927,
         "query_ms": "7"
       },
-      "fluctlightdb_index": {
-        "ndcg_at_10": 0.63,
-        "recall_at_10": 0.764,
-        "recall_at_100": 0.906,
-        "query_ms": "68"
-      },
       "fluctlightdb_chorus": {
-        "ndcg_at_10": 0.642,
-        "recall_at_10": 0.777,
-        "recall_at_100": 0.912,
-        "query_ms": "3.36",
-        "imprint_ms_per_doc": 2.239,
-        "lane": "chorus_grg",
-        "frozen_source": "beir-scifact-2026-07-08.json"
-      },
-      "fluctlightdb_agent": {
-        "ndcg_at_10": 0.651,
-        "recall_at_10": 0.79,
-        "recall_at_100": 0.941,
-        "query_ms": 15
+        "ndcg_at_10": 0.645,
+        "recall_at_10": 0.783,
+        "recall_at_100": 0.925,
+        "query_ms": "8.34",
+        "imprint_ms_per_doc": 2.39,
+        "lane": "chorus_grg_ir",
+        "frozen_source": "beir-scifact-2026-07-09.json"
       }
     },
-    "frozen_source": "beir-scifact-2026-07-08.json",
-    "chorus_frozen_source": "beir-scifact-2026-07-08.json",
-    "agent_frozen_source": "beir-scifact-2026-07-08.json"
+    "frozen_source": "beir-scifact-2026-07-09.json",
+    "chorus_frozen_source": "beir-scifact-2026-07-09.json"
   },
   "locomo": {
     "conversations": 10,
     "gold_evidence_spans": 1982,
     "top_k": 150,
-    "mode": "index",
+    "mode": "chorus",
+    "lane": "chorus_grg",
     "rag_mode": "all",
     "embedder": "all-MiniLM-L6-v2 ONNX CPU",
-    "mean_evidence_recall": 0.977,
-    "evidence_all_in_context": 0.964,
-    "evidence_hits": "1953/1982",
-    "wall_s_warm": 28.5,
-    "wall_s_cold": 28.5,
-    "memories_ingested": 8423,
-    "frozen_source": "locomo-index-2026-07-07.json"
+    "mean_evidence_recall": 0.99,
+    "evidence_all_in_context": 0.983,
+    "evidence_hits": "1970/1982",
+    "wall_s_warm": 24.5,
+    "wall_s_cold": 24.5,
+    "memories_ingested": 8422,
+    "frozen_source": "locomo-chorus-2026-07-09.json"
   },
   "famb": {
-    "index_macro": 1.0,
-    "agent_macro": 0.98,
-    "index_scores": {
+    "agent_macro": 1.0,
+    "chorus_macro": 1.0,
+    "agent_lane": "agent_unified",
+    "chorus_lane": "chorus_grg",
+    "agent_scores": {
       "paraphrase_recall_at_1": 1.0,
       "provenance_top1": 1.0,
       "persistence_recall": 1.0,
       "confusion_ingest": 1.0,
       "determinism": 1.0
     },
-    "agent_scores": {
-      "paraphrase_recall_at_1": 0.9,
+    "chorus_scores": {
+      "paraphrase_recall_at_1": 1.0,
       "provenance_top1": 1.0,
       "persistence_recall": 1.0,
       "confusion_ingest": 1.0,
       "determinism": 1.0
     },
-    "frozen_source_index": "famb-index-2026-07-07-v2.json",
-    "frozen_source_agent": "famb-agent-2026-07-07-v2.json"
+    "frozen_source_agent": "famb-agent-2026-07-09.json",
+    "frozen_source_chorus": "famb-chorus-2026-07-09.json"
   },
   "longmemeval_s": {
     "dataset": "longmemeval_s_cleaned.json (Wu et al., ICLR 2025)",

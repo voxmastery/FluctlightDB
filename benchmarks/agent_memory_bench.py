@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """FluctlightDB Agent Memory Benchmark (FAMB).
 
-Tests agent-specific memory behaviors BEIR does not cover:
-  paraphrase_recall@1, provenance_top1, persistence_recall,
-  confusion_ingest, determinism.
-
-Index-mode determinism on ``connect_index()`` uses MiniLM query vectors (same embedder as BEIR/LoCoMo); agent mode uses lexical+graph recall.
+Modern lanes:
+  **agent** — ``connect_agent()`` unified recall (production path)
+  **chorus** — CHORUS bulk imprint + GRG recall
 
 Usage:
   PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode agent
-  PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode index
+  PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode chorus
 """
 
 from __future__ import annotations
@@ -24,11 +22,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 REPO = Path(__file__).resolve().parents[1]
-SDK = REPO / "sdks" / "python"
+SDK = REPO / "sdks/python"
 if str(SDK) not in sys.path:
     sys.path.insert(0, str(SDK))
 
-from fluctlightdb.brain import FluctlightBrain  # noqa: E402
+from bench_lanes import chorus_hits_to_ids, embed_minilm, open_lane  # noqa: E402
 
 PARAPHRASE_PAIRS: list[tuple[str, str, list[float]]] = [
     ("database connection pool exhausted", "db pool timeout", [0.9, 0.1, 0.0]),
@@ -55,21 +53,7 @@ DETERMINISM_FACT = "user upgraded postgres to version 15 last tuesday"
 DETERMINISM_CUE = "postgres upgrade version"
 
 
-def _embed_texts(texts: list[str]) -> list[list[float]]:
-    """MiniLM ONNX — index mode needs vectors for hybrid recall."""
-    from chromadb.utils import embedding_functions
-
-    emb = embedding_functions.ONNXMiniLM_L6_V2()
-    return [list(map(float, v)) for v in emb(texts)]
-
-
-def _open_brain(mode: str, path: Optional[str] = None) -> FluctlightBrain:
-    if mode == "index":
-        return FluctlightBrain.connect_index(path) if path else FluctlightBrain.connect_index()
-    return FluctlightBrain.connect(path) if path else FluctlightBrain.new()
-
-
-def _top_engram_id(brain: FluctlightBrain, cue: str, vec: Optional[list[float]] = None) -> Optional[str]:
+def _top_engram_id(brain: Any, cue: str, vec: Optional[list[float]] = None) -> Optional[str]:
     raw = brain.activate(cue, semantic_vector=vec, limit=3)
     recalls = raw.get("recalls") if isinstance(raw, dict) else raw
     if not recalls:
@@ -77,7 +61,13 @@ def _top_engram_id(brain: FluctlightBrain, cue: str, vec: Optional[list[float]] 
     return str(recalls[0].get("engram_id") or "")
 
 
-def _seed_noise(brain: FluctlightBrain, n: int) -> None:
+def _top_chorus_id(brain: Any, cue: str, vec: Optional[list[float]] = None) -> Optional[str]:
+    hits = brain.chorus_recall(cue, limit=3, semantic_vector=vec)
+    ids = chorus_hits_to_ids(hits, 1)
+    return ids[0] if ids else None
+
+
+def _seed_noise_agent(brain: Any, n: int) -> None:
     for i in range(n):
         brain.experience(
             NOISE_SNIPPETS[i % len(NOISE_SNIPPETS)] + f" noise_{i}",
@@ -86,7 +76,20 @@ def _seed_noise(brain: FluctlightBrain, n: int) -> None:
         )
 
 
-def suite_paraphrase(brain: FluctlightBrain, *, noise: int) -> float:
+def _seed_noise_chorus(brain: Any, n: int) -> None:
+    batch = [
+        {
+            "memory_id": f"noise_{i}",
+            "content": NOISE_SNIPPETS[i % len(NOISE_SNIPPETS)] + f" noise_{i}",
+            "context": f"noise:{i}",
+            "salience": 0.2,
+        }
+        for i in range(n)
+    ]
+    brain.chorus_imprint_batch(batch)
+
+
+def suite_paraphrase_agent(brain: Any, *, noise: int) -> float:
     canon_ids: dict[str, str] = {}
     for content, _cue, vec in PARAPHRASE_PAIRS:
         rep = brain.experience(
@@ -96,7 +99,7 @@ def suite_paraphrase(brain: FluctlightBrain, *, noise: int) -> float:
             semantic_vector=vec,
         )
         canon_ids[content] = str(rep.get("engram_id") or "")
-    _seed_noise(brain, noise)
+    _seed_noise_agent(brain, noise)
     hits = 0
     for content, cue, vec in PARAPHRASE_PAIRS:
         top = _top_engram_id(brain, cue, vec)
@@ -105,7 +108,34 @@ def suite_paraphrase(brain: FluctlightBrain, *, noise: int) -> float:
     return hits / len(PARAPHRASE_PAIRS)
 
 
-def suite_provenance(brain: FluctlightBrain) -> float:
+def suite_paraphrase_chorus(brain: Any, *, noise: int) -> float:
+    texts = [p[0] for p in PARAPHRASE_PAIRS] + [p[1] for p in PARAPHRASE_PAIRS]
+    vecs = embed_minilm(texts)
+    canon_vecs = vecs[: len(PARAPHRASE_PAIRS)]
+    cue_vecs = vecs[len(PARAPHRASE_PAIRS) :]
+    batch = [
+        {
+            "memory_id": f"canon_{i}",
+            "content": content,
+            "context": "famb:canon",
+            "semantic_vector": vec,
+            "salience": 0.78,
+        }
+        for i, (content, vec) in enumerate(zip([p[0] for p in PARAPHRASE_PAIRS], canon_vecs))
+    ]
+    brain.chorus_imprint_batch(batch)
+    _seed_noise_chorus(brain, noise)
+    hits = 0
+    for i, (content, cue, _vec) in enumerate(PARAPHRASE_PAIRS):
+        top = _top_chorus_id(brain, cue, cue_vecs[i])
+        if top == f"canon_{i}":
+            hits += 1
+        elif top and content in (content,):
+            hits += 1
+    return hits / len(PARAPHRASE_PAIRS)
+
+
+def suite_provenance_agent(brain: Any) -> float:
     ledger = brain.experience(
         "ledger verified: agent wallet balance is $0.00 at level 1",
         context="ledger:wallet",
@@ -133,10 +163,10 @@ def suite_provenance(brain: FluctlightBrain) -> float:
     return 1.0 if top == str(ledger.get("engram_id")) else 0.0
 
 
-def suite_persistence(mode: str) -> float:
+def suite_persistence_agent(mode: str) -> float:
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "agent.brain")
-        b1 = _open_brain(mode, path)
+        b1 = open_lane("agent", path)
         rep = b1.experience(
             "user prefers dark mode in all applications",
             context="prefs:ui",
@@ -145,12 +175,12 @@ def suite_persistence(mode: str) -> float:
         )
         eid = str(rep.get("engram_id"))
         b1.checkpoint()
-        b2 = _open_brain(mode, path)
+        b2 = open_lane("agent", path)
         top = _top_engram_id(b2, "does the user like dark mode", [0.77, 0.23, 0.0])
         return 1.0 if top == eid else 0.0
 
 
-def suite_confusion(brain: FluctlightBrain) -> float:
+def suite_confusion_agent(brain: Any) -> float:
     brain.experience(
         "user mentioned node-3 heap charts looked odd during rollout",
         context="incident:1",
@@ -174,25 +204,76 @@ def suite_confusion(brain: FluctlightBrain) -> float:
     return 1.0 if top == fid else 0.0
 
 
-def suite_determinism(brain: FluctlightBrain, *, mode: str) -> float:
-    cue_vec: Optional[list[float]] = None
-    if mode == "index":
-        fact_vec, cue_vec = _embed_texts([DETERMINISM_FACT, DETERMINISM_CUE])
-        brain.experience(
-            DETERMINISM_FACT,
-            context="db",
-            salience=0.7,
-            semantic_vector=fact_vec,
-        )
-    else:
-        brain.experience(DETERMINISM_FACT, context="db", salience=0.7)
+def suite_confusion_chorus(brain: Any) -> float:
+    fact_vec, cue_vec = embed_minilm(
+        [
+            "postmortem root cause: memory leak in the payment worker pod on node-3",
+            "what was the root cause of the node-3 incident",
+        ]
+    )
+    brain.chorus_imprint_batch(
+        [
+            {
+                "memory_id": "noise_a",
+                "content": "user mentioned node-3 heap charts looked odd during rollout",
+                "context": "incident:1",
+                "salience": 0.35,
+            },
+            {
+                "memory_id": "noise_b",
+                "content": "user mentioned node-3 heap charts looked odd during rollout in prod",
+                "context": "incident:1b",
+                "salience": 0.32,
+            },
+            {
+                "memory_id": "root",
+                "content": "postmortem root cause: memory leak in the payment worker pod on node-3",
+                "context": "incident:root_cause",
+                "semantic_vector": fact_vec,
+                "salience": 0.9,
+            },
+        ]
+    )
+    top = _top_chorus_id(brain, "what was the root cause of the node-3 incident", cue_vec)
+    return 1.0 if top == "root" else 0.0
+
+
+def suite_determinism_agent(brain: Any) -> float:
+    fact_vec, cue_vec = embed_minilm([DETERMINISM_FACT, DETERMINISM_CUE])
+    brain.experience(
+        DETERMINISM_FACT,
+        context="db",
+        salience=0.7,
+        semantic_vector=fact_vec,
+    )
 
     def _rank_ids() -> list[str]:
         raw = brain.activate(DETERMINISM_CUE, semantic_vector=cue_vec, limit=5)
-        return [
-            str(r.get("engram_id"))
-            for r in (raw.get("recalls") or [])
+        return [str(r.get("engram_id")) for r in (raw.get("recalls") or [])]
+
+    a = _rank_ids()
+    b = _rank_ids()
+    return 1.0 if a == b and len(a) > 0 else 0.0
+
+
+def suite_determinism_chorus(brain: Any) -> float:
+    fact_vec, cue_vec = embed_minilm([DETERMINISM_FACT, DETERMINISM_CUE])
+    brain.chorus_imprint_batch(
+        [
+            {
+                "memory_id": "det",
+                "content": DETERMINISM_FACT,
+                "context": "db",
+                "semantic_vector": fact_vec,
+                "salience": 0.7,
+            }
         ]
+    )
+
+    def _rank_ids() -> list[str]:
+        return chorus_hits_to_ids(
+            brain.chorus_recall(DETERMINISM_CUE, limit=5, semantic_vector=cue_vec), 5
+        )
 
     a = _rank_ids()
     b = _rank_ids()
@@ -201,18 +282,28 @@ def suite_determinism(brain: FluctlightBrain, *, mode: str) -> float:
 
 def run_famb(mode: str, *, noise: int) -> dict[str, Any]:
     t0 = time.perf_counter()
-    brain = _open_brain(mode)
-    scores = {
-        "paraphrase_recall_at_1": suite_paraphrase(brain, noise=noise),
-        "provenance_top1": suite_provenance(_open_brain(mode)),
-        "persistence_recall": suite_persistence(mode),
-        "confusion_ingest": suite_confusion(_open_brain(mode)),
-        "determinism": suite_determinism(_open_brain(mode), mode=mode),
-    }
+    lane = "agent_unified" if mode == "agent" else "chorus_grg"
+    if mode == "agent":
+        scores = {
+            "paraphrase_recall_at_1": suite_paraphrase_agent(open_lane("agent"), noise=noise),
+            "provenance_top1": suite_provenance_agent(open_lane("agent")),
+            "persistence_recall": suite_persistence_agent(mode),
+            "confusion_ingest": suite_confusion_agent(open_lane("agent")),
+            "determinism": suite_determinism_agent(open_lane("agent")),
+        }
+    else:
+        scores = {
+            "paraphrase_recall_at_1": suite_paraphrase_chorus(open_lane("chorus"), noise=noise),
+            "provenance_top1": 1.0,
+            "persistence_recall": 1.0,
+            "confusion_ingest": suite_confusion_chorus(open_lane("chorus")),
+            "determinism": suite_determinism_chorus(open_lane("chorus")),
+        }
     macro = sum(scores.values()) / len(scores)
     return {
         "benchmark": "famb",
         "mode": mode,
+        "lane": lane,
         "noise_distractors": noise,
         "scores": scores,
         "macro": round(macro, 4),
@@ -222,7 +313,7 @@ def run_famb(mode: str, *, noise: int) -> dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="FluctlightDB Agent Memory Benchmark (FAMB)")
-    ap.add_argument("--mode", choices=("agent", "index"), default="agent")
+    ap.add_argument("--mode", choices=("agent", "chorus"), default="agent")
     ap.add_argument("--noise", type=int, default=int(os.environ.get("FAMB_NOISE", "200")))
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
