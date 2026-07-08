@@ -4,8 +4,6 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-  # Release workflow uses GITHUB_TOKEN — its `release: published` event does not
-  # re-trigger workflows. Chain publish after a successful Release run.
   workflow_run:
     workflows: ["Release"]
     types: [completed]
@@ -49,8 +47,8 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
 
-  publish-native:
-    name: fluctlightdb-native (Linux wheels)
+  publish-native-linux:
+    name: fluctlightdb-native (Linux)
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'release' ||
@@ -74,8 +72,67 @@ jobs:
           args: --release --out dist --sdist
           manylinux: auto
 
-      - name: Publish native wheels to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: crates/fluctlight-py/dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+
+  publish-native-macos:
+    name: fluctlightdb-native (macOS universal2)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: macos-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/fluctlightdb-native/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/fluctlight-py
+          command: build
+          args: --release --out dist --target universal2-apple-darwin
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: crates/fluctlight-py/dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+
+  publish-native-windows:
+    name: fluctlightdb-native (Windows x64)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: windows-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/fluctlightdb-native/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/fluctlight-py
+          command: build
+          args: --release --out dist
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: crates/fluctlight-py/dist/
           password: ${{ secrets.PYPI_API_TOKEN }}
