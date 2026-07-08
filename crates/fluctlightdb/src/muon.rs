@@ -149,56 +149,51 @@ impl MuonLane {
         let qc = self.hasher.encode(&sketch);
         let cue_tokens = token_bag(cue, cue);
 
-        let mut scored: Vec<MuonHit> = self
-            .prefilter
-            .query(&qc, self.imprints.len().min(256))
-            .into_iter()
-            .filter_map(|(sid, hamming)| {
-                let imp = self.imprints.get(&sid)?;
-                let photon = 1.0 - (hamming as f32 / self.photon_bits as f32);
-                let lexical = jaccard(&cue_tokens, &imp.tokens);
-                let phase = structural_boost(cue, &imp.user_keys, 256);
-                let keys_lex = jaccard(&cue_tokens, &token_bag(&imp.user_keys, ""));
-                let score = 0.25 * photon + 0.35 * lexical + 0.15 * phase + 0.25 * keys_lex;
-                let snippet = if !imp.user_keys.is_empty() {
+        let score_session = |imp: &MuonImprint| {
+            let photon = qc.estimated_cosine(&imp.code).max(0.0);
+            let lexical = jaccard(&cue_tokens, &imp.tokens);
+            let woverlap = weighted_term_overlap(cue, &imp.reel);
+            let phase = structural_boost(cue, &imp.user_keys, 256);
+            let keys_lex = jaccard(&cue_tokens, &token_bag(&imp.user_keys, ""));
+            let score = 0.15 * photon + 0.25 * lexical + 0.30 * woverlap + 0.15 * phase + 0.15 * keys_lex;
+            MuonHit {
+                session_id: imp.session_id.clone(),
+                score,
+                photon,
+                lexical: lexical.max(woverlap),
+                phase,
+                date: imp.date.clone(),
+                snippet: if !imp.user_keys.is_empty() {
                     imp.user_keys.chars().take(420).collect()
                 } else {
                     imp.reel.chars().take(420).collect()
-                };
-                Some(MuonHit {
-                    session_id: sid,
-                    score,
-                    photon,
-                    lexical,
-                    phase,
-                    date: imp.date.clone(),
-                    snippet,
+                },
+            }
+        };
+
+        // LongMemEval-scale haystacks (~50 sessions): brute all — still sub-ms.
+        let mut scored: Vec<MuonHit> = if self.imprints.len() <= 80 {
+            self.imprints.values().map(score_session).collect()
+        } else {
+            self.prefilter
+                .query(&qc, self.imprints.len().min(256))
+                .into_iter()
+                .filter_map(|(sid, hamming)| {
+                    let imp = self.imprints.get(&sid)?;
+                    let mut hit = score_session(imp);
+                    hit.photon = 1.0 - (hamming as f32 / self.photon_bits as f32);
+                    hit.score = 0.15 * hit.photon
+                        + 0.25 * hit.lexical
+                        + 0.30 * weighted_term_overlap(cue, &imp.reel)
+                        + 0.15 * hit.phase
+                        + 0.15 * jaccard(&cue_tokens, &token_bag(&imp.user_keys, ""));
+                    Some(hit)
                 })
-            })
-            .collect();
+                .collect()
+        };
 
         if scored.is_empty() {
-            // Fallback: brute lexical over all sessions (small N).
-            scored = self
-                .imprints
-                .values()
-                .map(|imp| {
-                    let photon = qc.estimated_cosine(&imp.code).max(0.0);
-                    let lexical = jaccard(&cue_tokens, &imp.tokens);
-                    let phase = structural_boost(cue, &imp.user_keys, 256);
-                    let keys_lex = jaccard(&cue_tokens, &token_bag(&imp.user_keys, ""));
-                    let score = 0.25 * photon + 0.35 * lexical + 0.15 * phase + 0.25 * keys_lex;
-                    MuonHit {
-                        session_id: imp.session_id.clone(),
-                        score,
-                        photon,
-                        lexical,
-                        phase,
-                        date: imp.date.clone(),
-                        snippet: imp.user_keys.chars().take(420).collect(),
-                    }
-                })
-                .collect();
+            scored = self.imprints.values().map(score_session).collect();
         }
 
         scored.sort_by(|a, b| {
@@ -294,6 +289,44 @@ pub fn jaccard(a: &[String], b: &[String]) -> f32 {
         0.0
     } else {
         inter / union
+    }
+}
+
+/// Weighted query-term overlap — stronger than Jaccard for short questions vs long turns.
+pub fn weighted_term_overlap(cue: &str, content: &str) -> f32 {
+    weighted_term_overlap_lower(cue, &content.to_lowercase())
+}
+
+/// Same as [`weighted_term_overlap`] when `content` is already lowercased.
+pub fn weighted_term_overlap_lower(cue: &str, content_lower: &str) -> f32 {
+    const STOP: &[&str] = &[
+        "what", "when", "where", "which", "that", "this", "with", "from", "have", "your", "about",
+        "the", "and", "for", "did", "was", "were", "are", "you", "user", "name", "tell", "does",
+    ];
+    let ct = content_lower;
+    let mut weight_sum = 0.0f32;
+    let mut hit = 0.0f32;
+    for w in cue.split(|c: char| !c.is_alphanumeric()) {
+        let w = w.to_lowercase();
+        if w.len() < 3 || STOP.contains(&w.as_str()) {
+            continue;
+        }
+        let wt = if w.len() >= 7 {
+            1.6
+        } else if w.len() >= 5 {
+            1.2
+        } else {
+            1.0
+        };
+        weight_sum += wt;
+        if ct.contains(&w) {
+            hit += wt;
+        }
+    }
+    if weight_sum <= 0.0 {
+        0.0
+    } else {
+        hit / weight_sum
     }
 }
 

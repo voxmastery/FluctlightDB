@@ -11,7 +11,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from .brain import FluctlightBrain, connect, connect_agent_fast, connect_brain, connect_conv, connect_index, connect_muon
+from .brain import FluctlightBrain, connect, connect_agent, connect_agent_fast, connect_brain, connect_chorus, connect_conv, connect_index, connect_muon
+from .reflex import ReflexHook, reflex_ingest_turn
 from .doctor import run_doctor
 from .handoff import Handoff, detect_agent
 from .project import ProjectBrains, ProjectConfig, connect_project, find_project_root
@@ -26,16 +27,20 @@ __all__ = [
     "ProjectBrains",
     "ProjectConfig",
     "connect",
+    "connect_agent",
     "connect_agent_fast",
     "connect_brain",
     "connect_conv",
     "connect_index",
+    "connect_chorus",
     "connect_muon",
     "connect_project",
     "detect_agent",
     "find_project_root",
     "get_recall_client",
     "get_worker",
+    "reflex_ingest_turn",
+    "ReflexHook",
     "run_doctor",
 ]
 

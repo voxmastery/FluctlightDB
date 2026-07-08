@@ -31,11 +31,11 @@ impl ActivationCache {
         }
     }
 
-    pub fn get(&self, cue: &str, agent_id: Option<&str>) -> Option<ActivationResult> {
+    pub fn get(&self, cue: &str, agent_id: Option<&str>, top_k: usize) -> Option<ActivationResult> {
         if !cache_enabled() {
             return None;
         }
-        let key = cache_key(cue, agent_id);
+        let key = cache_key(cue, agent_id, top_k);
         self.entries.get(&key).and_then(|e| {
             if e.inserted.elapsed() < self.ttl {
                 Some(e.result.clone())
@@ -45,7 +45,7 @@ impl ActivationCache {
         })
     }
 
-    pub fn put(&mut self, cue: &str, agent_id: Option<&str>, result: ActivationResult) {
+    pub fn put(&mut self, cue: &str, agent_id: Option<&str>, top_k: usize, result: ActivationResult) {
         if !cache_enabled() {
             return;
         }
@@ -57,7 +57,7 @@ impl ActivationCache {
                 self.entries.remove(&k);
             }
         }
-        let key = cache_key(cue, agent_id);
+        let key = cache_key(cue, agent_id, top_k);
         self.entries.insert(
             key,
             CacheEntry {
@@ -76,11 +76,12 @@ impl ActivationCache {
     }
 }
 
-fn cache_key(cue: &str, agent_id: Option<&str>) -> u64 {
+fn cache_key(cue: &str, agent_id: Option<&str>, top_k: usize) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     let mut h = DefaultHasher::new();
     cue.hash(&mut h);
     agent_id.hash(&mut h);
+    top_k.hash(&mut h);
     h.finish()
 }
 

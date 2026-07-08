@@ -377,6 +377,40 @@ def cmd_ui(args: argparse.Namespace) -> int:
     try:
         serve_inbox(start=args.path, host=args.host, port=args.port)
         return 0
+    except KeyboardInterrupt:
+        return 0
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+def cmd_inspect(args: argparse.Namespace) -> int:
+    from .brain_inspect import run_inspect_ui
+
+    try:
+        run_inspect_ui(args.brain, host=args.host, port=args.port)
+        return 0
+    except KeyboardInterrupt:
+        return 0
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+def cmd_replicate(args: argparse.Namespace) -> int:
+    from .brain import FluctlightBrain
+
+    try:
+        status = FluctlightBrain.replicate_sync(args.primary, args.replica)
+        if args.json:
+            print(json.dumps(status, indent=2))
+        else:
+            print(
+                f"replica sync: snapshot={status.get('snapshot_copied')} "
+                f"wal_segments={status.get('wal_segments')} "
+                f"lag={status.get('lag_seconds', 0):.1f}s"
+            )
+        return 0
     except Exception as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -450,6 +484,18 @@ def build_parser() -> argparse.ArgumentParser:
     ui.add_argument("--host", default="127.0.0.1")
     ui.add_argument("--port", type=int, default=8787)
     ui.set_defaults(func=cmd_ui)
+
+    inspect_p = sub.add_parser("inspect", help="Memory observability UI (engrams, recall, audit)")
+    inspect_p.add_argument("--brain", help="Agent brain directory path")
+    inspect_p.add_argument("--host", default="127.0.0.1")
+    inspect_p.add_argument("--port", type=int, default=8788)
+    inspect_p.set_defaults(func=cmd_inspect)
+
+    repl = sub.add_parser("replicate", help="Incremental brain replica sync (primary → replica dir)")
+    repl.add_argument("primary", help="Primary brain path (v4 dir or .flct file)")
+    repl.add_argument("replica", help="Replica directory")
+    repl.add_argument("--json", action="store_true")
+    repl.set_defaults(func=cmd_replicate)
 
     onboard = sub.add_parser("onboard", help="Guided onboarding wizard")
     onboard.add_argument("path", nargs="?", help="Project root")

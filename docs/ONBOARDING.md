@@ -50,13 +50,16 @@ Full guide: [VPS_DESKTOP.md](VPS_DESKTOP.md)
 ## 5. Use in code
 
 ```python
-from fluctlightdb import connect_project
+from fluctlightdb import connect_agent
 
-pb = connect_project()
-pb.remember("Use pytest for tests", scope="project")
-pb.handoff("Paused refactor", next_steps=["Finish tests"])
-print(pb.list_handoffs())
+brain = connect_agent()
+brain.turn_begin()
+brain.wm_push("Use pytest for tests", context="project", salience=0.7)
+print(brain.recall("test framework"))
+brain.turn_end(flush=True)
 ```
+
+Multi-agent project brains still use `connect_project()` for handoffs — see [MULTI_AGENT.md](MULTI_AGENT.md).
 
 ## vs Mem0 / Zep
 
