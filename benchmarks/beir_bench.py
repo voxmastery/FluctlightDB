@@ -183,7 +183,7 @@ def run_chorus(
         "query_ms_mean": round(per_query_ms, 2),
         "imprint_wall_s": round(imprint_s, 2),
         "query_batch_wall_s": round(batch_s, 2),
-        "lane": "chorus_grg_ir",
+        "lane": "chorus_grg_spectrum",
         "sleep": sleep_report,
     }
 
