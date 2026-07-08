@@ -1,10 +1,10 @@
 # arXiv submission checklist — FluctlightDB (July 2026)
 
-Use this after `paper-2026-07-07.json` metrics are frozen and `main.tex` builds clean.
+Use this after `paper-2026-07-09.json` metrics are frozen and `main.tex` builds clean.
 
 ## 1. Pre-flight (metrics & reproducibility)
 
-- [x] `benchmarks/results/paper-2026-07-07.json` — merged frozen numbers (retrieval + E2E)
+- [x] `benchmarks/results/paper-2026-07-09.json` — merged frozen numbers (retrieval + E2E)
 - [x] `benchmarks/results/e2e-cert-paper-v2-2026-07-07.json` — LongMemEval E2E 500 (paper profile)
 - [x] `benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json` — LongMemEval unified 500 retrieval
 - [x] `benchmarks/results/2025-06-22.json` — LoCoMo + BEIR + FAMB
@@ -67,7 +67,7 @@ LongMemEval E2E by type: user/assistant/preference 100%, temporal 99.3%, knowled
 1. Note the arXiv ID (e.g. `arXiv:2607.xxxxx`).
 2. Update `CITATION.cff` `preferred-citation` with arXiv ID.
 3. Update `README.md`, `hub/paper/README.md`, `papers/public/index.html` — replace "arXiv pending".
-4. New Zenodo version (optional): attach `main.pdf` + `paper-2026-07-07.json` + E2E JSON.
+4. New Zenodo version (optional): attach `main.pdf` + `paper-2026-07-09.json` + E2E JSON.
 5. Sync Hugging Face:
 
 ```bash

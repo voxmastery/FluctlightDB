@@ -18,7 +18,7 @@ hf repo create "$SPACE_REPO" --type space --space-sdk static --exist-ok --public
 hf upload "$PAPER_REPO" "$ROOT/hub/paper/README.md" README.md --commit-message "Update paper card"
 
 mkdir -p "$ROOT/.tmp/hf-bench"
-cp "$ROOT/benchmarks/results/paper-2026-07-07.json" "$ROOT/.tmp/hf-bench/results.json"
+cp "$ROOT/benchmarks/results/paper-2026-07-09.json" "$ROOT/.tmp/hf-bench/results.json"
 cp "$ROOT/benchmarks/results/e2e-cert-paper-v2-2026-07-07.json" "$ROOT/.tmp/hf-bench/e2e-cert-paper-v2-2026-07-07.json" 2>/dev/null || true
 cp "$ROOT/hub/dataset/README.md" "$ROOT/.tmp/hf-bench/README.md"
 hf upload "$BENCH_REPO" "$ROOT/.tmp/hf-bench" . --commit-message "Sync frozen benchmark results"

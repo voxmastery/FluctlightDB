@@ -21,7 +21,7 @@ def round3(x: float) -> float:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--paper", type=Path, default=REPO / "benchmarks/results/paper-2026-07-08.json")
+    ap.add_argument("--paper", type=Path, default=REPO / "benchmarks/results/paper-2026-07-09.json")
     ap.add_argument("--locomo", type=Path, required=True)
     ap.add_argument("--beir", type=Path, required=True)
     ap.add_argument("--famb-agent", type=Path, required=True)

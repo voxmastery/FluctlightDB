@@ -6,7 +6,7 @@ cd "$ROOT"
 
 E2E_JSON="${1:-benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}"
 FULL_JSON="${2:-benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json}"
-PAPER_JSON="${3:-benchmarks/results/paper-2026-07-07.json}"
+PAPER_JSON="${3:-benchmarks/results/paper-2026-07-09.json}"
 TEX="$ROOT/papers/arxiv-v1/main.tex"
 
 if [[ ! -f "$E2E_JSON" ]]; then

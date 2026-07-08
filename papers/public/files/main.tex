@@ -41,9 +41,9 @@ official \texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\
 End-to-end QA on the same benchmark---official reader prompts, GPT-4o judge, Muon
 retrieval in the \texttt{paper} profile---scores \textbf{97.4\%} (487/500) with
 \textbf{100\%} session recall@8 in the certified pipeline.
-On BEIR SciFact (shared MiniLM embeddings) the **CHORUS Lane**
-(\texttt{chorus\_imprint\_batch}, GRG full-vector IR recall) scores nDCG@10
-\textbf{0.645}, matching Chroma on the same embeddings, with 2.4\,ms/doc imprint on full
+On BEIR SciFact (shared MiniLM embeddings) the **CHORUS Lane** with **PRISM**
+(RaBitQ + QJL rank, SPECTRUM certify, float32 rerank) scores nDCG@10
+\textbf{0.645}, matching Chroma on the same embeddings, with 2.6\,ms/doc imprint on full
 SciFact. On FAMB, \texttt{connect\_agent()} and CHORUS each score \textbf{100\%} macro
 (July 2026 certified rerun). The engine, harnesses, and frozen metrics
 are released under the MIT license. We claim no new neuroscience and no new
@@ -248,8 +248,8 @@ The frozen retrieval numbers in Section~\ref{sec:eval} were measured with Fabric
 \label{sec:eval}
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-09.json} (LoCoMo, BEIR, FAMB reruns
-2026-07-09; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
+\texttt{benchmarks/results/paper-2026-07-09.json} (LoCoMo, BEIR, FAMB PRISM production
+refresh 2026-07-08; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
 2026-07-07).
 
 \begin{figure}[t]
@@ -265,8 +265,8 @@ CHORUS Lane nDCG@10; FAMB reports \texttt{connect\_agent()} macro score.}
 \subsection{BEIR SciFact: CHORUS Lane matches Chroma}
 We score standard IR metrics via \texttt{pytrec\_eval} against official qrels,
 using identical embeddings for FluctlightDB and Chroma. The **CHORUS Lane**
-(\texttt{connect\_chorus()}, batch \texttt{chorus\_imprint\_batch}, GRG full-vector
-IR recall when the corpus fits the photon exact-scan budget) is our bulk ingest path---12.4\,s
+(\texttt{connect\_chorus()}, batch \texttt{chorus\_imprint\_batch}, **PRISM** readout:
+RaBitQ + QJL rank, SPECTRUM certify, float32 rerank) is our bulk ingest path---13.5\,s
 to imprint all 5{,}183 SciFact documents.
 
 \begin{table}[h]
@@ -276,13 +276,13 @@ to imprint all 5{,}183 SciFact documents.
 \toprule
 System & nDCG@10 & R@10 & R@100 & Query (ms) \\
 \midrule
-Chroma & 0.645 & 0.783 & 0.927 & 7 \\
-FluctlightDB (CHORUS) & \textbf{0.645} & \textbf{0.783} & 0.925 & 8 \\
+Chroma & 0.645 & 0.783 & 0.927 & 17 \\
+FluctlightDB (CHORUS/PRISM) & \textbf{0.645} & \textbf{0.783} & 0.925 & 11 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-CHORUS matches Chroma nDCG@10 on shared embeddings with 2.4\,ms/doc imprint.
+CHORUS/PRISM matches Chroma nDCG@10 on shared embeddings with 2.6\,ms/doc imprint.
 Reproduce:
 \texttt{PYTHONPATH=sdks/python python benchmarks/beir\_bench.py}.
 
@@ -290,8 +290,8 @@ Reproduce:
 LoCoMo~\cite{maharana2024locomo} stresses very long, multi-session dialogue. We
 report the official evidence-recall metric: the fraction of gold \texttt{dia\_id}
 evidence spans present in retrieved context. Configuration: \texttt{connect\_chorus()},
-batch imprint per turn, $k{=}150$, GRG recall with shared MiniLM vectors. The
-July 2026 certified rerun (embed cache warm) scores \textbf{99.0\%} mean evidence
+batch imprint per turn, $k{=}150$, SPECTRUM full readout when $k{>}100$ (PRISM
+certify cap), GRG recall with shared MiniLM vectors. The July 2026 certified rerun (embed cache warm) scores \textbf{99.0\%} mean evidence
 recall.
 
 \begin{table}[h]
@@ -304,7 +304,7 @@ Metric & Value \\
 Mean evidence recall & \textbf{99.0\%} \\
 All evidence in context & 98.3\% \\
 Evidence hits & 1970/1982 \\
-Wall time (s) & 25 \\
+Wall time (s) & 20.5 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -534,7 +534,7 @@ benchmark. We release everything needed to reproduce and contest these claims.
 Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
 \texttt{benchmarks/longmemeval\_bench.py}, \texttt{benchmarks/longmemeval\_colab.ipynb},
 \texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py}.
-Frozen metrics: \texttt{benchmarks/results/paper-2026-07-08.json}. E2E:
+Frozen metrics: \texttt{benchmarks/results/paper-2026-07-09.json}. E2E:
 \texttt{benchmarks/longmemeval\_e2e.py};
 \texttt{benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}. Preprint DOI:
 \url{https://doi.org/10.5281/zenodo.20949890}. Source:
