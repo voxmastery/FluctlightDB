@@ -54,6 +54,17 @@ pip install "fluctlightdb[native]>=0.5.3"
 
 **Linux arm64** and **Windows arm64**: no prebuilt wheel yet — use **sdist** (`pip install fluctlightdb-native --no-binary :all:`) with Rust installed, or HTTP-only `pip install fluctlightdb` (no native extension).
 
+## macOS notes
+
+- Universal2 wheel covers Apple Silicon and Intel Macs.
+- File locking uses the same code path as Linux.
+
+## Windows notes
+
+- Hooks in `.cursor/hooks.json` point to `.cmd` wrappers that invoke `py -3 script.py`.
+- Install Python from python.org or Microsoft Store; the `py` launcher is recommended.
+- If MCP fails to start, run `fluctlight-project doctor` and fix the reported Python path.
+
 ## Serve vs embedded
 
 Do not point `fluctlight-serve` and embedded `connect_project()` at the **same brain directory** simultaneously. The engine enforces exclusive locks for up to 120s.
