@@ -74,27 +74,31 @@ jobs:
 
       - name: Build Linux manylinux abi3 wheel + sdist
         if: runner.os == 'Linux'
+        working-directory: crates/fluctlight-py
         run: |
           pip install maturin
-          maturin build --release --out dist --sdist --manifest-path crates/fluctlight-py/Cargo.toml
+          maturin build --release --out dist --sdist
 
       - name: Build macOS universal2 abi3 wheel
         if: runner.os == 'macOS'
+        working-directory: crates/fluctlight-py
         run: |
           pip install maturin
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
-          maturin build --release --out dist --target universal2-apple-darwin --manifest-path crates/fluctlight-py/Cargo.toml
+          maturin build --release --out dist --target universal2-apple-darwin
 
       - name: Build Windows x64 abi3 wheel
         if: runner.os == 'Windows'
+        working-directory: crates/fluctlight-py
         shell: bash
         run: |
           pip install maturin
-          maturin build --release --out dist --manifest-path crates/fluctlight-py/Cargo.toml
+          maturin build --release --out dist
 
       - name: List artifacts
         shell: bash
-        run: ls -la crates/fluctlight-py/dist/
+        working-directory: crates/fluctlight-py
+        run: ls -la dist/
 
       - uses: actions/upload-artifact@v4
         with:
