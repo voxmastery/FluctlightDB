@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 """Certified IR benchmark: BEIR + pytrec_eval (nDCG@10, Recall@10/100).
 
-Compares FluctlightDB index and agent modes vs Chroma with the same all-MiniLM-L6-v2 embeddings.
-
-Agent mode uses ``connect()`` (full episodic ingest) or ``connect_agent_fast()`` via
-``--agent-mode``. Full SciFact agent ingest is supported but slow ($\sim$3h); use
-``--skip-index`` with a prior index JSON to rerun agent only.
+Compares Chroma vs FluctlightDB lanes on shared all-MiniLM-L6-v2 embeddings:
+  - **index** — ``connect_index()`` (fast IR path)
+  - **chorus** — ``connect_chorus()`` + ``chorus_imprint_batch`` (bulk GRG lane)
+  - **agent** / **agent_fast** — legacy episodic ``experience()`` per doc (slow; optional)
 
 Usage:
   BEIR_DATA=/tmp/beir BEIR_DS=scifact \\
   PYTHONPATH=sdks/python python benchmarks/beir_bench.py
 
-  # Agent-only rerun (reuses chroma + index metrics from prior JSON):
+  # Modern lanes only (index + CHORUS, reuse prior Chroma):
   PYTHONPATH=sdks/python python benchmarks/beir_bench.py \\
-    --skip-chroma --skip-index --chroma-json benchmarks/results/beir-scifact-2026-07-07.json \\
-    --agent-mode agent --json-out benchmarks/results/beir-scifact-agent.json
+    --skip-chroma --chroma-json benchmarks/results/beir-scifact-2026-07-07.json \\
+    --json-out benchmarks/results/beir-scifact-2026-07-08.json
 """
 
 from __future__ import annotations
@@ -183,6 +182,73 @@ def run_fluctlight(
         return run, statistics.mean(lats) if lats else 0.0, write_ms
 
 
+def run_chorus(
+    doc_ids: list[str],
+    doc_texts: list[str],
+    doc_vecs: list[list[float]],
+    test_qids: list[str],
+    q_texts: list[str],
+    q_vecs: list[list[float]],
+    qrels: dict[str, dict[str, int]],
+) -> dict[str, Any]:
+    """CHORUS Lane: batch imprint + resonance recall (GRG fast path)."""
+    from fluctlightdb import connect_chorus
+
+    brain = connect_chorus()
+    batch = [
+        {
+            "memory_id": did,
+            "content": txt,
+            "context": did,
+            "semantic_vector": vec,
+            "salience": 0.6,
+        }
+        for did, txt, vec in zip(doc_ids, doc_texts, doc_vecs)
+    ]
+    t0 = time.perf_counter()
+    brain.chorus_imprint_batch(batch)
+    imprint_s = time.perf_counter() - t0
+
+    t1 = time.perf_counter()
+    batch_hits = brain.chorus_recall_batch(q_texts, q_vecs, limit=TOPK)
+    batch_s = time.perf_counter() - t1
+    per_query_ms = batch_s / max(len(test_qids), 1) * 1000.0
+
+    single_lats: list[float] = []
+    for qtxt, qv in zip(q_texts[:100], q_vecs[:100]):
+        tq = time.perf_counter()
+        brain.chorus_recall(qtxt, limit=TOPK, semantic_vector=qv)
+        single_lats.append((time.perf_counter() - tq) * 1000.0)
+    single_p50 = statistics.median(single_lats) if single_lats else per_query_ms
+
+    run: dict[str, dict[str, float]] = {}
+    for qid, hits in zip(test_qids, batch_hits):
+        scores: dict[str, float] = {}
+        for rank, h in enumerate(hits):
+            if isinstance(h, (list, tuple)) and len(h) >= 2:
+                mid, score = str(h[0]), float(h[1])
+            elif isinstance(h, dict):
+                mid = str(h.get("memory_id", ""))
+                score = float(h.get("score") or (TOPK - rank))
+            else:
+                continue
+            if mid:
+                scores[mid] = score
+        run[qid] = scores
+
+    sleep_report = brain.chorus_sleep()
+    return {
+        **score_run(run, qrels),
+        "imprint_ms_per_doc": round(imprint_s / len(doc_ids) * 1000.0, 3),
+        "query_ms": round(single_p50, 2),
+        "query_ms_mean": round(per_query_ms, 2),
+        "imprint_wall_s": round(imprint_s, 2),
+        "query_batch_wall_s": round(batch_s, 2),
+        "lane": "chorus_grg",
+        "sleep": sleep_report,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="BEIR certified IR benchmark")
     ap.add_argument("--json-out", type=Path, default=None)
@@ -198,9 +264,14 @@ def main() -> int:
         help="Prior chroma-only result when --skip-chroma",
     )
     ap.add_argument(
-        "--skip-agent",
+        "--skip-chorus",
         action="store_true",
-        help="Skip FluctlightDB agent-mode run (index + chroma only)",
+        help="Skip CHORUS Lane bulk imprint benchmark",
+    )
+    ap.add_argument(
+        "--run-legacy-agent",
+        action="store_true",
+        help="Also run slow legacy connect() agent ingest (hours on full SciFact)",
     )
     ap.add_argument(
         "--skip-index",
@@ -291,8 +362,15 @@ def main() -> int:
             fl_idx_block = prior["fluctlightdb_index"]
             print("index: reusing prior fluctlightdb_index metrics", flush=True)
 
+    fl_chorus_block: dict[str, Any] | None = None
+    if not args.skip_chorus:
+        print("fluctlight CHORUS imprint+recall...", flush=True)
+        fl_chorus_block = run_chorus(
+            doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs, qrels
+        )
+
     fl_agent_block: dict[str, Any] | None = None
-    if not args.skip_agent:
+    if args.run_legacy_agent:
         print(f"fluctlight {args.agent_mode} ingest+query...", flush=True)
         t_ag = time.perf_counter()
         ag_run, ag_q_ms, ag_w_ms = run_fluctlight(
@@ -320,6 +398,8 @@ def main() -> int:
         },
         "fluctlightdb_index": fl_idx_block or {},
     }
+    if fl_chorus_block is not None:
+        out["fluctlightdb_chorus"] = fl_chorus_block
     if fl_agent_block is not None:
         out["fluctlightdb_agent"] = fl_agent_block
     print(json.dumps(out, indent=2))

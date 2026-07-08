@@ -37,6 +37,20 @@ def main() -> int:
 
     chroma = beir["chroma"]
     fl_idx = beir["fluctlightdb_index"]
+    fl_ch = beir.get("fluctlightdb_chorus")
+    if fl_ch:
+        chorus = {
+            "ndcg_at_10": round3(fl_ch["ndcg_at_10"]),
+            "recall_at_10": round3(fl_ch["recall_at_10"]),
+            "recall_at_100": round3(fl_ch["recall_at_100"]),
+            "query_ms": str(fl_ch.get("query_ms", fl_ch.get("query_ms_mean", ""))),
+            "imprint_ms_per_doc": fl_ch.get("imprint_ms_per_doc"),
+            "lane": fl_ch.get("lane", "chorus_grg"),
+            "frozen_source": str(args.beir.name),
+        }
+    else:
+        chorus = paper.get("beir_scifact", {}).get("systems", {}).get("fluctlightdb_chorus", {})
+
     fl_ag = beir.get("fluctlightdb_agent")
     if fl_ag:
         agent = {
@@ -81,9 +95,11 @@ def main() -> int:
                 "recall_at_100": round3(fl_idx["recall_at_100"]),
                 "query_ms": f"{round(fl_idx['query_ms']):.0f}",
             },
+            "fluctlightdb_chorus": chorus,
             "fluctlightdb_agent": agent,
         },
         "frozen_source": str(args.beir.name),
+        "chorus_frozen_source": chorus.get("frozen_source", str(args.beir.name)),
         "agent_frozen_source": agent.get("frozen_source", str(args.beir.name)),
     }
 
@@ -101,7 +117,8 @@ def main() -> int:
     print(f"Wrote {out}")
     print(
         f"LoCoMo {paper['locomo']['mean_evidence_recall']:.1%} | "
-        f"BEIR idx {fl_idx['ndcg_at_10']:.3f} vs chroma {chroma['ndcg_at_10']:.3f} | "
+        f"BEIR idx {fl_idx['ndcg_at_10']:.3f} chorus {chorus.get('ndcg_at_10', 0):.3f} "
+        f"vs chroma {chroma['ndcg_at_10']:.3f} | "
         f"FAMB {paper['famb']['index_macro']:.0%}/{paper['famb']['agent_macro']:.0%}"
     )
     return 0

@@ -19,8 +19,8 @@ for f in 01-brain-architecture 02-benchmark-summary 03-longmemeval-by-type 04-lo
 done
 # legacy alias for draft markdown
 cp "$FIGURES/01-brain-architecture.png" "$PUBLIC/assets/brain-architecture.png" 2>/dev/null || true
-cp "$ROOT/benchmarks/results/paper-2026-07-07.json" "$PUBLIC/data/results.json"
-cp "$ROOT/benchmarks/results/paper-2026-07-07.json" "$ROOT/hub/dataset/results.json" 2>/dev/null || true
+cp "$ROOT/benchmarks/results/paper-2026-07-08.json" "$PUBLIC/data/results.json"
+cp "$ROOT/benchmarks/results/paper-2026-07-08.json" "$ROOT/hub/dataset/results.json" 2>/dev/null || true
 cp "$ROOT/benchmarks/results/e2e-cert-paper-v2-2026-07-07.json" "$PUBLIC/data/e2e-cert-paper-v2-2026-07-07.json" 2>/dev/null || true
 cp "$ROOT/benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json" "$PUBLIC/data/longmemeval-preference-v4-mpnet-2026-07-04.json" 2>/dev/null || true
 cp "$ROOT/benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json" "$PUBLIC/data/longmemeval-colab-v2-full-2026-07-04.json" 2>/dev/null || true
@@ -62,8 +62,8 @@ cat > "$PUBLIC/index.html" << 'HTML'
         <li>LongMemEval-S session@8 <span class="metric">97.6%</span></li>
         <li>LongMemEval-S E2E QA <span class="metric">97.4%</span></li>
         <li>LongMemEval preference@8 <span class="metric">96.7%</span></li>
-        <li>BEIR SciFact nDCG@10 (index) <span class="metric">0.634</span></li>
-        <li>FAMB macro (index / agent) <span class="metric">80% / 98%</span></li>
+        <li>BEIR SciFact CHORUS nDCG@10 <span class="metric">0.642</span></li>
+        <li>FAMB macro (index / agent) <span class="metric">100% / 98%</span></li>
       </ul>
       <h2 style="margin-top:18px">Cite</h2>
       <p style="font-size:0.75rem;color:#8ba3c7;margin-top:6px">
@@ -107,7 +107,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
           </div>
           <div class="dl-card">
             <h3>results.json</h3>
-            <p>Frozen benchmark metrics (paper-2026-07-07)</p>
+            <p>Frozen benchmark metrics (paper-2026-07-08)</p>
             <a href="data/results.json" download>Download JSON</a>
           </div>
           <div class="dl-card">

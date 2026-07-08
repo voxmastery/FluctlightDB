@@ -41,10 +41,11 @@ official \texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\
 End-to-end QA on the same benchmark---official reader prompts, GPT-4o judge, Muon
 retrieval in the \texttt{paper} profile---scores \textbf{97.4\%} (487/500) with
 \textbf{100\%} session recall@8 in the certified pipeline.
-On BEIR SciFact (shared MiniLM embeddings) index mode scores nDCG@10
-\textbf{0.634} versus Chroma \textbf{0.645}; agent mode improves Recall@100 to
-\textbf{0.941}. On an agent-specific suite (FAMB) index-mode macro is
-\textbf{100\%} index and \textbf{98\%} agent macro on a July 2026 rerun. The engine, harnesses, and frozen metrics
+On BEIR SciFact (shared MiniLM embeddings) the **CHORUS Lane**
+(\texttt{chorus\_imprint\_batch}, GRG resonance recall) scores nDCG@10
+\textbf{0.642} versus Chroma \textbf{0.645} with 2.2\,ms/doc imprint on full
+SciFact. On FAMB, index macro is \textbf{100\%} and agent macro \textbf{98\%}
+(July 2026 certified rerun). The engine, harnesses, and frozen metrics
 are released under the MIT license. We claim no new neuroscience and no new
 transformer; we claim a missing layer of the data stack, and an engine that fills it.
 \end{abstract}
@@ -82,7 +83,7 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   \item \textbf{Evidence.} \textbf{97.7\%} evidence recall on full LoCoMo,
   \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
   \textbf{97.4\%} end-to-end QA on LongMemEval-S (500 questions, official judge),
-  BEIR SciFact competitive with Chroma on shared embeddings, and
+  BEIR SciFact CHORUS competitive with Chroma on shared embeddings, and
   \textbf{100\%}/\textbf{98\%} FAMB macro (index/agent) on July 2026 reruns.
   \item \textbf{Reproducibility.} Open harnesses and frozen result JSON so every
   number here can be re-run with one command.
@@ -247,8 +248,8 @@ The frozen retrieval numbers in Section~\ref{sec:eval} were measured with Fabric
 \label{sec:eval}
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-07.json} (LoCoMo, BEIR, FAMB reruns
-2026-07-07; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
+\texttt{benchmarks/results/paper-2026-07-08.json} (LoCoMo, BEIR, FAMB reruns
+2026-07-08; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
 2026-07-07).
 
 \begin{figure}[t]
@@ -257,32 +258,35 @@ number below is reproduced by a script in \texttt{benchmarks/} and frozen in
 \caption{Headline benchmark results (frozen July 2026). LoCoMo and LongMemEval-S
 retrieval use official recall metrics; LongMemEval-S E2E uses the certified
 \texttt{paper} profile (OpenAI GPT-4o/GPT-5 reader, GPT-4o judge); BEIR reports
-nDCG@10; FAMB reports index-mode macro score.}
+CHORUS Lane nDCG@10; FAMB reports index-mode macro score.}
 \label{fig:benchmarks}
 \end{figure}
 
-\subsection{BEIR SciFact: competitive with a tuned vector baseline}
+\subsection{BEIR SciFact: CHORUS Lane near parity with Chroma}
 We score standard IR metrics via \texttt{pytrec\_eval} against official qrels,
-using identical embeddings for FluctlightDB and Chroma. On a certified July 2026
-rerun, index mode trails Chroma slightly on nDCG@10 (0.634 vs.\ 0.645) while
-agent mode, with graph co-activation, improves deep recall (Recall@100 0.941
-vs.\ 0.927; agent row from certified June 2025 run---rerun via
-\texttt{beir\_bench.py --skip-index --agent-mode agent}, $\sim$3h wall time on
-full SciFact).
+using identical embeddings for FluctlightDB and Chroma. The legacy index path
+(\texttt{connect\_index()}) is a fast IR baseline; the **CHORUS Lane**
+(\texttt{connect\_chorus()}, batch \texttt{chorus\_imprint\_batch}, GRG resonance
+recall) is our bulk agent-scale ingest path---11.6\,s to imprint all 5{,}183
+SciFact documents vs.\ hours for per-doc episodic \texttt{experience()}.
 
 \begin{table}[h]
 \centering
-\caption{BEIR SciFact (shared MiniLM embeddings, July 2026 rerun).}
+\caption{BEIR SciFact (shared MiniLM embeddings, July 2026 certified rerun).}
 \begin{tabular}{lrrrr}
 \toprule
 System & nDCG@10 & R@10 & R@100 & Query (ms) \\
 \midrule
 Chroma & 0.645 & 0.783 & 0.927 & 7 \\
-FluctlightDB (index) & 0.634 & 0.768 & 0.910 & 26 \\
-FluctlightDB (agent) & \textbf{0.651} & \textbf{0.790} & \textbf{0.941} & 15 \\
+FluctlightDB (index) & 0.630 & 0.764 & 0.906 & 68 \\
+FluctlightDB (CHORUS) & \textbf{0.642} & \textbf{0.777} & 0.912 & 3 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+CHORUS reaches within 0.3 nDCG points of Chroma with 2.2\,ms/doc imprint and
+3\,ms p50 query latency on the full corpus. Reproduce:
+\texttt{PYTHONPATH=sdks/python python benchmarks/beir\_bench.py}.
 
 \subsection{LoCoMo: 97.7\% evidence recall on the full set}
 LoCoMo~\cite{maharana2024locomo} stresses very long, multi-session dialogue. We
@@ -459,8 +463,9 @@ Systems such as Chroma, Qdrant, and FAISS~\cite{thakur2021beir} optimize approxi
 nearest-neighbor search. They answer \emph{similarity}, not \emph{memory}: there is
 no native episode, provenance-weighted recall, write-time separation, or
 cue-driven spreading activation. FluctlightDB's \texttt{connect\_index()} mode
-deliberately exposes a vector-fast path so we can measure IR credibility on BEIR;
-agent mode adds graph co-activation on top of the same store.
+deliberately exposes a vector-fast path and a CHORUS bulk-imprint lane so we can
+measure IR credibility on BEIR; episodic agent mode adds graph co-activation for
+live agents.
 
 \subsection{Agent memory SDKs and layers}
 \textbf{Mem0}~\cite{chhikara2025mem0} is the closest contemporary system: it
@@ -531,7 +536,7 @@ benchmark. We release everything needed to reproduce and contest these claims.
 Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
 \texttt{benchmarks/longmemeval\_bench.py}, \texttt{benchmarks/longmemeval\_colab.ipynb},
 \texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py}.
-Frozen metrics: \texttt{benchmarks/results/paper-2026-07-07.json}. End-to-end:
+Frozen metrics: \texttt{benchmarks/results/paper-2026-07-08.json}. E2E:
 \texttt{benchmarks/longmemeval\_e2e.py};
 \texttt{benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}. Preprint DOI:
 \url{https://doi.org/10.5281/zenodo.20949890}. Source:
