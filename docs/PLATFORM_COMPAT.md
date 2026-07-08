@@ -34,12 +34,6 @@ Run `fluctlight-project doctor` to see the resolved command on your machine.
 
 Both use the same cross-platform locking stack (`filelock` in Python, `fs2` in Rust).
 
-## Windows notes
-
-- Hooks in `.cursor/hooks.json` point to `.cmd` wrappers that invoke `py -3 script.py`.
-- Install Python from python.org or Microsoft Store; the `py` launcher is recommended.
-- If MCP fails to start, run `fluctlight-project doctor` and fix the reported Python path.
-
 ## Native wheels (PyPI `fluctlightdb-native`)
 
 | Platform | Wheel tag | Python |
@@ -49,7 +43,7 @@ Both use the same cross-platform locking stack (`filelock` in Python, `fs2` in R
 | Windows x64 | `win_amd64` | 3.9–3.13 (abi3) |
 
 ```bash
-pip install "fluctlightdb[native]>=0.5.3"
+pip install "fluctlightdb[native]>=0.5.4"
 ```
 
 **Linux arm64** and **Windows arm64**: no prebuilt wheel yet — use **sdist** (`pip install fluctlightdb-native --no-binary :all:`) with Rust installed, or HTTP-only `pip install fluctlightdb` (no native extension).
