@@ -90,12 +90,19 @@ jobs:
         run: python -m unittest tests.test_project.TestProjectInit.test_connect_and_handoff -v
 
   pypi-wheel-smoke:
-    name: pypi-wheel-smoke (py${{ matrix.python }})
-    runs-on: ubuntu-latest
+    name: pypi-wheel-smoke (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        include:
+          - { os: ubuntu-latest, python: "3.9" }
+          - { os: ubuntu-latest, python: "3.10" }
+          - { os: ubuntu-latest, python: "3.11" }
+          - { os: ubuntu-latest, python: "3.12" }
+          - { os: ubuntu-latest, python: "3.13" }
+          - { os: macos-latest, python: "3.11" }
+          - { os: windows-latest, python: "3.11" }
     steps:
       - uses: actions/checkout@v4
 
@@ -105,10 +112,17 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Build abi3 native wheel + sdist
+      - name: Build abi3 native wheel (+ sdist on Linux only)
+        shell: bash
         run: |
           pip install maturin build
-          maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml --sdist
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml --sdist
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml --target universal2-apple-darwin
+          else
+            maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml
+          fi
           cd sdks/python && python -m build -o ../../dist-sdk
 
       - name: Install published-style artifacts (no source tree)
