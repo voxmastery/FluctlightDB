@@ -7,7 +7,6 @@ use fluctlightdb::{
     ChorusHit, ChorusRecallOpts, Episode, FluctlightBrain, RetentionPolicy, ToolObserveInput,
     ProvenanceKind,
 };
-use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -387,7 +386,7 @@ impl PyBrain {
         &self,
         py: Python<'_>,
         cues: Vec<String>,
-        embeddings_flat: &Bound<'_, PyAny>,
+        embeddings_flat: Vec<f32>,
         dim: usize,
         limit: Option<usize>,
         fast: Option<bool>,
@@ -398,11 +397,7 @@ impl PyBrain {
             fast,
             float_rerank: chorus_float_rerank_enabled(),
         };
-        let buf = PyBuffer::<f32>::get(embeddings_flat)?;
-        let data = buf
-            .as_slice(py)
-            .ok_or_else(|| PyRuntimeError::new_err("embeddings buffer is not contiguous"))?;
-        let flat: Vec<f32> = data.iter().map(|c| c.get()).collect();
+        let flat = embeddings_flat;
         let mut queries: Vec<(&str, Option<&[f32]>)> = Vec::with_capacity(cues.len());
         for (i, cue) in cues.iter().enumerate() {
             let slice = if dim > 0 {

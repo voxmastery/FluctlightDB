@@ -49,7 +49,7 @@ zip -r fluctlightdb-arxiv-source.zip main.tex references.bib main.bbl ../figures
 
 | Benchmark | Metric | Score |
 |-----------|--------|------:|
-| LoCoMo | Evidence recall | **98.1%** (1925/1982, k=150) |
+| LoCoMo | Evidence recall | **99.0%** (1970/1982, k=150) |
 | LongMemEval-S | session_recall@8 (v4 retrieval) | **97.6%** (488/500 unified v4) |
 | LongMemEval-S E2E | overall accuracy | **97.4%** (487/500, paper profile) |
 | LongMemEval-S E2E | task-averaged accuracy | **98.2%** |
@@ -79,7 +79,7 @@ bash scripts/publish-paper-huggingface.sh   # after hf auth login
 
 **Say:**
 - Third data model for agent memory; embedded engine with `experience()` / `activate()`.
-- 98.1% LoCoMo evidence recall (official retrieval metric).
+- 99.0% LoCoMo evidence recall (official retrieval metric).
 - 97.6% LongMemEval-S session recall@8 (unified v4 488/500) — competitive with published hybrid systems.
 - **97.4% LongMemEval-S end-to-end QA** (487/500, official Wu et al. judge; paper profile).
 - 96.7% on preference slice (29/30) with v4 pref-facts harness.

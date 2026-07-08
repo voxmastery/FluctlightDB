@@ -143,7 +143,7 @@ Artifact: `benchmarks/results/e2e-cert-paper-v2-2026-07-07.json`. Reproduce: `E2
 
 ## 5. Discussion
 
-**The engine is the contribution, not the reader.** 98.1% on full LoCoMo says it surfaces the right evidence. We do not launder a retrieval win into a generation claim.
+**The engine is the contribution, not the reader.** 99.0% on full LoCoMo says it surfaces the right evidence. We do not launder a retrieval win into a generation claim.
 
 **In production.** Beyond benchmarks, FluctlightDB backs a continuously running operational agent in a deployed production system — persisting cross-session state for an autonomous service, not a research fixture. The durability and cold-start guarantees above are properties we rely on, not only ones we measured.
 

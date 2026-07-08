@@ -3,8 +3,11 @@
 Run from repo root unless noted. Install deps:
 
 ```bash
-pip install chromadb pytrec-eval-terrier "fluctlightdb[native]"
+pip install chromadb pytrec-eval-terrier "fluctlightdb[native]>=0.5.2"
 # or dev: pip install -e sdks/python && ./scripts/install-native.sh
+
+# LoCoMo one-command reproduce (downloads data, checks frozen cert)
+make reproduce-locomo
 ```
 
 | Script | Purpose | Data |

@@ -68,7 +68,7 @@ Multi-agent project brains still use `connect_project()` for handoffs — see [M
 | Model | Hosted API + chat extraction | Embedded **database engine** |
 | Multi-tool monorepo | Bring your own glue | `fluctlight-project init` |
 | Data location | Their cloud (typical) | **Your disk / your VPS / your git** |
-| Benchmarks | Their numbers | Public LoCoMo 98.1% evidence recall |
+| Benchmarks | Their numbers | Public LoCoMo **99.0%** evidence recall |
 
 FluctlightDB is **not** a hosted memory SaaS — it's SQLite-for-agents at the repo level. You own the files.
 

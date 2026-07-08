@@ -474,9 +474,8 @@ class FluctlightBrain:
             import numpy as np
 
             arr = np.ascontiguousarray(embeddings, dtype=np.float32)
-            raw = self._brain.chorus_recall_batch_flat(
-                cues, memoryview(arr.ravel()), dim, limit, fast
-            )
+            flat = arr.ravel().tolist()
+            raw = self._brain.chorus_recall_batch_flat(cues, flat, dim, limit, fast)
         except ImportError:
             flat: list[float] = [x for row in embeddings for x in row]
             raw = self._brain.chorus_recall_batch_flat(cues, flat, dim, limit, fast)

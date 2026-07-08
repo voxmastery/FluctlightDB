@@ -71,7 +71,7 @@ jobs:
         with:
           working-directory: crates/fluctlight-py
           command: build
-          args: --release --out dist
+          args: --release --out dist --sdist
           manylinux: auto
 
       - name: Publish native wheels to PyPI
