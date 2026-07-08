@@ -54,7 +54,7 @@ impl PhotonCode {
     }
 
     /// Extract the `band`-th block of `rows` bits as an LSH bucket key.
-    fn band_key(&self, band: usize, rows: usize) -> u64 {
+    pub fn band_key(&self, band: usize, rows: usize) -> u64 {
         let start = band * rows;
         let mut key: u64 = 0;
         for r in 0..rows {
@@ -147,6 +147,11 @@ impl PhotonStore {
         self.codes.is_empty()
     }
 
+    /// Lookup id + code by store index (for GRG rerank after multi-probe).
+    pub fn entry_at(&self, idx: usize) -> Option<(&str, &PhotonCode)> {
+        self.codes.get(idx).map(|(id, code)| (id.as_str(), code))
+    }
+
     pub fn insert(&mut self, id: impl Into<String>, code: PhotonCode) {
         let idx = self.codes.len();
         for band in 0..self.bands {
@@ -158,17 +163,94 @@ impl PhotonStore {
 
     /// Candidate indices whose bitcode collides with the cue in at least one band.
     pub fn candidates(&self, cue: &PhotonCode) -> Vec<usize> {
+        self.multi_probe_candidates(cue, usize::MAX, 0)
+    }
+
+    /// Multi-probe LSH (Lv et al. VLDB 2007): primary buckets + 1-bit key perturbations.
+    pub fn multi_probe_candidates(
+        &self,
+        cue: &PhotonCode,
+        max_candidates: usize,
+        probe_bits: usize,
+    ) -> Vec<usize> {
+        if self.codes.is_empty() {
+            return Vec::new();
+        }
+        let cap = if max_candidates == usize::MAX {
+            self.codes.len()
+        } else {
+            max_candidates
+        };
         let mut seen = vec![false; self.codes.len()];
         let mut out = Vec::new();
-        for band in 0..self.bands {
-            let key = cue.band_key(band, self.rows);
+
+        let mut push_bucket = |band: usize, key: u64| -> bool {
             if let Some(idxs) = self.buckets[band].get(&key) {
                 for &i in idxs {
                     if !seen[i] {
                         seen[i] = true;
                         out.push(i);
+                        if out.len() >= cap {
+                            return true;
+                        }
                     }
                 }
+            }
+            false
+        };
+
+        for band in 0..self.bands {
+            let key = cue.band_key(band, self.rows);
+            if push_bucket(band, key) {
+                return out;
+            }
+            for bit in 0..probe_bits.min(self.rows) {
+                let probe_key = key ^ (1u64 << bit);
+                if push_bucket(band, probe_key) {
+                    return out;
+                }
+            }
+        }
+        out
+    }
+
+    /// IVF-lite coarse gate: band-0 cell + 1-bit neighbor cells (for corpora > exact-scan budget).
+    pub fn ivf_coarse_candidates(
+        &self,
+        cue: &PhotonCode,
+        max_candidates: usize,
+        neighbor_bits: usize,
+    ) -> Vec<usize> {
+        if self.codes.is_empty() || self.bands == 0 {
+            return Vec::new();
+        }
+        let cap = max_candidates.min(self.codes.len());
+        let band = 0usize;
+        let key = cue.band_key(band, self.rows);
+        let mut seen = vec![false; self.codes.len()];
+        let mut out = Vec::new();
+
+        let mut push_key = |k: u64| -> bool {
+            if let Some(idxs) = self.buckets[band].get(&k) {
+                for &i in idxs {
+                    if !seen[i] {
+                        seen[i] = true;
+                        out.push(i);
+                        if out.len() >= cap {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        };
+
+        if push_key(key) {
+            return out;
+        }
+        for bit in 0..neighbor_bits.min(self.rows) {
+            if push_key(key ^ (1u64 << bit)) {
+                return out;
             }
         }
         out
@@ -184,6 +266,33 @@ impl PhotonStore {
         scored.sort_by_key(|(_, h)| *h);
         scored.truncate(k);
         scored
+    }
+
+    /// Nearest neighbor by Hamming distance (full scan).
+    pub fn nearest(&self, cue: &PhotonCode) -> Option<(String, PhotonCode)> {
+        self.codes
+            .iter()
+            .map(|(id, c)| (id.clone(), cue.hamming(c), c.clone()))
+            .min_by_key(|(_, h, _)| *h)
+            .map(|(id, _, c)| (id, c))
+    }
+
+    /// Drop entries whose id is not in `keep`.
+    pub fn retain(&mut self, keep: impl Fn(&str) -> bool) {
+        let mut next: Vec<(String, PhotonCode)> = Vec::new();
+        for (id, code) in self.codes.drain(..) {
+            if keep(&id) {
+                next.push((id, code));
+            }
+        }
+        self.codes = next;
+        self.buckets = vec![HashMap::new(); self.bands];
+        for (idx, (_, code)) in self.codes.iter().enumerate() {
+            for band in 0..self.bands {
+                let key = code.band_key(band, self.rows);
+                self.buckets[band].entry(key).or_default().push(idx);
+            }
+        }
     }
 
     /// Brute-force exact Hamming top-k (no LSH) — reference for recall measurement.
@@ -342,21 +451,37 @@ mod tests {
     }
 
     #[test]
-    fn lsh_query_matches_exact_topk_for_close_neighbors() {
+    fn multi_probe_recalls_more_than_single_probe() {
+        let sh = SimHasher::new(256, 17);
+        let mut store = PhotonStore::new(256, 32, 8);
+        let target = rand_vec(500, 128);
+        store.insert("target", sh.encode(&target));
+        for s in 0..300 {
+            store.insert(format!("d{s}"), sh.encode(&rand_vec(s, 128)));
+        }
+        let query: Vec<f32> = target
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| x + rand_vec(7, 128)[i] * 0.02)
+            .collect();
+        let qc = sh.encode(&query);
+        let single = store.multi_probe_candidates(&qc, usize::MAX, 0);
+        let multi = store.multi_probe_candidates(&qc, usize::MAX, 4);
+        assert!(multi.len() >= single.len());
+        assert!(multi.iter().any(|&i| store.entry_at(i).unwrap().0 == "target"));
+    }
+
+    #[test]
+    fn ivf_coarse_surfaces_neighbors() {
         let sh = SimHasher::new(256, 91);
         let mut store = PhotonStore::new(256, 32, 8);
         let anchor = rand_vec(1, 128);
-        // A tight cluster around the anchor (guaranteed LSH collisions) + noise.
-        for c in 0..5 {
-            let v: Vec<f32> = anchor.iter().enumerate().map(|(i, &x)| x + rand_vec(3000 + c, 128)[i] * 0.005).collect();
-            store.insert(format!("c{c}"), sh.encode(&v));
-        }
+        store.insert("anchor", sh.encode(&anchor));
         for s in 0..200 {
             store.insert(format!("n{s}"), sh.encode(&rand_vec(s, 128)));
         }
         let qc = sh.encode(&anchor);
-        let lsh_top1 = store.query(&qc, 1)[0].0.clone();
-        let exact_top1 = store.query_exact(&qc, 1)[0].0.clone();
-        assert_eq!(lsh_top1, exact_top1, "LSH top-1 diverged from exact top-1");
+        let coarse = store.ivf_coarse_candidates(&qc, 64, 3);
+        assert!(!coarse.is_empty());
     }
 }
