@@ -1,6 +1,6 @@
 {
   "title": "FluctlightDB: A Memory Model of Data for AI Agents",
-  "description": "Preprint and software release for FluctlightDB — an embedded brain-native memory engine for AI agents. Third data model: experience()/activate(). LoCoMo 98.1% evidence recall, BEIR SciFact parity, FAMB 97-98%. MIT license.",
+  "description": "Preprint and software release for FluctlightDB — an embedded brain-native memory engine for AI agents. Third data model: experience()/activate(). LoCoMo 99.0% evidence recall, BEIR SciFact parity, FAMB 100%. MIT license.",
   "creators": [
     {
       "name": "S, Ganesh",

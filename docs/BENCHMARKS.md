@@ -73,17 +73,25 @@ Index-mode query latency uses slim vector-fast recalls (large doc bodies omitted
 | **Metrics** | QA F1 / accuracy, summarization quality; official RAG **evidence recall** (gold `dia_id` in context) |
 | **Paper** | Maharana et al., *Evaluating Very Long-Term Conversational Memory of LLM Agents*, ACL 2024 |
 | **Site** | https://snap-research.github.io/locomo/ |
-| **Status** | **Full eval complete** — 98.1% mean evidence recall (10 conv, k=150, hybrid); frozen in `benchmarks/results/2025-06-22.json` |
+| **Status** | **Full eval complete** — **99.0%** mean evidence recall (10 conv, k=150, CHORUS); frozen in `benchmarks/results/locomo-chorus-2026-07-08.json` |
 | **In-repo** | `benchmarks/locomo_eval.py`, `benchmarks/locomo_metrics.py` |
 
-**FluctlightDB results (June 2026, frozen run 2025-06-22):**
+**One-command reproduce:**
+
+```bash
+make reproduce-locomo
+# or: bash scripts/reproduce-locomo.sh
+```
+
+**FluctlightDB results (July 2026, CHORUS certified):**
 
 | Run | Mean evidence recall | Evidence hits | Wall time |
 |-----|---------------------|---------------|-----------|
-| Warm | **98.1%** | 1925/1982 | 271s |
-| Cold (caches cleared) | **98.1%** | 1925/1982 | 335s |
+| Certified (embed cache warm) | **99.0%** | 1970/1982 | ~20s |
 
-Config: `connect_index()`, ingest dialog + observations, `--rag-mode all --top-k 150`, hybrid vector+BM25, 2 CPU threads, all-MiniLM-L6-v2 ONNX.
+Config: `connect_chorus()`, batch imprint per turn, `--top-k 150`, all-MiniLM-L6-v2 ONNX (via Chroma embedder in harness). For k>100, engine uses full SPECTRUM readout (PRISM certify cap).
+
+Historical index-mode run (June 2026): 98.1% — superseded by CHORUS cert; see `benchmarks/results/2025-06-22.json`.
 
 > Mem0/Zep often report **LLM-as-judge end-to-end QA** on LoCoMo (~92% / ~75%) — not the same metric as evidence recall. Compare only when the metric column matches.
 

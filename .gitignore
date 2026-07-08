@@ -9,6 +9,9 @@ embed-server/__pycache__/
 *.egg-info/
 dist/
 .maturin/
+dist-native/
+dist-sdk/
+dist-reproduce/
 *.so
 *.dylib
 *.dll

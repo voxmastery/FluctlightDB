@@ -26,7 +26,7 @@ pip install "fluctlightdb[native]"
 
 | Benchmark | Result |
 |-----------|--------|
-| LoCoMo evidence recall | **98.1%** (10 conv, k=150) |
+| LoCoMo evidence recall | **99.0%** (10 conv, k=150) |
 | BEIR SciFact nDCG@10 | **0.645** (ties Chroma + MiniLM) |
 | FAMB macro | **97–98%** |
 

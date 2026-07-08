@@ -23,20 +23,28 @@ Alternative: store `PYPI_API_TOKEN` as a repository secret and remove `id-token:
 
 ## Release process
 
-1. Bump versions:
+1. Bump versions (keep in sync):
    - `sdks/python/pyproject.toml` → `version`
-   - `crates/fluctlight-py/pyproject.toml` → `version` (keep in sync)
-2. Commit, tag, and push:
+   - `crates/fluctlight-py/pyproject.toml` → `version`
+
+   Native wheels use **stable ABI (abi3, cp39 tag)** — one manylinux wheel for Python **3.9–3.13**. Publish **sdist** as fallback (`maturin build --sdist`).
+
+2. Verify locally:
 
    ```bash
-   git tag v0.4.0
+   bash scripts/verify-pypi-wheel.sh
+   ```
+
+3. Commit, tag, and push:
+
+   ```bash
+   git tag v0.5.2
    git push origin main --tags
    ```
 
-3. Create a **GitHub Release** from the tag (title `v0.4.0`).  
-   The `Publish to PyPI` workflow runs on `release: published`.
+4. Create a **GitHub Release** from the tag. The `Publish to PyPI` workflow runs via `workflow_run` after **Release**, or trigger **Publish to PyPI** manually.
 
-Or trigger manually: Actions → **Publish to PyPI** → Run workflow.
+CI job **`pypi-wheel-smoke`** mirrors release: build wheels, install on Python 3.9–3.13, `import fluctlightdb_native` — no source tree.
 
 ## Local test build (before release)
 
@@ -47,9 +55,10 @@ python -m build
 python -m pip install dist/fluctlightdb-*.whl
 python -c "from fluctlightdb import FluctlightClient; print(FluctlightClient)"
 
-# Native (requires Rust + maturin)
+# Native abi3 wheel (matches CI / PyPI)
 cd ../../crates/fluctlight-py
-maturin build --release
+maturin build --release --sdist
+bash ../../scripts/verify-pypi-wheel.sh
 ```
 
 Test upload to TestPyPI:

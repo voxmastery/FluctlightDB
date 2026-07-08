@@ -17,7 +17,7 @@ The three shareable artifacts, in priority order:
 2. **The Recall Fabric** — nine brain-native mechanisms (photon/lattice/phase/relation/
    crystallize/forgetting/chronos/confidence/consensus), each with a crisp neuroscience anchor.
    This is the "serious systems" credibility layer for HN / researchers.
-3. **The numbers** — 98.1% LoCoMo evidence recall, 97.6% LongMemEval session@8, reproducible
+3. **The numbers** — 99.0% LoCoMo evidence recall, 97.6% LongMemEval session@8, reproducible
    from a script. This is the "it's real" proof for skeptics.
 
 ## Assets to prepare (before launch day)

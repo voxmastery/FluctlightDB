@@ -88,3 +88,32 @@ jobs:
       - name: Run native integration tests
         working-directory: sdks/python
         run: python -m unittest tests.test_project.TestProjectInit.test_connect_and_handoff -v
+
+  pypi-wheel-smoke:
+    name: pypi-wheel-smoke (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build abi3 native wheel + sdist
+        run: |
+          pip install maturin build
+          maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml --sdist
+          cd sdks/python && python -m build -o ../../dist-sdk
+
+      - name: Install published-style artifacts (no source tree)
+        run: |
+          python -m venv /tmp/flct-smoke
+          /tmp/flct-smoke/bin/pip install --upgrade pip
+          /tmp/flct-smoke/bin/pip install dist-native/*.whl dist-sdk/*.whl
+          /tmp/flct-smoke/bin/python -c "import fluctlightdb_native; import fluctlightdb; print('ok', fluctlightdb_native.__name__)"
