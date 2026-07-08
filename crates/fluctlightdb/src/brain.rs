@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::agent_runtime::AgentState;
 use crate::activation::{activate_from_hybrid, cap_candidates, complete, default_candidate_cap};
 use crate::amygdala::Amygdala;
 use crate::autonomic::{AutonomicState, TickReport};
@@ -56,6 +57,10 @@ pub struct FluctlightBrain {
     pub core_memories: CoreMemoryStore,
     pub autonomic: AutonomicState,
     #[serde(default)]
+    pub agent: AgentState,
+    #[serde(default)]
+    pub governance: crate::governance::GovernanceState,
+    #[serde(default)]
     pub semantic: SemanticField,
     #[serde(default)]
     pub recent_separations: Vec<SeparationResult>,
@@ -88,6 +93,9 @@ pub struct FluctlightBrain {
     /// Runtime-only episodic fission shards (Tau Lane). Never persisted.
     #[serde(skip)]
     pub(crate) tau: crate::tau::TauLane,
+    /// Runtime-only CHORUS phase field (θ–γ wavelet substrate). Never persisted.
+    #[serde(skip)]
+    pub(crate) chorus: crate::chorus::ChorusField,
 }
 
 impl Default for FluctlightBrain {
@@ -119,6 +127,8 @@ impl FluctlightBrain {
             prefrontal: Prefrontal::default(),
             core_memories: CoreMemoryStore::default(),
             autonomic: AutonomicState::new(),
+            agent: AgentState::default(),
+            governance: crate::governance::GovernanceState::default(),
             semantic: SemanticField::default(),
             recent_separations: Vec::new(),
             checkpoint_policy: CheckpointPolicy::default(),
@@ -132,6 +142,7 @@ impl FluctlightBrain {
             consensus: crate::consensus::SharedMemory::default(),
             muon: crate::muon_runtime::new_muon_lane(),
             tau: crate::tau_runtime::new_tau_lane(),
+            chorus: crate::chorus_runtime::new_chorus_field(),
         };
         brain.development.on_tick();
         brain.prefrontal.unlocked = brain.development.pfc_unlocked();
@@ -185,7 +196,9 @@ impl FluctlightBrain {
                 episode: episode.clone(),
             })?;
         }
-        self.experience_internal(episode, true)
+        let report = self.experience_internal(episode, true)?;
+        self.agent_on_experience(report.engram_id);
+        Ok(report)
     }
 
     pub(crate) fn experience_internal(
@@ -212,6 +225,62 @@ impl FluctlightBrain {
 
         let salience =
             (episode.salience_hint + self.amygdala.weight_for(Uuid::nil())).clamp(0.0, 1.0);
+
+        // Index-mode IR benchmarks: O(1) ingest per doc (sidecar upsert + semantic field).
+        if crate::activation::fast_ingest_mode() && crate::activation::vector_fast_mode() {
+            let tick = self.development.metrics.ticks;
+            let engram_id = Uuid::new_v4();
+            let rich = crate::tokenize::tokenize_rich(
+                &episode.content,
+                &episode.context,
+                episode.outcome.as_deref(),
+            );
+            let ec_neurons: Vec<crate::id::NeuronId> = rich
+                .iter()
+                .map(|t| crate::id::NeuronId::from_seeds(&["ec", &t.surface]))
+                .collect();
+            let separation = SeparationResult {
+                ec_neurons: ec_neurons.clone(),
+                dg_neurons: vec![],
+                ca3_neurons: vec![],
+                separation_index: 1.0,
+                max_overlap_before: 0.0,
+                max_overlap_after: 0.0,
+                separators_added: 0,
+                token_count: rich.len(),
+            };
+            let mut engram = Engram {
+                id: engram_id,
+                life_id: self.life.life_id,
+                neurons: ec_neurons.clone(),
+                ec_neurons: ec_neurons.clone(),
+                dg_neurons: vec![],
+                separation_index: 1.0,
+                episode: episode.clone(),
+                salience,
+                encoded_at_tick: tick,
+                encoded_at_stage: self.development.stage as u8,
+                replay_count: 0,
+                is_core: false,
+            };
+            if let Some(ref vector) = episode.semantic_vector {
+                let ec_sem =
+                    self.semantic
+                        .register_engram(engram_id, self.life.life_id, vector.clone());
+                engram.ec_neurons.extend(ec_sem);
+            }
+            self.amygdala.tag(engram_id, salience);
+            self.hippocampus.encode(engram);
+            let vector_for_index = episode.semantic_vector.clone();
+            self.index_engram(engram_id, &episode.content, vector_for_index.as_deref());
+            self.activation_cache.lock().unwrap().invalidate();
+            self.development.on_experience(salience);
+            self.prefrontal.unlocked = self.development.pfc_unlocked();
+            if checkpoint {
+                self.maybe_checkpoint()?;
+            }
+            return Ok(ExperienceReport::ok(engram_id, separation, false));
+        }
         let gate = self.neuromodulators.plasticity_gate(salience);
         if episode.salience_hint > 0.5 {
             self.neuromodulators.on_surprise(episode.salience_hint);
@@ -341,6 +410,7 @@ impl FluctlightBrain {
         self.autonomic.on_tick();
         self.development.on_tick();
         self.autonomic.roll_sleep_window(self.autonomic.total_ticks);
+        let _ = self.agent_on_tick()?;
 
         let pressure = self.autonomic.synapse_pressure(
             self.graph.synapse_count(),
@@ -396,7 +466,7 @@ impl FluctlightBrain {
         cue: &str,
         cue_vector: Option<&[f32]>,
     ) -> ActivationResult {
-        self.activate_scoped(cue, cue_vector, None)
+        self.activate_scoped(cue, cue_vector, None, crate::api_slim::DEFAULT_API_RECALL_LIMIT)
     }
 
     pub fn activate_scoped(
@@ -404,16 +474,17 @@ impl FluctlightBrain {
         cue: &str,
         cue_vector: Option<&[f32]>,
         agent_id: Option<&str>,
+        top_k: usize,
     ) -> ActivationResult {
-        if let Some(cached) = self.activation_cache.lock().unwrap().get(cue, agent_id) {
+        let top_k = top_k.max(1).min(crate::index::MAX_CANDIDATE_CAP);
+        if let Some(cached) = self.activation_cache.lock().unwrap().get(cue, agent_id, top_k) {
             return cached;
         }
 
-        // Recall Fabric: Photon LSH replaces hybrid index candidate generation when enabled —
-        // sub-linear bucket lookup instead of scanning the full sidecar index.
+        let candidate_cap = top_k.max(default_candidate_cap());
         let candidate_set: Option<HashSet<uuid::Uuid>> =
             if let Some(photon) = self.fabric_photon_candidates(cue_vector) {
-                Some(cap_candidates(photon.into_iter().collect(), default_candidate_cap()))
+                Some(cap_candidates(photon.into_iter().collect(), candidate_cap))
             } else {
                 self.recall_index
                     .as_ref()
@@ -422,11 +493,18 @@ impl FluctlightBrain {
                             cue,
                             cue_vector,
                             &self.semantic,
-                            default_candidate_cap(),
+                            candidate_cap,
                         )
                         .ok()
                     })
-                    .map(|ids| cap_candidates(ids, default_candidate_cap()))
+                    .and_then(|ids| {
+                        let capped = cap_candidates(ids, candidate_cap);
+                        if capped.is_empty() {
+                            None
+                        } else {
+                            Some(capped)
+                        }
+                    })
             };
 
         let mut result = activate_from_hybrid(
@@ -438,7 +516,7 @@ impl FluctlightBrain {
             self.life.life_id,
             crate::activation::activation_max_hops(),
             self.development.stage.myelination(),
-            8,
+            top_k,
             candidate_set.as_ref(),
         );
         let cortex_boost = self.cortex.fact_boost(cue) + self.cortex.semantic_boost(cue_vector);
@@ -458,6 +536,7 @@ impl FluctlightBrain {
         // Recall Fabric (opt-in): full Photon → Lattice → Phase composed recall merged into
         // hybrid activation, then forgetting retention + confidence weighting. Off by default.
         self.fabric_on_activate(cue, cue_vector, &mut result.recalls);
+        self.merge_chorus_recalls(cue, cue_vector, &mut result.recalls, top_k);
         result
             .recalls
             .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
@@ -471,7 +550,7 @@ impl FluctlightBrain {
         self.activation_cache
             .lock()
             .unwrap()
-            .put(cue, agent_id, result.clone());
+            .put(cue, agent_id, top_k, result.clone());
         result
     }
 
@@ -479,10 +558,13 @@ impl FluctlightBrain {
     pub fn activate_batch(
         &self,
         items: &[(String, Option<Vec<f32>>, Option<String>)],
+        top_k: usize,
     ) -> Vec<ActivationResult> {
         items
             .iter()
-            .map(|(cue, vec, agent)| self.activate_scoped(cue, vec.as_deref(), agent.as_deref()))
+            .map(|(cue, vec, agent)| {
+                self.activate_scoped(cue, vec.as_deref(), agent.as_deref(), top_k)
+            })
             .collect()
     }
 
@@ -1030,6 +1112,8 @@ impl FluctlightBrain {
             prefrontal,
             core_memories,
             autonomic,
+            agent: AgentState::default(),
+            governance: crate::governance::GovernanceState::default(),
             semantic,
             recent_separations,
             checkpoint_policy: CheckpointPolicy::default(),
@@ -1043,6 +1127,7 @@ impl FluctlightBrain {
             consensus: crate::consensus::SharedMemory::default(),
             muon: crate::muon_runtime::new_muon_lane(),
             tau: crate::tau_runtime::new_tau_lane(),
+            chorus: crate::chorus_runtime::new_chorus_field(),
         }
     }
 }
@@ -1072,6 +1157,8 @@ impl Clone for FluctlightBrain {
             prefrontal: self.prefrontal.clone(),
             core_memories: self.core_memories.clone(),
             autonomic: self.autonomic.clone(),
+            agent: self.agent.clone(),
+            governance: self.governance.clone(),
             semantic: self.semantic.clone(),
             recent_separations: self.recent_separations.clone(),
             checkpoint_policy: self.checkpoint_policy.clone(),
@@ -1085,6 +1172,7 @@ impl Clone for FluctlightBrain {
             consensus: self.consensus.clone(),
             muon: self.muon.clone(),
             tau: self.tau.clone(),
+            chorus: self.chorus.clone(),
         }
     }
 }

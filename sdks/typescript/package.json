@@ -1,0 +1,16 @@
+{
+  "name": "@fluctlightdb/agent",
+  "version": "0.5.1",
+  "description": "FluctlightDB TypeScript agent brain client",
+  "type": "module",
+  "main": "fluctlightdb.ts",
+  "exports": {
+    ".": "./fluctlightdb.ts",
+    "./agent": "./agent.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types smoke.test.ts"
+  },
+  "keywords": ["ai-agents", "memory", "fluctlightdb"],
+  "license": "MIT"
+}

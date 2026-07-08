@@ -22,6 +22,11 @@ pub fn vector_fast_mode() -> bool {
     env_truthy("FLUCTLIGHT_VECTOR_FAST")
 }
 
+/// Bulk IR ingest: skip dentate/graph wiring; index + semantic vector only.
+pub fn fast_ingest_mode() -> bool {
+    env_truthy("FLUCTLIGHT_FAST_INGEST")
+}
+
 /// Agent hot path: shallow spread + capped hybrid candidates (SYNAPSE-style selective subgraph).
 pub fn agent_fast_mode() -> bool {
     env_truthy("FLUCTLIGHT_AGENT_FAST")
@@ -145,7 +150,12 @@ pub fn activate_from_hybrid(
                 .filter_map(|n| activation.get(n))
                 .sum();
             let semantic_boost = semantic_sims.get(&engram.id).copied().unwrap_or(0.0);
-            let completion = overlap * 0.45 + graph_boost * 0.35 + semantic_boost * 0.20;
+            let completion = if vector_fast_mode() {
+                // Index / IR path: cosine-dominant ranking (Chroma-class) with lexical tie-break.
+                semantic_boost * 0.82 + overlap * 0.12 + graph_boost * 0.06
+            } else {
+                overlap * 0.45 + graph_boost * 0.35 + semantic_boost * 0.20
+            };
             RecallResult {
                 engram_id: engram.id,
                 activation: completion,

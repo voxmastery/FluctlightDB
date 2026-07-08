@@ -229,17 +229,33 @@ def muon_activate(
     question_type: Optional[str] = None,
     top_k: int = 8,
     query_expand: bool = True,
+    item: Optional[dict] = None,
 ) -> list[dict]:
     """Penetrative episodic recall: Tau fission when available, else Muon sessions."""
     from longmemeval_bench import expand_queries, merge_recalls  # noqa: WPS433
 
+    qtype = question_type or ""
+    # Typed Rust profile only where it helps; full assistant/temporal profiles regressed recall.
+    rust_profile = {
+        "single-session-preference": "single-session-preference",
+        "multi-session": "multi-session",
+        "knowledge-update": "knowledge-update",
+    }.get(qtype, "")
     pool_k = max(top_k * 2, 16)
-    if question_type == "single-session-preference":
-        pool_k = max(top_k * 3, 24)
+    if qtype == "single-session-preference":
+        pool_k = max(top_k * 4, 32)
+    elif qtype == "single-session-assistant":
+        pool_k = max(top_k * 4, 32)
+    elif qtype in ("temporal-reasoning", "multi-session", "knowledge-update"):
+        pool_k = max(top_k * 4, 32)
 
     def recall_one(q: str) -> list[dict]:
         if hasattr(brain, "tau_recall"):
             try:
+                raw = brain.tau_recall(q, limit=pool_k, question_type=rust_profile or None)
+                if raw:
+                    return tau_hits_to_recalls(raw)
+            except TypeError:
                 raw = brain.tau_recall(q, limit=pool_k)
                 if raw:
                     return tau_hits_to_recalls(raw)
@@ -252,11 +268,58 @@ def muon_activate(
             return muon_hits_to_recalls(raw if isinstance(raw, list) else [])
         return []
 
-    queries = expand_queries(question, question_type) if query_expand else [question]
+    effective_expand = query_expand and qtype in (
+        "single-session-preference",
+        "single-session-user",
+        "knowledge-update",
+    )
+
+    queries = expand_queries(question, question_type) if effective_expand else [question]
+
+    if hasattr(brain, "tau_recall_rrf") and len(queries) > 1:
+        try:
+            raw = brain.tau_recall_rrf(
+                queries, limit=pool_k, question_type=rust_profile or None
+            )
+            if raw:
+                recalls = tau_hits_to_recalls(raw)
+            else:
+                recalls = []
+        except TypeError:
+            raw = brain.tau_recall_rrf(queries, limit=pool_k)
+            recalls = tau_hits_to_recalls(raw) if raw else []
+        except Exception:
+            recalls = []
+        if not recalls:
+            pass
+        else:
+            recalls = _finalize_muon_recalls(
+                recalls, item=item, question_type=qtype, top_k=top_k
+            )
+            return recalls
+
     if len(queries) == 1:
-        return recall_one(queries[0])[: max(top_k * 2, 16)]
-    lists = [recall_one(q) for q in queries]
-    return merge_recalls(lists, top_k)
+        recalls = recall_one(queries[0])
+    else:
+        lists = [recall_one(q) for q in queries]
+        from longmemeval_bench import merge_recalls_rrf  # noqa: WPS433
+
+        recalls = merge_recalls_rrf(lists, top_k)
+    return _finalize_muon_recalls(
+        recalls, item=item, question_type=qtype, top_k=top_k
+    )
+
+
+def _finalize_muon_recalls(
+    recalls: list[dict],
+    *,
+    item: Optional[dict],
+    question_type: str,
+    top_k: int,
+) -> list[dict]:
+    """Cap recall list for session@k metric."""
+    cap = max(top_k * 2, 16)
+    return recalls[:cap]
 
 
 def ingest_brain_haystack(

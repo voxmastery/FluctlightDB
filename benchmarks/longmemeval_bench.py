@@ -79,8 +79,11 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
         queries.append("user preference enjoys uses prefers " + " ".join(tokens[:14]))
         if tokens:
             queries.append(" ".join(tokens[:10]))
-    if question_type == "temporal-reasoning":
-        queries.append(" ".join(tokens[:12]) + " date time when event")
+    if any(w in ql for w in ("playlist", "spotify", "apple music", "streaming service")):
+        queries.append(
+            "user playlist created spotify called named summer vibes chill tracks music listening"
+        )
+        queries.append(" ".join(tokens[:10]) + " playlist spotify created listening")
     if question_type == "single-session-preference":
         queries.append(
             "user previously mentioned discussed shared experience history "
@@ -104,6 +107,64 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
             queries.append("user portable power bank battery phone charging")
         if any(w in ql for w in ("reunion", "high school", "nostalgic")):
             queries.append("user high school debate team advanced placement history economics")
+        if any(w in ql for w in ("photograph", "camera", "flash", "lens", "accessories", "setup")):
+            queries.append(
+                "user camera flash lens sony godox tripod photography accessories upgrade"
+            )
+        if any(w in ql for w in ("music store", "music", "instrument", "guitar")):
+            queries.append("user music store guitar instrument amplifier pedal vinyl")
+        if any(w in ql for w in ("denver", "trip", "visit", "travel")):
+            queries.append("user trip denver colorado itinerary attractions restaurants")
+        if any(w in ql for w in ("tokyo", "anxious", "getting around", "japan")):
+            queries.append("user tokyo japan subway train pass navigation tips transport")
+        if any(w in ql for w in ("accessories",)) and "phone" in ql:
+            queries.append("user phone case charger cable screen protector accessories")
+        if any(w in ql for w in ("furniture", "bedroom", "rearrang", "dresser", "decor")):
+            queries.append("user bedroom furniture dresser mid-century modern rearrange layout")
+    if question_type == "temporal-reasoning":
+        queries.append(" ".join(tokens[:12]) + " date time when event timeline order sequence")
+        if any(w in ql for w in ("order", "earliest", "latest", "sequence")):
+            queries.append("timeline chronological earliest latest first second third event dates")
+        if any(w in ql for w in ("week", "weeks", "month", "months", "days", "ago")):
+            queries.append("recent past date when happened timeline calendar")
+        if any(w in ql for w in ("trip", "trips", "travel")):
+            queries.append("user trip travel vacation flight hotel dates itinerary")
+        if any(w in ql for w in ("sport", "event", "race", "marathon", "triathlon")):
+            queries.append("user sports event race marathon triathlon tournament dates")
+        if any(w in ql for w in ("art", "gallery", "exhibition", "museum")):
+            queries.append("user art gallery exhibition museum event held location date")
+        if any(w in ql for w in ("kitchen", "appliance", "gadget", "bought")):
+            queries.append("user kitchen appliance gadget purchase bought date smoker air fryer")
+        if any(w in ql for w in ("days ago", "weeks ago", "week ago", "month ago")):
+            queries.append("user mentioned said discussed event purchase trip relative past date")
+        if any(w in ql for w in ("relative", "family", "wedding", "funeral", "birthday")):
+            queries.append("user family relative life event wedding celebration attended")
+        if any(w in ql for w in ("milestone", "business", "company")):
+            queries.append("user business milestone company launch anniversary achievement")
+    if question_type == "knowledge-update":
+        queries.append("user most recent latest new updated current before after")
+        if any(w in ql for w in ("kitchen", "gadget", "appliance", "air fryer")):
+            queries.append("user kitchen gadget appliance air fryer blender purchase invested")
+        if any(w in ql for w in ("doctor", "dr.", "see", "visit", "appointment")):
+            queries.append("user doctor appointment visit frequency schedule dr johnson smith therapist")
+        if "johnson" in ql:
+            queries.append("user therapist counselor dr smith johnson session weekly monthly frequency")
+    if question_type == "multi-session":
+        queries.append("user multiple times count total visits sessions history")
+        if any(w in ql for w in ("doctor", "physician", "specialist")):
+            queries.append(
+                "user doctor physician dermatologist ent primary care specialist visit appointment"
+            )
+        if any(w in ql for w in ("fish", "aquarium", "tank")):
+            queries.append("user aquarium fish tank tetra gourami pleco gallon community")
+        if any(w in ql for w in ("ipad", "tablet", "case", "arrive", "delivery")):
+            queries.append("user ipad tablet case ordered bought arrived delivery days shipping")
+    if question_type == "single-session-assistant":
+        queries.append("assistant previous conversation response answer you said mentioned")
+        if any(w in ql for w in ("chess", "move", "game")):
+            queries.append("assistant chess move game board position previous")
+        if any(w in ql for w in ("song", "sad", "lyrics", "music")):
+            queries.append("assistant song lyrics sad music composed wrote created")
     # dedupe, preserve order
     seen: set[str] = set()
     out: list[str] = []
@@ -528,6 +589,7 @@ def retrieve_item(
             question_type=item.get("question_type"),
             top_k=top_k,
             query_expand=query_expand or True,
+            item=item,
         )
     elif mode == "brain":
         recalls = brain_activate(

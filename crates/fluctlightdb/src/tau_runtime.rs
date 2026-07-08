@@ -21,10 +21,25 @@ impl FluctlightBrain {
     }
 
     pub fn tau_recall(&self, cue: &str, k: usize) -> Vec<TauHit> {
+        self.tau_recall_typed(cue, k, "")
+    }
+
+    pub fn tau_recall_typed(&self, cue: &str, k: usize, question_type: &str) -> Vec<TauHit> {
         if !tau_enabled() {
             return Vec::new();
         }
-        self.tau.recall(cue, k)
+        self.tau.recall_typed(cue, k, question_type)
+    }
+
+    pub fn tau_recall_rrf(&self, cues: &[&str], k: usize) -> Vec<TauHit> {
+        self.tau_recall_rrf_typed(cues, k, "")
+    }
+
+    pub fn tau_recall_rrf_typed(&self, cues: &[&str], k: usize, question_type: &str) -> Vec<TauHit> {
+        if !tau_enabled() {
+            return Vec::new();
+        }
+        self.tau.recall_rrf_typed(cues, k, question_type)
     }
 
     /// Promote one episodic shard into a full hippocampal engram (lazy crystallize).

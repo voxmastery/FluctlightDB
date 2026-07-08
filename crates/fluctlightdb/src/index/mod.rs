@@ -24,6 +24,20 @@ pub const MAX_CANDIDATE_CAP: usize = 4096;
 pub const LEXICAL_SEED_LIMIT: usize = 64;
 pub const SEMANTIC_SEED_LIMIT: usize = 50;
 
+fn lexical_seed_limit(cap: usize) -> usize {
+    std::env::var("FLUCTLIGHT_LEXICAL_SEED_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or_else(|| LEXICAL_SEED_LIMIT.max(cap).min(512))
+}
+
+fn semantic_seed_limit(cap: usize) -> usize {
+    std::env::var("FLUCTLIGHT_SEMANTIC_SEED_LIMIT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or_else(|| SEMANTIC_SEED_LIMIT.max(cap).min(512))
+}
+
 enum IndexBackend {
     Sidecar(SidecarIndex),
     Memory(Mutex<LexicalIndex>),
@@ -45,7 +59,7 @@ impl RecallIndex {
     }
 
     pub fn open_sidecar(brain_path: &Path) -> Result<Self> {
-        let db_path = Self::sidecar_path(brain_path);
+        let db_path = Self::resolve_sidecar_path(brain_path);
         let sidecar = SidecarIndex::open(&db_path)?;
         Ok(Self {
             backend: Mutex::new(IndexBackend::Sidecar(sidecar)),
@@ -59,6 +73,39 @@ impl RecallIndex {
         } else {
             brain_path.with_extension("flct.index.sqlite")
         }
+    }
+
+    /// Pre-v4 directory brains kept the sidecar as a sibling `*.flct.index.sqlite` file.
+    pub fn legacy_sidecar_path(brain_path: &Path) -> PathBuf {
+        if brain_path.is_dir() {
+            let name = brain_path
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("brain");
+            let stem = name.strip_suffix(".brain").unwrap_or(name);
+            brain_path
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(format!("{stem}.flct.index.sqlite"))
+        } else {
+            Self::sidecar_path(brain_path)
+        }
+    }
+
+    fn resolve_sidecar_path(brain_path: &Path) -> PathBuf {
+        let primary = Self::sidecar_path(brain_path);
+        if primary.exists() {
+            return primary;
+        }
+        let legacy = Self::legacy_sidecar_path(brain_path);
+        if legacy.exists() {
+            if let Some(parent) = primary.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::copy(&legacy, &primary);
+            return primary;
+        }
+        primary
     }
 
     pub fn rebuild(brain: &FluctlightBrain) -> Result<Self> {
@@ -130,6 +177,8 @@ impl RecallIndex {
         // Callers may exceed DEFAULT_CANDIDATE_CAP (e.g. k=150 bench runs), but an
         // unbounded cap lets one recall allocate the whole store; hard-limit it.
         let cap = cap.max(1).min(MAX_CANDIDATE_CAP);
+        let lex_limit = lexical_seed_limit(cap);
+        let sem_limit = semantic_seed_limit(cap);
         let mut set = HashSet::new();
 
         let guard = self
@@ -138,11 +187,11 @@ impl RecallIndex {
             .map_err(|e| crate::error::Error::Store(format!("recall index lock: {e}")))?;
         match &*guard {
             IndexBackend::Sidecar(s) => {
-                for id in s.fts_search(cue, LEXICAL_SEED_LIMIT)? {
+                for id in s.fts_search(cue, lex_limit)? {
                     set.insert(id);
                 }
                 if let Some(vec) = cue_vector {
-                    for id in s.semantic_search(vec, SEMANTIC_SEED_LIMIT)? {
+                    for id in s.semantic_search(vec, sem_limit)? {
                         set.insert(id);
                     }
                 }
@@ -151,11 +200,11 @@ impl RecallIndex {
                 let lex = lex
                     .lock()
                     .map_err(|e| crate::error::Error::Store(format!("lexical lock: {e}")))?;
-                for id in lex.search(cue, LEXICAL_SEED_LIMIT)? {
+                for id in lex.search(cue, lex_limit)? {
                     set.insert(id);
                 }
                 if let Some(vec) = cue_vector {
-                    for id in semantic_top_k(semantic, vec, SEMANTIC_SEED_LIMIT) {
+                    for id in semantic_top_k(semantic, vec, sem_limit) {
                         set.insert(id);
                     }
                 }
@@ -217,5 +266,40 @@ mod tests {
         let result = brain.activate_with_semantic("wallet balance", Some(&[1.0, 0.0, 0.0]));
         assert!(!result.recalls.is_empty());
         assert!(RecallIndex::sidecar_path(&brain_path).exists());
+    }
+
+    #[test]
+    fn sidecar_recall_after_checkpoint_reload() {
+        let dir = tempdir().unwrap();
+        let brain_path = dir.path().join("agent.brain");
+        let eid = {
+            let mut brain = FluctlightBrain::new();
+            brain.attach_store_path(brain_path.clone());
+            brain
+                .experience(Episode {
+                    content: "user prefers dark mode in all applications".into(),
+                    context: "prefs".into(),
+                    outcome: None,
+                    salience_hint: 0.8,
+                    semantic_vector: Some(vec![0.77, 0.23, 0.0]),
+                    agent_id: None,
+                    tenant_id: None,
+                    rag: None,
+                    provenance: None,
+                })
+                .unwrap();
+            brain.checkpoint().unwrap();
+            let result =
+                brain.activate_with_semantic("dark mode", Some(&[0.77, 0.23, 0.0]));
+            assert!(!result.recalls.is_empty());
+            result.recalls[0].engram_id
+        };
+        let brain2 = FluctlightBrain::open(&brain_path).unwrap();
+        let result = brain2.activate_with_semantic("dark mode", Some(&[0.77, 0.23, 0.0]));
+        assert!(
+            !result.recalls.is_empty(),
+            "recall after reload should find checkpointed engram"
+        );
+        assert_eq!(result.recalls[0].engram_id, eid);
     }
 }

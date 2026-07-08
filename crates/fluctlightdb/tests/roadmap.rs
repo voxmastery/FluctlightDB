@@ -60,8 +60,8 @@ fn tenant_scoped_recall_isolation() {
             provenance: None,
         })
         .unwrap();
-    let a = brain.activate_scoped("secret project", None, Some("agent_a"));
-    let b = brain.activate_scoped("secret project", None, Some("agent_b"));
+    let a = brain.activate_scoped("secret project", None, Some("agent_a"), 8);
+    let b = brain.activate_scoped("secret project", None, Some("agent_b"), 8);
     assert!(a
         .recalls
         .iter()

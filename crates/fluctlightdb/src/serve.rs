@@ -794,6 +794,7 @@ fn dispatch(
                     &cue,
                     api_body.semantic_vector.as_deref(),
                     agent_id.as_deref(),
+                    1,
                 ))
             })?;
             crate::api_slim::slim_activation_for_api(&mut result, Some(1));
@@ -821,11 +822,15 @@ fn dispatch(
             let timer = Timer::start();
             let cue = api_body.cue.unwrap_or_default();
             let agent_id = api_body.agent_id.clone();
+            let top_k = api_body
+                .limit
+                .unwrap_or(crate::api_slim::DEFAULT_API_RECALL_LIMIT);
             let mut result: ActivationResult = server.with_brain_read(tenant_id, |b| {
                 Ok(b.activate_scoped(
                     &cue,
                     api_body.semantic_vector.as_deref(),
                     agent_id.as_deref(),
+                    top_k,
                 ))
             })?;
             crate::api_slim::slim_activation_for_api(&mut result, api_body.limit);
@@ -849,8 +854,11 @@ fn dispatch(
                 .into_iter()
                 .map(|b| (b.cue, b.semantic_vector, b.agent_id))
                 .collect();
+            let top_k = api_body
+                .limit
+                .unwrap_or(crate::api_slim::DEFAULT_API_RECALL_LIMIT);
             let mut results: Vec<ActivationResult> =
-                server.with_brain_read(tenant_id, |b| Ok(b.activate_batch(&items)))?;
+                server.with_brain_read(tenant_id, |b| Ok(b.activate_batch(&items, top_k)))?;
             for result in &mut results {
                 crate::api_slim::slim_activation_for_api(result, api_body.limit);
             }

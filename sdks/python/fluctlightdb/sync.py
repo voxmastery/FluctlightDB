@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -38,6 +39,17 @@ def _git(root: Path, *args: str, timeout: float = 120.0) -> subprocess.Completed
 
 def _is_repo(root: Path) -> bool:
     return _git(root, "rev-parse", "--is-inside-work-tree").stdout.strip() == "true"
+
+
+def sync_replicate(primary: str, replica: str) -> SyncResult:
+    """Incremental WAL replica sync (Rust engine). Requires fluctlightdb[native]."""
+    try:
+        from .brain import FluctlightBrain
+
+        status = FluctlightBrain.replicate_sync(primary, replica)
+        return SyncResult(True, "replica synced", stdout=json.dumps(status))
+    except Exception as exc:
+        return SyncResult(False, str(exc))
 
 
 def sync_status(start: Optional[Path] = None) -> SyncResult:
