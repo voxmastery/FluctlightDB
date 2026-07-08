@@ -1,10 +1,16 @@
 //! Python extension — direct library calls into FluctlightDB (no HTTP/subprocess).
 
 use fluctlightdb::api_slim;
-use fluctlightdb::{Episode, FluctlightBrain, ProvenanceKind};
+use fluctlightdb::chorus_runtime::{chorus_fast_enabled, chorus_float_rerank_enabled};
+use fluctlightdb::recall_router::RecallMode;
+use fluctlightdb::{
+    ChorusHit, ChorusRecallOpts, Episode, FluctlightBrain, RetentionPolicy, ToolObserveInput,
+    ProvenanceKind,
+};
+use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -83,9 +89,13 @@ impl PyBrain {
         agent_id: Option<String>,
         limit: Option<usize>,
     ) -> PyResult<Py<PyAny>> {
-        let mut result =
-            self.inner
-                .activate_scoped(cue, semantic_vector.as_deref(), agent_id.as_deref());
+        let top_k = limit.unwrap_or(crate::api_slim::DEFAULT_API_RECALL_LIMIT);
+        let mut result = self.inner.activate_scoped(
+            cue,
+            semantic_vector.as_deref(),
+            agent_id.as_deref(),
+            top_k,
+        );
         api_slim::slim_activation_for_api(&mut result, limit);
         Python::with_gil(|py| {
             let dict = PyDict::new(py);
@@ -105,7 +115,8 @@ impl PyBrain {
             .into_iter()
             .map(|i| (i.cue, i.semantic_vector, i.agent_id))
             .collect();
-        let mut results = self.inner.activate_batch(&batch);
+        let top_k = limit.unwrap_or(crate::api_slim::DEFAULT_API_RECALL_LIMIT);
+        let mut results = self.inner.activate_batch(&batch, top_k);
         for r in &mut results {
             api_slim::slim_activation_for_api(r, limit);
         }
@@ -301,14 +312,321 @@ impl PyBrain {
         self.inner.muon_len()
     }
 
-    #[pyo3(signature = (cue, limit=None))]
-    fn tau_recall(&self, py: Python<'_>, cue: &str, limit: Option<usize>) -> PyResult<Py<PyAny>> {
-        let hits = self.inner.tau_recall(cue, limit.unwrap_or(8));
+    #[pyo3(signature = (cue, limit=None, question_type=None))]
+    fn tau_recall(
+        &self,
+        py: Python<'_>,
+        cue: &str,
+        limit: Option<usize>,
+        question_type: Option<&str>,
+    ) -> PyResult<Py<PyAny>> {
+        let hits = self
+            .inner
+            .tau_recall_typed(cue, limit.unwrap_or(8), question_type.unwrap_or(""));
+        json_val_to_py(py, &hits)
+    }
+
+    #[pyo3(signature = (cues, limit=None, question_type=None))]
+    fn tau_recall_rrf(
+        &self,
+        py: Python<'_>,
+        cues: Vec<String>,
+        limit: Option<usize>,
+        question_type: Option<&str>,
+    ) -> PyResult<Py<PyAny>> {
+        let refs: Vec<&str> = cues.iter().map(|s| s.as_str()).collect();
+        let hits = self.inner.tau_recall_rrf_typed(
+            &refs,
+            limit.unwrap_or(8),
+            question_type.unwrap_or(""),
+        );
         json_val_to_py(py, &hits)
     }
 
     fn tau_shard_len(&self) -> usize {
         self.inner.tau_shard_len()
+    }
+
+    fn chorus_imprint_batch_json(&mut self, batch_json: &str) -> PyResult<usize> {
+        self.require_writable()?;
+        let batch: Vec<fluctlightdb::ChorusImprintInput> =
+            serde_json::from_str(batch_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(self.inner.chorus_imprint_batch(&batch))
+    }
+
+    #[pyo3(signature = (cue, limit=None, semantic_vector=None, fast=None, tag=None))]
+    fn chorus_recall(
+        &mut self,
+        py: Python<'_>,
+        cue: &str,
+        limit: Option<usize>,
+        semantic_vector: Option<Vec<f32>>,
+        fast: Option<bool>,
+        tag: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let k = limit.unwrap_or(8);
+        let fast = fast.unwrap_or_else(chorus_fast_enabled);
+        let opts = ChorusRecallOpts {
+            fast,
+            float_rerank: chorus_float_rerank_enabled(),
+        };
+        let hits = self.inner.chorus_recall_with_opts(
+            cue,
+            k,
+            semantic_vector.as_deref(),
+            opts,
+        );
+        if tag.unwrap_or(false) {
+            self.inner.chorus_tag_hits(&hits);
+        }
+        chorus_hits_to_py(py, &hits, fast)
+    }
+
+    #[pyo3(signature = (cues, embeddings_flat, dim, limit=None, fast=None))]
+    fn chorus_recall_batch_flat(
+        &self,
+        py: Python<'_>,
+        cues: Vec<String>,
+        embeddings_flat: &Bound<'_, PyAny>,
+        dim: usize,
+        limit: Option<usize>,
+        fast: Option<bool>,
+    ) -> PyResult<Py<PyAny>> {
+        let k = limit.unwrap_or(8);
+        let fast = fast.unwrap_or_else(chorus_fast_enabled);
+        let opts = ChorusRecallOpts {
+            fast,
+            float_rerank: chorus_float_rerank_enabled(),
+        };
+        let buf = PyBuffer::<f32>::get(embeddings_flat)?;
+        let data = buf
+            .as_slice(py)
+            .ok_or_else(|| PyRuntimeError::new_err("embeddings buffer is not contiguous"))?;
+        let flat: Vec<f32> = data.iter().map(|c| c.get()).collect();
+        let mut queries: Vec<(&str, Option<&[f32]>)> = Vec::with_capacity(cues.len());
+        for (i, cue) in cues.iter().enumerate() {
+            let slice = if dim > 0 {
+                let start = i * dim;
+                let end = start + dim;
+                if end <= flat.len() {
+                    Some(flat[start..end].as_ref())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            queries.push((cue.as_str(), slice));
+        }
+        let batch = self.inner.chorus_recall_batch(&queries, k, opts);
+        chorus_batch_to_py(py, &batch, fast)
+    }
+
+    fn chorus_sleep(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let report = self
+            .inner
+            .chorus_sleep()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &report)
+    }
+
+    fn chorus_tick(&mut self) -> u8 {
+        self.inner.chorus_tick()
+    }
+
+    fn chorus_len(&self) -> usize {
+        self.inner.chorus_len()
+    }
+
+    fn turn_begin(&mut self) {
+        self.inner.turn_begin();
+    }
+
+    #[pyo3(signature = (flush=true))]
+    fn turn_end(&mut self, py: Python<'_>, flush: bool) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let report = self
+            .inner
+            .turn_end(flush)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &report)
+    }
+
+    #[pyo3(signature = (content, context="turn", salience=0.6, semantic_vector=None))]
+    fn wm_push(
+        &mut self,
+        content: &str,
+        context: &str,
+        salience: f32,
+        semantic_vector: Option<Vec<f32>>,
+    ) {
+        self.inner
+            .wm_push(content, context, salience, semantic_vector);
+    }
+
+    fn wm_len(&self) -> usize {
+        self.inner.wm_len()
+    }
+
+    fn observe_tool_json(&mut self, py: Python<'_>, payload_json: &str) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let input: ToolObserveInput =
+            serde_json::from_str(payload_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let out = self
+            .inner
+            .observe_tool(&input)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &out)
+    }
+
+    #[pyo3(signature = (cue, mode="auto", limit=None, semantic_vector=None, tick_from=None, tick_to=None))]
+    fn recall_unified(
+        &self,
+        py: Python<'_>,
+        cue: &str,
+        mode: &str,
+        limit: Option<usize>,
+        semantic_vector: Option<Vec<f32>>,
+        tick_from: Option<u64>,
+        tick_to: Option<u64>,
+    ) -> PyResult<Py<PyAny>> {
+        let k = limit.unwrap_or(8);
+        let mode = parse_recall_mode(mode);
+        let temporal = if tick_from.is_some() || tick_to.is_some() {
+            Some(fluctlightdb::TemporalFilter {
+                from_tick: tick_from,
+                to_tick: tick_to,
+            })
+        } else {
+            None
+        };
+        let out = self.inner.recall_unified(
+            cue,
+            semantic_vector.as_deref(),
+            mode,
+            k,
+            temporal,
+        );
+        json_val_to_py(py, &out)
+    }
+
+    #[pyo3(signature = (cue, semantic_vector=None))]
+    fn resolve(
+        &self,
+        py: Python<'_>,
+        cue: &str,
+        semantic_vector: Option<Vec<f32>>,
+    ) -> PyResult<Py<PyAny>> {
+        let out = self.inner.resolve(cue, semantic_vector.as_deref());
+        json_val_to_py(py, &out)
+    }
+
+    #[pyo3(signature = (days=None, unless_verified=true, min_salience=None))]
+    fn retain_for(
+        &mut self,
+        days: Option<u32>,
+        unless_verified: bool,
+        min_salience: Option<f32>,
+    ) -> PyResult<()> {
+        self.require_writable()?;
+        let mut policy = self.inner.retention_policy().clone();
+        policy.retain_days = days;
+        policy.unless_verified = unless_verified;
+        if let Some(s) = min_salience {
+            policy.min_salience = s;
+        }
+        self.inner.set_retention_policy(policy);
+        Ok(())
+    }
+
+    fn consolidate(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let report = self
+            .inner
+            .consolidate()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &report)
+    }
+
+    fn set_auto_consolidate(&mut self, enabled: bool) -> PyResult<()> {
+        self.require_writable()?;
+        self.inner.agent.auto_consolidate = enabled;
+        Ok(())
+    }
+
+    fn query_json(&self, py: Python<'_>, payload_json: &str) -> PyResult<Py<PyAny>> {
+        let req: fluctlightdb::query::QueryRequest =
+            serde_json::from_str(payload_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let resp = fluctlightdb::query::execute(&self.inner, req);
+        json_val_to_py(py, &resp)
+    }
+
+    fn query_mut_json(&mut self, py: Python<'_>, payload_json: &str) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let req: fluctlightdb::query::QueryRequest =
+            serde_json::from_str(payload_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let resp = fluctlightdb::query::execute_mut(&mut self.inner, req);
+        json_val_to_py(py, &resp)
+    }
+
+    fn export_snapshot_json(&self, py: Python<'_>) -> PyResult<String> {
+        fluctlightdb::export_snapshot_json(&self.inner)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+    }
+
+    fn import_snapshot_json(&mut self, py: Python<'_>, json: &str) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let report = fluctlightdb::import_snapshot_json(&mut self.inner, json)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &report)
+    }
+
+    fn scrub_pii(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let report = self
+            .inner
+            .scrub_pii()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &report)
+    }
+
+    fn delete_by_subject(&mut self, py: Python<'_>, subject: &str) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let report = self
+            .inner
+            .delete_by_subject(subject)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &report)
+    }
+
+    fn delete_by_agent_id(&mut self, py: Python<'_>, agent_id: &str) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let n = self
+            .inner
+            .delete_by_agent_id(agent_id)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        Ok(n.into_py(py))
+    }
+
+    fn audit_log_json(&self, py: Python<'_>, limit: Option<usize>) -> PyResult<Py<PyAny>> {
+        let entries = self.inner.audit_log(limit.unwrap_or(50));
+        json_val_to_py(py, &entries)
+    }
+
+    fn graph_export_json(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let g = self.inner.export_graph();
+        json_val_to_py(py, &g)
+    }
+
+    #[staticmethod]
+    fn replicate_sync(primary: &str, replica: &str, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let status = fluctlightdb::sync_once(
+            std::path::Path::new(primary),
+            std::path::Path::new(replica),
+        )
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &status)
     }
 
     fn tau_crystallize_shard(&mut self, shard_id: &str) -> PyResult<String> {
@@ -319,6 +637,58 @@ impl PyBrain {
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         Ok(id.to_string())
     }
+}
+
+fn parse_recall_mode(mode: &str) -> RecallMode {
+    match mode.to_lowercase().as_str() {
+        "episodic" => RecallMode::Episodic,
+        "corpus" | "chorus" => RecallMode::Corpus,
+        "session" | "muon" => RecallMode::Session,
+        "hybrid" => RecallMode::Hybrid,
+        _ => RecallMode::Auto,
+    }
+}
+
+fn chorus_hits_to_py(py: Python<'_>, hits: &[ChorusHit], fast: bool) -> PyResult<Py<PyAny>> {
+    let list = PyList::empty(py);
+    if fast {
+        for hit in hits {
+            list.append((hit.memory_id.as_str(), hit.score))?;
+        }
+    } else {
+        for hit in hits {
+            let dict = PyDict::new(py);
+            dict.set_item("memory_id", &hit.memory_id)?;
+            dict.set_item("score", hit.score)?;
+            dict.set_item("photon", hit.photon)?;
+            dict.set_item("field", hit.field)?;
+            dict.set_item("lexical", hit.lexical)?;
+            dict.set_item("theta", hit.theta)?;
+            dict.set_item("lane", &hit.lane)?;
+            if !hit.snippet.is_empty() {
+                dict.set_item("snippet", &hit.snippet)?;
+            }
+            list.append(dict)?;
+        }
+    }
+    Ok(list.into())
+}
+
+fn chorus_batch_to_py(py: Python<'_>, batch: &[Vec<ChorusHit>], fast: bool) -> PyResult<Py<PyAny>> {
+    let outer = PyList::empty(py);
+    for hits in batch {
+        if fast {
+            let list = PyList::empty(py);
+            for hit in hits {
+                list.append((hit.memory_id.as_str(), hit.score))?;
+            }
+            outer.append(list)?;
+        } else {
+            let inner = chorus_hits_to_py(py, hits, false)?;
+            outer.append(inner)?;
+        }
+    }
+    Ok(outer.into())
 }
 
 fn json_val_to_py<T: serde::Serialize>(py: Python<'_>, val: &T) -> PyResult<Py<PyAny>> {

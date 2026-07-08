@@ -48,13 +48,18 @@ pip install "fluctlightdb[native]"
 ```
 
 ```python
-from fluctlightdb import connect
+from fluctlightdb import connect_agent
 
-brain = connect("/tmp/my-agent-brain")
-brain.experience("User prefers dark mode", context="settings", salience=0.8)
-print(brain.activate("theme preference"))
+brain = connect_agent("/tmp/my-agent-brain")
+brain.turn_begin()
+brain.wm_push("User prefers dark mode", context="settings", salience=0.8)
+print(brain.recall("theme preference"))
+brain.turn_end(flush=True)
 brain.checkpoint()
 ```
+
+**Framework integrations:** LangChain, LlamaIndex, OpenAI Agents — see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).  
+**MCP memory tools:** `pip install "fluctlightdb[mcp]"` → `memory_remember`, `memory_recall`, `memory_resolve`.
 
 ---
 
@@ -85,7 +90,7 @@ That gap shows up as the same pain in every serious agent:
 
 **In one line:** FluctlightDB is a **database engine for what agents learn** — write episodes, recall from cues, hybrid retrieval, evidence ranking, compaction — **embedded on disk**, not a hosted memory SaaS and not a replacement for Postgres.
 
-**Proof:** **98.1%** LoCoMo evidence recall · **97.6%** LongMemEval-S session@8 · BEIR SciFact parity · FAMB **97–98%** — [frozen results](benchmarks/results/paper-2026-07-04.json).
+**Proof:** **99.0%** LoCoMo (CHORUS) · **97.4%** LongMemEval E2E (locked cert) · **97.6%** LongMemEval-S session@8 · BEIR SciFact **nDCG@10 parity** (PRISM + float rerank) · FAMB **100%** — [frozen results](benchmarks/results/paper-2026-07-09.json).
 
 ---
 
@@ -95,7 +100,7 @@ The items above are **engine primitives**, not plugins you wire up yourself:
 
 1. **`experience()` / `activate()` / `checkpoint()`** — the database contract (not `INSERT` + `vector_search()` + custom glue).
 2. **Hybrid recall** — vectors, keywords, and graph activation in one `activate(cue)` call.
-3. **Two modes** — `connect()` for live agents; `connect_index()` for bulk ingest and IR benchmarks.
+3. **Two modes** — `connect_agent()` for live agents (recommended); `connect_index()` for bulk ingest and IR benchmarks.
 
 Details: [Manifesto](docs/Manifesto.md) · optional brain-native internals · use it like SQLite for agents without reading neuroscience.
 
@@ -154,7 +159,7 @@ Endpoints it uses (all `POST`, `Role::Read`):
 
 ## Where it is going
 
-- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **98.1% LoCoMo** + **97.6% LongMemEval-S** (unified v4 full 500 on Colab GPU), BEIR SciFact parity, FAMB 97–98%, **multi-agent project brains** (MCP + hooks + handoffs, Windows/macOS/Linux).
+- **Now:** embedded Python/Rust, HTTP server, provenance-aware recall, **99.0% LoCoMo** (CHORUS), **97.4% LongMemEval E2E** (locked cert), **97.6% LongMemEval-S** session@8, BEIR SciFact **nDCG@10 parity** via **PRISM** (RaBitQ + QJL + float rerank), FAMB **100%**, multi-agent project brains (MCP + hooks + handoffs).
 - **Next:** full 500 v4 confirmation run, LoCoMo end-to-end QA vs Mem0/Zep on defined metrics, multi-tenant scale at 100k+ memories, optional managed sync (self-hosted works today).
 - **Goal:** the default **database engine for agent memory** — the way SQLite became the default embedded DB for apps.
 - **Long-term vision:** **foundational memory infrastructure** for durable, trustworthy autonomy — the persistence layer between a stateless LLM call and agents (or stacks) that must operate over weeks, prefer evidence over chat, and carry identity across tools. We are building the **database for that layer**, not claiming to be AGI. Any serious path toward general, long-horizon autonomy still needs a third data model for *what was learned and what can be trusted*; FluctlightDB is that engine.
@@ -163,23 +168,24 @@ Endpoints it uses (all `POST`, `Role::Read`):
 
 ## Benchmarks
 
-Frozen results: [`benchmarks/results/paper-2026-07-04.json`](benchmarks/results/paper-2026-07-04.json)
+Frozen results: [`benchmarks/results/paper-2026-07-09.json`](benchmarks/results/paper-2026-07-09.json)
 
-### Latest measured results (July 2026)
+### Latest measured results (July 2026 — PRISM production)
 
 | Benchmark | Metric | FluctlightDB | Baseline / note |
 |-----------|--------|--------------|-----------------|
-| **LoCoMo** (10 conv, 1,982 gold spans) | Mean **evidence recall** @ k=150 | **98.1%** (1925/1982) | Warm and cold-start identical |
-| | All evidence in context | 97.1% | Hybrid vector + BM25, index mode |
-| | Wall time | 271s warm / 335s cold | 2 CPU threads, MiniLM ONNX |
+| **LoCoMo** (10 conv, 1,982 gold spans) | Mean **evidence recall** @ k=150 | **99.0%** (1970/1982) | CHORUS + full SPECTRUM readout (k>100) |
+| | All evidence in context | 98.3% | MiniLM ONNX, `connect_chorus()` |
+| | Wall time | ~20s | 8,422 memories ingested |
+| **LongMemEval E2E** (500 Q, locked) | **Overall accuracy** | **97.4%** | Frozen cert — do not rerun |
+| | **session_recall@8** | **100%** | `e2e-cert-paper-v2-2026-07-07.json` |
 | **LongMemEval-S** (500 Q) | **session_recall@8** | **97.6%** (488/500) | mpnet GPU v4 unified |
-| | By type (preference) | **96.7%** (29/30) | v4 pref-facts-key |
-| | Wall time | 4380s (~8.8 s/Q) | Colab GPU; see `longmemeval_colab_v2.ipynb` |
-| **BEIR SciFact** | nDCG@10 (index mode) | **0.645** | Chroma + same MiniLM: 0.645 (tie) |
-| | Recall@100 (agent mode) | **0.941** | Chroma: 0.925 |
-| | Query latency (index) | **4–7 ms** | Chroma: 4–7 ms |
-| **FAMB** (agent-specific) | Macro (index mode) | **98%** | Paraphrase 92%, provenance/persistence 100% |
-| | Macro (agent mode) | **97%** | Paraphrase 83%, other suites 100% |
+| **BEIR SciFact** | nDCG@10 (CHORUS/PRISM) | **0.645** | Chroma + same MiniLM: **0.645** (exact tie) |
+| | Recall@100 | **0.925** | Chroma: 0.927 |
+| | Query p50 | **~11 ms** | Lane: `chorus_grg_prism` + float rerank |
+| **FAMB** | Macro (agent + chorus) | **100%** | Paraphrase, provenance, persistence, determinism |
+
+**PRISM recall stack (k ≤ 100):** RaBitQ popcount + QJL residual → SPECTRUM certify top-M → **float32 gold rerank**. For k > 100 (e.g. LoCoMo k=150), engine uses full **SPECTRUM** readout on all traces (no certify cap).
 
 > **Metric note:** LoCoMo **evidence recall** and LongMemEval **session_recall@K** are retrieval metrics (gold evidence/session in top-K). Mem0/Zep often report **LLM-as-judge end-to-end QA** — a harder, different number. Do not compare retrieval % to QA % without naming the metric.
 
@@ -192,19 +198,15 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install chromadb pytrec-eval-terrier "fluctlightdb[native]"
 # or dev: pip install -e sdks/python && ./scripts/install-native.sh
 
-# Agent memory (paraphrase, provenance, persistence) — ~4 min
+# Agent memory (paraphrase, provenance, persistence) — ~15s
 PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode agent
-PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode index
+PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode chorus
 
-# BEIR SciFact (download once)
-mkdir -p /tmp/beir && cd /tmp/beir
-curl -sL https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/scifact.zip -o scifact.zip
-unzip -o scifact.zip && cd -
+# BEIR SciFact (CHORUS / PRISM lane)
+BEIR_DATA=/tmp/beir BEIR_DS=scifact PYTHONPATH=sdks/python python benchmarks/beir_bench.py
 
-BEIR_DATA=/tmp/beir BEIR_DS=scifact MODE=index PYTHONPATH=sdks/python python benchmarks/beir_bench.py
-
-# LoCoMo full eval (needs dataset — see benchmarks/README.md)
-PYTHONPATH=sdks/python python benchmarks/locomo_eval.py --mode index --rag-mode all --top-k 150
+# LoCoMo (CHORUS, k=150)
+PYTHONPATH=sdks/python python benchmarks/locomo_eval.py --mode chorus --top-k 150
 
 # LongMemEval (pilot / full — CPU-heavy ingest)
 PYTHONPATH=sdks/python python benchmarks/longmemeval_bench.py --mode index
