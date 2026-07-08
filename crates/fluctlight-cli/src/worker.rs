@@ -92,10 +92,12 @@ pub fn run_worker(path: PathBuf) -> io::Result<()> {
             "status" => json!({"ok": true, "id": req.id, "status": brain.status()}),
             "activate" => {
                 let cue = req.cue.unwrap_or_default();
+                let top_k = req.limit.unwrap_or(api_slim::DEFAULT_API_RECALL_LIMIT);
                 let mut result = brain.activate_scoped(
                     &cue,
                     req.semantic_vector.as_deref(),
                     req.agent_id.as_deref(),
+                    top_k,
                 );
                 api_slim::slim_activation_for_api(&mut result, req.limit);
                 json!({"ok": true, "id": req.id, "result": result})
@@ -107,7 +109,8 @@ pub fn run_worker(path: PathBuf) -> io::Result<()> {
                     .into_iter()
                     .map(|b| (b.cue, b.semantic_vector, b.agent_id))
                     .collect();
-                let mut results = brain.activate_batch(&items);
+                let top_k = req.limit.unwrap_or(api_slim::DEFAULT_API_RECALL_LIMIT);
+                let mut results = brain.activate_batch(&items, top_k);
                 for result in &mut results {
                     api_slim::slim_activation_for_api(result, req.limit);
                 }
