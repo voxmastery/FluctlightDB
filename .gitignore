@@ -40,3 +40,9 @@ papers/arxiv-v1/*.aux
 papers/arxiv-v1/*.log
 papers/arxiv-v1/*.out
 papers/arxiv-v1/*.blg
+
+# Benchmark run scratch (canonical freezes stay tracked; see benchmarks/results/.gitignore)
+**/benchmarks/results/*.checkpoint.jsonl
+**/benchmarks/results/*.checkpoint.jsonl.bak
+**/benchmarks/results/*.log
+**/benchmarks/results/.*.lock

@@ -1,0 +1,22 @@
+# Run scratch — never commit (canonical freezes stay tracked: paper-*.json, *-cert-*, *-2026-07-08/09)
+*.checkpoint.jsonl
+*.checkpoint.jsonl.bak
+*.log
+.*.lock
+
+# Intermediate experiment runs superseded by certified freezes
+beir-scifact-2026-07-06*.json
+beir-agent-run.log
+chorus-beir*.json
+famb-*-2026-07-06.json
+locomo-index-2026-07-06*.json
+longmemeval-muon-*.json
+longmemeval-2026-07-06.json
+longmemeval-conv-*.json
+longmemeval-e2e-cursor-*
+longmemeval-e2e-v4-mpnet*
+longmemeval-full-v4-mpnet*
+longmemeval-index-*-2026-07-05.json
+e2e-cert-gemini-*
+e2e-cert-2026-07-07.*
+e2e-validate-gate.checkpoint*
