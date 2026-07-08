@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::muon::count_sketch;
 use crate::photon::{PhotonCode, PhotonStore, SimHasher, DEFAULT_BITS};
+use crate::prism::{self, PrismSignature, DEFAULT_CERTIFY_M, DEFAULT_PRISM_FULL_MAX};
 use crate::spectrum::{SpectrumSignature, DEFAULT_FULL_READOUT_MAX};
 
 pub const THETA_BINS: u8 = 8;
@@ -77,6 +78,9 @@ pub struct ChorusTrace {
     /// SPECTRUM int16 readout — pairs with GRG for cosine-equivalent rank at int16 bandwidth.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spectrum: Option<SpectrumSignature>,
+    /// PRISM RaBitQ+FHT rank + SPECTRUM micro-certify (highest accuracy + speed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prism: Option<PrismSignature>,
     pub theta: u8,
     pub gamma: u8,
     pub phi: u8,
@@ -154,6 +158,10 @@ pub struct ChorusConfig {
     pub grg_max_dim: usize,
     /// Full SPECTRUM readout on all traces up to this store size (no GRG shortlist cap).
     pub spectrum_full_readout_max: usize,
+    /// PRISM certify top-M after RaBitQ rank (0 = disable PRISM path).
+    pub prism_certify_m: usize,
+    /// Full PRISM rank (no shortlist) up to this store size.
+    pub prism_full_readout_max: usize,
 }
 
 impl Default for ChorusConfig {
@@ -171,6 +179,8 @@ impl Default for ChorusConfig {
             grg_lsh_rows: 8,
             grg_max_dim: 512,
             spectrum_full_readout_max: DEFAULT_FULL_READOUT_MAX,
+            prism_certify_m: DEFAULT_CERTIFY_M,
+            prism_full_readout_max: DEFAULT_PRISM_FULL_MAX,
         }
     }
 }
@@ -401,6 +411,7 @@ impl ChorusField {
             .filter(|v| !v.is_empty())
             .map(|v| normalize_vector(v));
         let spectrum = norm_vec.as_ref().map(|v| SpectrumSignature::from_vector(v));
+        let prism = norm_vec.as_ref().map(|v| PrismSignature::from_vector(v));
 
         let trace = ChorusTrace {
             memory_id: input.memory_id.clone(),
@@ -413,6 +424,7 @@ impl ChorusField {
             code: code.clone(),
             vector: norm_vec,
             spectrum,
+            prism,
             theta,
             gamma,
             phi,
@@ -575,6 +587,72 @@ impl ChorusField {
         let cue_unit = cue_vector
             .filter(|v| !v.is_empty())
             .map(as_unit_vector);
+
+        // PRISM: RaBitQ popcount rank on all gated traces + SPECTRUM certify top-M only.
+        if opts.fast
+            && self.config.prism_certify_m > 0
+            && cue_unit.is_some()
+        {
+            let qv = cue_unit.as_deref().unwrap();
+            let (query_prism, query_cert) = prism::query_from_vector(qv);
+            let query_code = self.encode_vector(qv);
+            let full_prism = self.traces.len() <= self.config.prism_full_readout_max;
+            let candidate_ids: Vec<String> = if full_prism {
+                self.trace_order.clone()
+            } else {
+                let gate_k = self
+                    .config
+                    .grg_shortlist_k
+                    .max(k.saturating_mul(16))
+                    .min(self.photon.len().max(1));
+                self.grg_shortlist(&query_code, gate_k)
+            };
+            let mut refs: Vec<(String, &PrismSignature)> = Vec::with_capacity(candidate_ids.len());
+            for id in &candidate_ids {
+                if let Some(trace) = self
+                    .traces
+                    .get(id)
+                    .or_else(|| self.find_trace_by_parent(id))
+                {
+                    if let Some(ref ps) = trace.prism {
+                        refs.push((parent_memory_id(&trace.memory_id).to_string(), ps));
+                    }
+                }
+            }
+            if !refs.is_empty() {
+                let certify_m = self
+                    .config
+                    .prism_certify_m
+                    .max(k.saturating_mul(4))
+                    .max(256)
+                    .min(refs.len());
+                let ranked = prism::rank_and_certify(
+                    &refs,
+                    &query_prism,
+                    &query_cert,
+                    k,
+                    certify_m,
+                );
+                return ranked
+                    .into_iter()
+                    .map(|(memory_id, score)| ChorusHit {
+                        memory_id,
+                        score,
+                        photon: 0.0,
+                        field: 0.0,
+                        lexical: 0.0,
+                        theta: 0,
+                        lane: if full_prism {
+                            "grg-prism".into()
+                        } else {
+                            "grg-prism-gated".into()
+                        },
+                        snippet: String::new(),
+                    })
+                    .collect();
+            }
+        }
+
         let query_code = match cue_unit.as_deref() {
             Some(v) => self.encode_vector(v),
             None => self.hasher.encode(&Self::wavelet_taps(cue, "", 64)),
