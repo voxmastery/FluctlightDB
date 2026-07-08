@@ -43,7 +43,7 @@ Both use the same cross-platform locking stack (`filelock` in Python, `fs2` in R
 | Windows x64 | `win_amd64` | 3.9–3.13 (abi3) |
 
 ```bash
-pip install "fluctlightdb[native]>=0.5.4"
+pip install "fluctlightdb[native]>=0.5.5"
 ```
 
 **Linux arm64** and **Windows arm64**: no prebuilt wheel yet — use **sdist** (`pip install fluctlightdb-native --no-binary :all:`) with Rust installed, or HTTP-only `pip install fluctlightdb` (no native extension).
