@@ -14,7 +14,7 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Ellipse, FancyArrowPatch, FancyBboxPatch
 
 ROOT = Path(__file__).resolve().parent
-METRICS = ROOT.parents[1] / "benchmarks" / "results" / "paper-2026-07-08.json"
+METRICS = ROOT.parents[1] / "benchmarks" / "results" / "paper-2026-07-09.json"
 
 # Print-safe academic palette
 C_STORAGE = "#4C78A8"
@@ -249,15 +249,15 @@ def fig_benchmark_summary() -> None:
     retr_pct = lme["session_recall_at_8"] * 100
     locomo_pct = m["locomo"]["mean_evidence_recall"] * 100
     beir_sys = m["beir_scifact"]["systems"]
-    beir_ndcg = beir_sys.get("fluctlightdb_chorus", beir_sys["fluctlightdb_index"])["ndcg_at_10"]
-    famb_pct = m["famb"]["index_macro"] * 100
+    beir_ndcg = beir_sys["fluctlightdb_chorus"]["ndcg_at_10"]
+    famb_pct = m["famb"]["agent_macro"] * 100
 
     labels = [
         "LoCoMo\nevidence recall",
         "LongMemEval-S\nsession@8 (retrieval)",
         "LongMemEval-S\nE2E QA (OpenAI)",
         "BEIR SciFact\nCHORUS nDCG@10",
-        "FAMB\nmacro (index)",
+        "FAMB\nmacro (agent)",
     ]
     values = [locomo_pct, retr_pct, e2e_pct, beir_ndcg * 100, famb_pct]
     colors = ["#4C78A8", "#72B7B2", "#59A14F", "#E15759", "#B07AA1"]

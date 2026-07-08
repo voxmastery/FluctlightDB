@@ -19,8 +19,8 @@ for f in 01-brain-architecture 02-benchmark-summary 03-longmemeval-by-type 04-lo
 done
 # legacy alias for draft markdown
 cp "$FIGURES/01-brain-architecture.png" "$PUBLIC/assets/brain-architecture.png" 2>/dev/null || true
-cp "$ROOT/benchmarks/results/paper-2026-07-08.json" "$PUBLIC/data/results.json"
-cp "$ROOT/benchmarks/results/paper-2026-07-08.json" "$ROOT/hub/dataset/results.json" 2>/dev/null || true
+cp "$ROOT/benchmarks/results/paper-2026-07-09.json" "$PUBLIC/data/results.json"
+cp "$ROOT/benchmarks/results/paper-2026-07-09.json" "$ROOT/hub/dataset/results.json" 2>/dev/null || true
 cp "$ROOT/benchmarks/results/e2e-cert-paper-v2-2026-07-07.json" "$PUBLIC/data/e2e-cert-paper-v2-2026-07-07.json" 2>/dev/null || true
 cp "$ROOT/benchmarks/results/longmemeval-preference-v4-mpnet-2026-07-04.json" "$PUBLIC/data/longmemeval-preference-v4-mpnet-2026-07-04.json" 2>/dev/null || true
 cp "$ROOT/benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json" "$PUBLIC/data/longmemeval-colab-v2-full-2026-07-04.json" 2>/dev/null || true
@@ -107,7 +107,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
           </div>
           <div class="dl-card">
             <h3>results.json</h3>
-            <p>Frozen benchmark metrics (paper-2026-07-08)</p>
+            <p>Frozen benchmark metrics (paper-2026-07-09)</p>
             <a href="data/results.json" download>Download JSON</a>
           </div>
           <div class="dl-card">

@@ -2,11 +2,12 @@
 """LoCoMo long-dialogue evidence recall benchmark.
 
 Official metric: fraction of gold evidence dia_ids present in top-k recall context.
-Uses all-MiniLM-L6-v2 ONNX (same as BEIR paper runs) with batched embed + activate_batch.
+Modern lanes (default **chorus**): bulk CHORUS imprint + GRG/vector recall.
+**muon**: session-bulk Muon/Tau imprint + episodic recall.
 
 Usage:
   LOCOMO_DATA=/tmp/locomo/locomo10.json \\
-  PYTHONPATH=sdks/python python3 benchmarks/locomo_eval.py --mode index --top-k 150
+  PYTHONPATH=sdks/python python3 benchmarks/locomo_eval.py --mode chorus --top-k 150
 """
 
 from __future__ import annotations
@@ -22,11 +23,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 REPO = Path(__file__).resolve().parents[1]
-SDK = REPO / "sdks" / "python"
+SDK = REPO / "sdks/python"
 if str(SDK) not in sys.path:
     sys.path.insert(0, str(SDK))
 
-from fluctlightdb import connect_conv, connect_index  # noqa: E402
+from bench_lanes import chorus_hits_to_ids, configure_ir_env, open_lane  # noqa: E402
 from locomo_metrics import evidence_hit, evidence_recall_fraction, summarize_hits  # noqa: E402
 
 DEFAULT_DATA = Path(os.environ.get("LOCOMO_DATA", "/tmp/locomo/locomo10.json"))
@@ -34,7 +35,6 @@ CACHE_DIR = Path(os.environ.get("LOCOMO_CACHE", "/tmp/locomo/cache"))
 
 
 def batch_embed(texts: list[str], batch_size: int = 128) -> list[list[float]]:
-    """all-MiniLM-L6-v2 ONNX CPU — matches BEIR / paper frozen runs."""
     from chromadb.utils import embedding_functions
 
     emb = embedding_functions.ONNXMiniLM_L6_V2()
@@ -46,8 +46,6 @@ def batch_embed(texts: list[str], batch_size: int = 128) -> list[list[float]]:
 
 
 class EmbedCache:
-    """Disk-backed text→vector cache keyed by SHA256 prefix."""
-
     def __init__(self, path: Path) -> None:
         self.path = path
         self.hits = 0
@@ -145,33 +143,90 @@ def collect_turns(item: dict, rag_mode: str) -> list[dict[str, str]]:
     return rows
 
 
-def ingest_conversation(
+def ingest_chorus(
     brain: Any,
     item: dict,
     embedder: EmbedCache,
     *,
-    fast: bool,
     rag_mode: str,
 ) -> int:
     rows = collect_turns(item, rag_mode)
     if not rows:
         return 0
-    vecs = [None] * len(rows) if fast else embedder.get_many([r["body"][:800] for r in rows])
-    for row, vec in zip(rows, vecs):
-        salience = 0.72 if row["kind"] == "obs" else 0.62
-        brain.experience(
-            row["body"],
-            context=f"locomo:{row['dia']}",
-            salience=salience,
-            semantic_vector=vec,
-            doc_id=row["dia"],
-            chunk_id=row["chunk_id"],
-        )
-    return len(rows)
+    vecs = embedder.get_many([r["body"][:800] for r in rows])
+    batch = [
+        {
+            "memory_id": row["dia"],
+            "content": row["body"],
+            "context": f"locomo:{row['dia']}",
+            "semantic_vector": vec,
+            "salience": 0.72 if row["kind"] == "obs" else 0.62,
+        }
+        for row, vec in zip(rows, vecs)
+    ]
+    return int(brain.chorus_imprint_batch(batch))
+
+
+def ingest_muon(
+    brain: Any,
+    item: dict,
+    *,
+    rag_mode: str,
+) -> int:
+    conv = item.get("conversation") or {}
+    batch: list[dict[str, str]] = []
+    for sess_key, turns in iter_sessions(conv):
+        lines: list[str] = []
+        for turn in turns:
+            if not isinstance(turn, dict):
+                continue
+            dia = str(turn.get("dia_id") or "").strip()
+            text = (turn.get("text") or "").strip()
+            if not dia or not text:
+                continue
+            speaker = turn.get("speaker") or "user"
+            lines.append(f"[{dia}] {speaker}: {text}")
+        if lines:
+            batch.append(
+                {
+                    "session_id": sess_key,
+                    "date": "",
+                    "body": "\n".join(lines),
+                    "user_keys": "\n".join(lines)[:4000],
+                }
+            )
+    if rag_mode in ("all", "obs"):
+        obs = item.get("observation") or {}
+        for sess_key, speakers in obs.items():
+            if not isinstance(speakers, dict):
+                continue
+            obs_lines: list[str] = []
+            for _speaker, facts in speakers.items():
+                if not isinstance(facts, list):
+                    continue
+                for row in facts:
+                    if not isinstance(row, (list, tuple)) or len(row) < 2:
+                        continue
+                    fact, dia = str(row[0]), str(row[1])
+                    if fact and dia:
+                        obs_lines.append(f"[{dia}] {fact}")
+            if obs_lines:
+                sid = f"{sess_key}:obs"
+                batch.append(
+                    {
+                        "session_id": sid,
+                        "date": "",
+                        "body": "\n".join(obs_lines),
+                        "user_keys": "\n".join(obs_lines)[:4000],
+                    }
+                )
+    if not batch:
+        return 0
+    brain.muon_imprint_batch(batch)
+    return len(batch)
 
 
 def expand_session_neighbors(found: set[str], item: dict, window: int = 3) -> set[str]:
-    """LoCoMo gold spans often point to adjacent turns (e.g. 'look at this' → next-turn reveal)."""
     session_order: dict[int, list[str]] = {}
     conv = item.get("conversation") or {}
     for sess_key, turns in iter_sessions(conv):
@@ -208,7 +263,7 @@ def expand_session_neighbors(found: set[str], item: dict, window: int = 3) -> se
     return expanded
 
 
-def recalled_dia_ids(recalls: list[dict], limit: int) -> set[str]:
+def recalled_dia_ids_from_activate(recalls: list[dict], limit: int) -> set[str]:
     found: set[str] = set()
     for r in recalls[:limit]:
         ep = r.get("episode") or {}
@@ -223,8 +278,24 @@ def recalled_dia_ids(recalls: list[dict], limit: int) -> set[str]:
     return found
 
 
+def recalled_dia_ids_from_chorus(hits: list[Any], limit: int) -> set[str]:
+    found: set[str] = set()
+    for mid in chorus_hits_to_ids(hits, limit):
+        if mid.startswith("D") and ":" in mid:
+            found.add(mid)
+        found.update(re.findall(r"\bD\d+:\d+\b", mid))
+    return found
+
+
+def recalled_dia_ids_from_muon(hits: list[dict], limit: int) -> set[str]:
+    found: set[str] = set()
+    for h in hits[:limit]:
+        text = str(h.get("snippet") or h.get("content") or "")
+        found.update(re.findall(r"\bD\d+:\d+\b", text))
+    return found
+
+
 def normalize_evidence(evidence: list) -> list[str]:
-    """Split compound evidence ids (e.g. 'D8:6; D9:17' or 'D9:1 D4:4')."""
     out: list[str] = []
     for raw in evidence:
         chunk = str(raw).replace(";", " ")
@@ -235,13 +306,12 @@ def normalize_evidence(evidence: list) -> list[str]:
     return out
 
 
-def eval_conversation(
+def eval_conversation_chorus(
     brain: Any,
     item: dict,
     embedder: EmbedCache,
     *,
     top_k: int,
-    fast: bool,
 ) -> list[dict]:
     qas = [
         qa
@@ -251,21 +321,11 @@ def eval_conversation(
     if not qas:
         return []
     questions = [(qa.get("question") or "").strip()[:400] for qa in qas]
-    q_vecs = [None] * len(questions) if fast else embedder.get_many(questions)
-
-    batch_items = [
-        {"cue": q, "semantic_vector": v} for q, v in zip(questions, q_vecs)
-    ]
-    batch = brain.activate_batch(batch_items, limit=top_k)
-    results = batch.get("results") if isinstance(batch, dict) else batch
-    if not isinstance(results, list):
-        results = []
-
+    q_vecs = embedder.get_many(questions)
+    batch = brain.chorus_recall_batch(questions, q_vecs, limit=top_k)
     rows: list[dict] = []
-    for qa, result in zip(qas, results):
-        recalls = result.get("recalls") if isinstance(result, dict) else []
-        recalls = recalls if isinstance(recalls, list) else []
-        recalled = expand_session_neighbors(recalled_dia_ids(recalls, top_k), item)
+    for qa, hits in zip(qas, batch):
+        recalled = expand_session_neighbors(recalled_dia_ids_from_chorus(hits, top_k), item)
         evidence = normalize_evidence(qa.get("evidence") or [])
         rows.append(
             {
@@ -273,7 +333,40 @@ def eval_conversation(
                 "evidence": evidence,
                 "evidence_frac": evidence_recall_fraction(evidence, recalled),
                 "all_evidence": evidence_hit(evidence, recalled),
-                "recall_n": len(recalls),
+                "recall_n": len(hits or []),
+            }
+        )
+    return rows
+
+
+def eval_conversation_muon(
+    brain: Any,
+    item: dict,
+    *,
+    top_k: int,
+) -> list[dict]:
+    qas = [
+        qa
+        for qa in (item.get("qa") or [])
+        if isinstance(qa, dict) and (qa.get("question") or "").strip() and qa.get("evidence")
+    ]
+    rows: list[dict] = []
+    for qa in qas:
+        question = (qa.get("question") or "").strip()
+        raw = brain.tau_recall(question, limit=top_k)
+        if not raw:
+            raw = brain.muon_recall(question, limit=top_k)
+            if isinstance(raw, dict):
+                raw = raw.get("hits") or []
+        recalled = expand_session_neighbors(recalled_dia_ids_from_muon(raw or [], top_k), item)
+        evidence = normalize_evidence(qa.get("evidence") or [])
+        rows.append(
+            {
+                "question": question,
+                "evidence": evidence,
+                "evidence_frac": evidence_recall_fraction(evidence, recalled),
+                "all_evidence": evidence_hit(evidence, recalled),
+                "recall_n": len(raw or []),
             }
         )
     return rows
@@ -282,20 +375,22 @@ def eval_conversation(
 def main() -> int:
     ap = argparse.ArgumentParser(description="LoCoMo evidence recall benchmark")
     ap.add_argument("--data", type=Path, default=DEFAULT_DATA)
-    ap.add_argument("--mode", choices=("index", "conv"), default=os.environ.get("LOCOMO_MODE", "index"))
+    ap.add_argument(
+        "--mode",
+        choices=("chorus", "muon"),
+        default=os.environ.get("LOCOMO_MODE", "chorus"),
+    )
     ap.add_argument("--rag-mode", choices=("dialog", "obs", "all"), default="all")
     ap.add_argument("--top-k", type=int, default=int(os.environ.get("LOCOMO_TOP_K", "150")))
     ap.add_argument("--limit", type=int, default=0, help="0 = all conversations")
-    ap.add_argument("--fast", action="store_true", help="lexical only (no embeddings)")
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
 
-    os.environ.setdefault("FLUCTLIGHT_CANDIDATE_CAP", str(max(512, args.top_k * 2)))
+    configure_ir_env()
     items = load_locomo(args.data)
     if args.limit > 0:
         items = items[: args.limit]
 
-    connect = connect_index if args.mode == "index" else connect_conv
     cache_path = CACHE_DIR / "minilm_vecs.pkl"
     embedder = EmbedCache(cache_path)
     t0 = time.perf_counter()
@@ -303,22 +398,25 @@ def main() -> int:
     total_ingest = 0
 
     for item in items:
-        brain = connect()
-        total_ingest += ingest_conversation(
-            brain, item, embedder, fast=args.fast, rag_mode=args.rag_mode
-        )
-        all_rows.extend(
-            eval_conversation(brain, item, embedder, top_k=args.top_k, fast=args.fast)
-        )
+        brain = open_lane(args.mode)
+        if args.mode == "chorus":
+            total_ingest += ingest_chorus(brain, item, embedder, rag_mode=args.rag_mode)
+            all_rows.extend(
+                eval_conversation_chorus(brain, item, embedder, top_k=args.top_k)
+            )
+        else:
+            total_ingest += ingest_muon(brain, item, rag_mode=args.rag_mode)
+            all_rows.extend(eval_conversation_muon(brain, item, top_k=args.top_k))
 
-    if not args.fast:
-        embedder.save()
+    embedder.save()
 
     summary = summarize_hits(all_rows)
+    lane = "chorus_grg" if args.mode == "chorus" else "muon_tau"
     out = {
         "benchmark": "locomo",
         "dataset": str(args.data),
         "mode": args.mode,
+        "lane": lane,
         "rag_mode": args.rag_mode,
         "top_k": args.top_k,
         "embedder": "all-MiniLM-L6-v2 ONNX CPU",

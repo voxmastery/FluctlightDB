@@ -34,7 +34,7 @@ semantics (cue-driven activation across a linked memory graph). We present
 \textbf{FluctlightDB}, an embedded, brain-native database engine that implements
 this model behind two primitives, \texttt{experience()} and \texttt{activate()}.
 On the official LoCoMo long-conversation benchmark (10 conversations,
-1{,}982 gold evidence spans), FluctlightDB's hybrid index recalls \textbf{97.7\%}
+1{,}982 gold evidence spans), FluctlightDB's **CHORUS Lane** recalls \textbf{99.0\%}
 of gold evidence on a certified July 2026 rerun. On LongMemEval-S (500 questions,
 official \texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\%}
 (488/500), competitive with published hybrid memory systems on the same benchmark.
@@ -42,9 +42,9 @@ End-to-end QA on the same benchmark---official reader prompts, GPT-4o judge, Muo
 retrieval in the \texttt{paper} profile---scores \textbf{97.4\%} (487/500) with
 \textbf{100\%} session recall@8 in the certified pipeline.
 On BEIR SciFact (shared MiniLM embeddings) the **CHORUS Lane**
-(\texttt{chorus\_imprint\_batch}, GRG resonance recall) scores nDCG@10
-\textbf{0.642} versus Chroma \textbf{0.645} with 2.2\,ms/doc imprint on full
-SciFact. On FAMB, index macro is \textbf{100\%} and agent macro \textbf{98\%}
+(\texttt{chorus\_imprint\_batch}, GRG full-vector IR recall) scores nDCG@10
+\textbf{0.645}, matching Chroma on the same embeddings, with 2.4\,ms/doc imprint on full
+SciFact. On FAMB, \texttt{connect\_agent()} and CHORUS each score \textbf{100\%} macro
 (July 2026 certified rerun). The engine, harnesses, and frozen metrics
 are released under the MIT license. We claim no new neuroscience and no new
 transformer; we claim a missing layer of the data stack, and an engine that fills it.
@@ -80,11 +80,11 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   \item \textbf{An engine.} FluctlightDB, an embedded Rust engine exposing
   \texttt{experience()} / \texttt{activate()} / \texttt{checkpoint()}---one
   durable store per agent, with no external services.
-  \item \textbf{Evidence.} \textbf{97.7\%} evidence recall on full LoCoMo,
+  \item \textbf{Evidence.} \textbf{99.0\%} evidence recall on full LoCoMo (CHORUS),
   \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
-  \textbf{97.4\%} end-to-end QA on LongMemEval-S (500 questions, official judge),
-  BEIR SciFact CHORUS competitive with Chroma on shared embeddings, and
-  \textbf{100\%}/\textbf{98\%} FAMB macro (index/agent) on July 2026 reruns.
+  \textbf{97.4\%} end-to-end QA on LongMemEval-S (500 questions, official judge, Muon),
+  BEIR SciFact CHORUS matches Chroma nDCG@10 on shared embeddings, and
+  \textbf{100\%}/\textbf{100\%} FAMB macro (agent/CHORUS) on July 2026 reruns.
   \item \textbf{Reproducibility.} Open harnesses and frozen result JSON so every
   number here can be re-run with one command.
 \end{itemize}
@@ -248,8 +248,8 @@ The frozen retrieval numbers in Section~\ref{sec:eval} were measured with Fabric
 \label{sec:eval}
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-08.json} (LoCoMo, BEIR, FAMB reruns
-2026-07-08; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
+\texttt{benchmarks/results/paper-2026-07-09.json} (LoCoMo, BEIR, FAMB reruns
+2026-07-09; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
 2026-07-07).
 
 \begin{figure}[t]
@@ -258,17 +258,16 @@ number below is reproduced by a script in \texttt{benchmarks/} and frozen in
 \caption{Headline benchmark results (frozen July 2026). LoCoMo and LongMemEval-S
 retrieval use official recall metrics; LongMemEval-S E2E uses the certified
 \texttt{paper} profile (OpenAI GPT-4o/GPT-5 reader, GPT-4o judge); BEIR reports
-CHORUS Lane nDCG@10; FAMB reports index-mode macro score.}
+CHORUS Lane nDCG@10; FAMB reports \texttt{connect\_agent()} macro score.}
 \label{fig:benchmarks}
 \end{figure}
 
-\subsection{BEIR SciFact: CHORUS Lane near parity with Chroma}
+\subsection{BEIR SciFact: CHORUS Lane matches Chroma}
 We score standard IR metrics via \texttt{pytrec\_eval} against official qrels,
-using identical embeddings for FluctlightDB and Chroma. The legacy index path
-(\texttt{connect\_index()}) is a fast IR baseline; the **CHORUS Lane**
-(\texttt{connect\_chorus()}, batch \texttt{chorus\_imprint\_batch}, GRG resonance
-recall) is our bulk agent-scale ingest path---11.6\,s to imprint all 5{,}183
-SciFact documents vs.\ hours for per-doc episodic \texttt{experience()}.
+using identical embeddings for FluctlightDB and Chroma. The **CHORUS Lane**
+(\texttt{connect\_chorus()}, batch \texttt{chorus\_imprint\_batch}, GRG full-vector
+IR recall when the corpus fits the photon exact-scan budget) is our bulk ingest path---12.4\,s
+to imprint all 5{,}183 SciFact documents.
 
 \begin{table}[h]
 \centering
@@ -278,22 +277,21 @@ SciFact documents vs.\ hours for per-doc episodic \texttt{experience()}.
 System & nDCG@10 & R@10 & R@100 & Query (ms) \\
 \midrule
 Chroma & 0.645 & 0.783 & 0.927 & 7 \\
-FluctlightDB (index) & 0.630 & 0.764 & 0.906 & 68 \\
-FluctlightDB (CHORUS) & \textbf{0.642} & \textbf{0.777} & 0.912 & 3 \\
+FluctlightDB (CHORUS) & \textbf{0.645} & \textbf{0.783} & 0.925 & 8 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-CHORUS reaches within 0.3 nDCG points of Chroma with 2.2\,ms/doc imprint and
-3\,ms p50 query latency on the full corpus. Reproduce:
+CHORUS matches Chroma nDCG@10 on shared embeddings with 2.4\,ms/doc imprint.
+Reproduce:
 \texttt{PYTHONPATH=sdks/python python benchmarks/beir\_bench.py}.
 
-\subsection{LoCoMo: 97.7\% evidence recall on the full set}
+\subsection{LoCoMo: 99.0\% evidence recall on the full set}
 LoCoMo~\cite{maharana2024locomo} stresses very long, multi-session dialogue. We
 report the official evidence-recall metric: the fraction of gold \texttt{dia\_id}
-evidence spans present in retrieved context. Configuration: \texttt{connect\_index()},
-ingest of dialog \emph{and} observations, $k{=}150$, hybrid vector+BM25. The
-July 2026 certified rerun (embed cache warm) scores \textbf{97.7\%} mean evidence
+evidence spans present in retrieved context. Configuration: \texttt{connect\_chorus()},
+batch imprint per turn, $k{=}150$, GRG recall with shared MiniLM vectors. The
+July 2026 certified rerun (embed cache warm) scores \textbf{99.0\%} mean evidence
 recall.
 
 \begin{table}[h]
@@ -303,10 +301,10 @@ recall.
 \toprule
 Metric & Value \\
 \midrule
-Mean evidence recall & \textbf{97.7\%} \\
-All evidence in context & 96.4\% \\
-Evidence hits & 1953/1982 \\
-Wall time (s) & 29 \\
+Mean evidence recall & \textbf{99.0\%} \\
+All evidence in context & 98.3\% \\
+Evidence hits & 1970/1982 \\
+Wall time (s) & 25 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -319,14 +317,14 @@ quoted spans. A 50-question LoCoMo end-to-end pilot with a hosted reader LLM pro
 future work. On LongMemEval-S we report a full 500-question end-to-end certification
 (Table~\ref{tab:longmemeval-e2e}, Figure~\ref{fig:longmemeval-e2e-types}). The
 engine's job is to put the evidence in front of the reader, and at that job it scores
-97.7\% on LoCoMo retrieval.
+99.0\% on LoCoMo retrieval.
 
 \subsection{FAMB: the agent-specific suite}
 Generic IR does not test what agents need. FAMB measures paraphrase recall@1
 (real cues never match stored wording), provenance top-1 (verified ledger beats
 chat claim), persistence (recall survives checkpoint + reopen), confusion ingest
-(near-duplicates do not block new facts), and determinism. Index-mode macro is
-\textbf{100\%}; agent-mode macro is \textbf{98\%} (July 2026 certified rerun).
+(near-duplicates do not block new facts), and determinism. \texttt{connect\_agent()} macro is
+\textbf{100\%}; CHORUS macro is \textbf{100\%} (July 2026 certified rerun).
 
 \subsection{LongMemEval-S: 97.6\% session recall@8 (v4 unified 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
@@ -433,7 +431,7 @@ same pipeline is 100\% session@8.}
 
 \section{Discussion}
 \textbf{The engine is the contribution, not the reader.} A memory system should be
-judged on whether it surfaces the right evidence; 97.7\% on full LoCoMo says it
+judged on whether it surfaces the right evidence; 99.0\% on full LoCoMo says it
 does. End-to-end QA additionally depends on the language model and the prompt
 budget, and we are careful not to launder a retrieval win into a generation claim.
 
@@ -510,7 +508,7 @@ Cognee & Pipeline & Graph + vector ETL & --- & Task-specific \\
 MemGPT / Letta & Agent OS & Context tiers / blocks & --- & Session QA \\
 HippoRAG & Graph RAG & Associative graph retrieval & --- & Multi-hop QA \\
 Chroma / Qdrant & Vector DB & ANN top-$k$ & --- & IR / similarity \\
-FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{97.7\%} & LoCoMo evidence \\
+FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{99.0\%} & LoCoMo evidence \\
 FluctlightDB & Engine & hybrid index + session keys & \textbf{97.6\%} & LongMemEval session@8 \\
 FluctlightDB & Engine & Muon + paper E2E & \textbf{97.4\%} & LongMemEval E2E QA \\
 \bottomrule
@@ -528,7 +526,7 @@ model gave search a database for \emph{similarity}. Autonomous agents need a
 database for \emph{memory}, and it should be as boring to adopt and as rigorous to
 trust as SQLite. FluctlightDB is our argument that this engine can exist today: it
 matches vector baselines where they are strong, wins where memory semantics
-matter, recalls 97.7\% of gold evidence on LoCoMo, 97.6\% session recall on
+matter, recalls 99.0\% of gold evidence on LoCoMo, 97.6\% session recall on
 LongMemEval-S (retrieval-only v4), and 97.4\% end-to-end QA on the same
 benchmark. We release everything needed to reproduce and contest these claims.
 

@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 """Certified IR benchmark: BEIR + pytrec_eval (nDCG@10, Recall@10/100).
 
-Compares Chroma vs FluctlightDB lanes on shared all-MiniLM-L6-v2 embeddings:
-  - **index** — ``connect_index()`` (fast IR path)
-  - **chorus** — ``connect_chorus()`` + ``chorus_imprint_batch`` (bulk GRG lane)
-  - **agent** / **agent_fast** — legacy episodic ``experience()`` per doc (slow; optional)
+Compares Chroma vs FluctlightDB **CHORUS** lane on shared all-MiniLM-L6-v2 embeddings.
 
 Usage:
   BEIR_DATA=/tmp/beir BEIR_DS=scifact \\
-  PYTHONPATH=sdks/python python benchmarks/beir_bench.py
-
-  # Modern lanes only (index + CHORUS, reuse prior Chroma):
   PYTHONPATH=sdks/python python benchmarks/beir_bench.py \\
-    --skip-chroma --chroma-json benchmarks/results/beir-scifact-2026-07-07.json \\
-    --json-out benchmarks/results/beir-scifact-2026-07-08.json
+    --json-out benchmarks/results/beir-scifact-2026-07-09.json
 """
 
 from __future__ import annotations
@@ -24,7 +17,6 @@ import os
 import pickle
 import statistics
 import sys
-import tempfile
 import time
 import urllib.request
 import zipfile
@@ -32,9 +24,11 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
-SDK = REPO / "sdks" / "python"
+SDK = REPO / "sdks/python"
 if str(SDK) not in sys.path:
     sys.path.insert(0, str(SDK))
+
+from bench_lanes import configure_ir_env, open_lane  # noqa: E402
 
 BEIR_ROOT = Path(os.environ.get("BEIR_DATA", "/tmp/beir"))
 BEIR_DS = os.environ.get("BEIR_DS", "scifact")
@@ -101,7 +95,13 @@ def score_run(run: dict[str, dict[str, float]], qrels: dict[str, dict[str, int]]
     }
 
 
-def run_chroma(doc_ids: list[str], doc_texts: list[str], doc_vecs: list[list[float]], test_qids: list[str], q_texts: list[str], q_vecs: list[list[float]]) -> tuple[dict[str, dict[str, float]], float, float]:
+def run_chroma(
+    doc_ids: list[str],
+    doc_texts: list[str],
+    doc_vecs: list[list[float]],
+    test_qids: list[str],
+    q_vecs: list[list[float]],
+) -> tuple[dict[str, dict[str, float]], float, float]:
     import chromadb
 
     t0 = time.perf_counter()
@@ -122,66 +122,6 @@ def run_chroma(doc_ids: list[str], doc_texts: list[str], doc_vecs: list[list[flo
     return run, statistics.mean(lats) if lats else 0.0, write_ms
 
 
-def run_fluctlight(
-    doc_ids: list[str],
-    doc_texts: list[str],
-    doc_vecs: list[list[float]],
-    test_qids: list[str],
-    q_texts: list[str],
-    q_vecs: list[list[float]],
-    *,
-    mode: str = "index",
-) -> tuple[dict[str, dict[str, float]], float, float]:
-    os.environ.setdefault("FLUCTLIGHT_CHECKPOINT_EVERY_N", "100000")
-    os.environ.setdefault("FLUCTLIGHT_WAL", "0")
-    os.environ.setdefault("FLUCTLIGHT_SEPARATION_GATE", "0")
-    os.environ.setdefault("FLUCTLIGHT_CANDIDATE_CAP", str(max(TOPK, 512)))
-
-    if mode == "index":
-        os.environ.setdefault("FLUCTLIGHT_FAST_INGEST", "1")
-        os.environ.setdefault("FLUCTLIGHT_VECTOR_FAST", "1")
-        from fluctlightdb import connect_index
-
-        open_brain = connect_index
-    else:
-        for key in ("FLUCTLIGHT_FAST_INGEST", "FLUCTLIGHT_VECTOR_FAST", "FLUCTLIGHT_AGENT_FAST"):
-            os.environ.pop(key, None)
-        if mode == "agent_fast":
-            from fluctlightdb import connect_agent_fast
-
-            open_brain = lambda p: connect_agent_fast(p)  # type: ignore[assignment]
-        else:
-            from fluctlightdb import connect
-
-            open_brain = connect
-
-    with tempfile.TemporaryDirectory(prefix=f"beir-fl-{mode}-") as tmp:
-        brain = open_brain(os.path.join(tmp, "brain"))
-        t0 = time.perf_counter()
-        n = len(doc_ids)
-        for i, (did, txt, vec) in enumerate(zip(doc_ids, doc_texts, doc_vecs)):
-            brain.experience(txt, context=did, salience=0.6, semantic_vector=vec, doc_id=did)
-            if (i + 1) % 1000 == 0 or i + 1 == n:
-                print(f"  fluctlight {mode} ingest {i + 1}/{n}", flush=True)
-        write_ms = (time.perf_counter() - t0) / len(doc_ids) * 1000.0
-        run: dict[str, dict[str, float]] = {}
-        lats: list[float] = []
-        for qid, qtxt, qv in zip(test_qids, q_texts, q_vecs):
-            t1 = time.perf_counter()
-            raw = brain.activate(qtxt, semantic_vector=qv, limit=TOPK)
-            lats.append((time.perf_counter() - t1) * 1000.0)
-            recalls = raw.get("recalls") if isinstance(raw, dict) else raw
-            scores: dict[str, float] = {}
-            for rank, r in enumerate(recalls or []):
-                ep = r.get("episode") or {}
-                rag = ep.get("rag") or {}
-                did = rag.get("doc_id") or ep.get("context")
-                if did:
-                    scores[str(did)] = float(r.get("activation") or (TOPK - rank))
-            run[qid] = scores
-        return run, statistics.mean(lats) if lats else 0.0, write_ms
-
-
 def run_chorus(
     doc_ids: list[str],
     doc_texts: list[str],
@@ -191,10 +131,9 @@ def run_chorus(
     q_vecs: list[list[float]],
     qrels: dict[str, dict[str, int]],
 ) -> dict[str, Any]:
-    """CHORUS Lane: batch imprint + resonance recall (GRG fast path)."""
-    from fluctlightdb import connect_chorus
-
-    brain = connect_chorus()
+    """CHORUS Lane: batch imprint + full-vector IR recall (≤50k traces)."""
+    configure_ir_env()
+    brain = open_lane("chorus")
     batch = [
         {
             "memory_id": did,
@@ -244,45 +183,24 @@ def run_chorus(
         "query_ms_mean": round(per_query_ms, 2),
         "imprint_wall_s": round(imprint_s, 2),
         "query_batch_wall_s": round(batch_s, 2),
-        "lane": "chorus_grg",
+        "lane": "chorus_grg_ir",
         "sleep": sleep_report,
     }
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="BEIR certified IR benchmark")
+    ap = argparse.ArgumentParser(description="BEIR certified IR benchmark (Chroma vs CHORUS)")
     ap.add_argument("--json-out", type=Path, default=None)
     ap.add_argument(
         "--skip-chroma",
         action="store_true",
-        help="Reuse chroma metrics from --chroma-json (saves ~1 min)",
+        help="Reuse chroma metrics from --chroma-json",
     )
     ap.add_argument(
         "--chroma-json",
         type=Path,
-        default=REPO / "benchmarks" / "results" / "beir-scifact-2026-07-06.json",
-        help="Prior chroma-only result when --skip-chroma",
-    )
-    ap.add_argument(
-        "--skip-chorus",
-        action="store_true",
-        help="Skip CHORUS Lane bulk imprint benchmark",
-    )
-    ap.add_argument(
-        "--run-legacy-agent",
-        action="store_true",
-        help="Also run slow legacy connect() agent ingest (hours on full SciFact)",
-    )
-    ap.add_argument(
-        "--skip-index",
-        action="store_true",
-        help="Skip FluctlightDB index-mode run (agent + chroma only)",
-    )
-    ap.add_argument(
-        "--agent-mode",
-        choices=("agent", "agent_fast"),
-        default=os.environ.get("BEIR_AGENT_MODE", "agent"),
-        help="Agent path: full connect() or connect_agent_fast() (default: agent)",
+        default=REPO / "benchmarks" / "results" / "beir-scifact-2026-07-08.json",
+        help="Prior chroma result when --skip-chroma",
     )
     args = ap.parse_args()
 
@@ -339,50 +257,14 @@ def main() -> int:
         print("chroma: reusing prior metrics", flush=True)
     else:
         chroma_run, chroma_q_ms, chroma_w_ms = run_chroma(
-            doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs
+            doc_ids, doc_texts, doc_vecs, test_qids, q_vecs
         )
         chroma_scores = score_run(chroma_run, qrels)
 
-    fl_idx_block: dict[str, Any] | None = None
-    if not args.skip_index:
-        print("fluctlight index ingest+query...", flush=True)
-        t_fl = time.perf_counter()
-        fl_run, fl_q_ms, fl_w_ms = run_fluctlight(
-            doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs, mode="index"
-        )
-        fl_idx_block = {
-            **score_run(fl_run, qrels),
-            "write_ms_per_doc": round(fl_w_ms, 2),
-            "query_ms": round(fl_q_ms, 2),
-            "wall_s": round(time.perf_counter() - t_fl, 1),
-        }
-    elif args.chroma_json.is_file():
-        prior = json.loads(args.chroma_json.read_text())
-        if "fluctlightdb_index" in prior:
-            fl_idx_block = prior["fluctlightdb_index"]
-            print("index: reusing prior fluctlightdb_index metrics", flush=True)
-
-    fl_chorus_block: dict[str, Any] | None = None
-    if not args.skip_chorus:
-        print("fluctlight CHORUS imprint+recall...", flush=True)
-        fl_chorus_block = run_chorus(
-            doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs, qrels
-        )
-
-    fl_agent_block: dict[str, Any] | None = None
-    if args.run_legacy_agent:
-        print(f"fluctlight {args.agent_mode} ingest+query...", flush=True)
-        t_ag = time.perf_counter()
-        ag_run, ag_q_ms, ag_w_ms = run_fluctlight(
-            doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs, mode=args.agent_mode
-        )
-        fl_agent_block = {
-            **score_run(ag_run, qrels),
-            "write_ms_per_doc": round(ag_w_ms, 2),
-            "query_ms": round(ag_q_ms, 2),
-            "wall_s": round(time.perf_counter() - t_ag, 1),
-            "mode": args.agent_mode,
-        }
+    print("fluctlight CHORUS imprint+recall...", flush=True)
+    fl_chorus_block = run_chorus(
+        doc_ids, doc_texts, doc_vecs, test_qids, q_texts, q_vecs, qrels
+    )
 
     out: dict[str, Any] = {
         "benchmark": "beir",
@@ -396,12 +278,8 @@ def main() -> int:
             "write_ms_per_doc": round(chroma_w_ms, 2),
             "query_ms": round(chroma_q_ms, 2),
         },
-        "fluctlightdb_index": fl_idx_block or {},
+        "fluctlightdb_chorus": fl_chorus_block,
     }
-    if fl_chorus_block is not None:
-        out["fluctlightdb_chorus"] = fl_chorus_block
-    if fl_agent_block is not None:
-        out["fluctlightdb_agent"] = fl_agent_block
     print(json.dumps(out, indent=2))
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
