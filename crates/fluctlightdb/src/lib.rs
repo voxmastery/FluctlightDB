@@ -4,6 +4,7 @@
 //! Not a vector database. Not SQL. Memory as engrams, recall as activation.
 
 pub mod activation;
+pub mod agent_runtime;
 pub mod amygdala;
 pub mod api_slim;
 pub mod auth;
@@ -14,8 +15,11 @@ pub mod budget;
 pub mod cache;
 pub mod checkpoint_policy;
 pub mod chronos;
+pub mod chorus;
+pub mod chorus_runtime;
 pub mod compact;
 pub mod confidence;
+pub mod conflict_lattice;
 pub mod consensus;
 pub mod cortex;
 pub mod crystallize;
@@ -27,6 +31,8 @@ pub mod error;
 pub mod fovea;
 pub mod graph;
 pub mod graph_export;
+pub mod brain_snapshot;
+pub mod governance;
 pub mod hippocampus;
 pub mod id;
 pub mod index;
@@ -45,14 +51,17 @@ pub mod neuromodulator;
 pub mod partial;
 pub mod phase_parse;
 pub mod photon;
+pub mod spectrum;
 pub mod plasticity;
 pub mod prefrontal;
 pub mod preplay;
 pub mod query;
 pub mod rate_limit;
 pub mod recall_fabric;
+pub mod recall_router;
 pub mod relation;
 pub mod raw_export;
+pub mod retention_policy;
 pub mod reality;
 pub mod replicate;
 pub mod segment;
@@ -69,10 +78,18 @@ pub mod store_lock;
 pub mod tenant;
 pub mod tokenize;
 pub mod types;
+pub mod wm_ring;
 pub mod wal;
 pub mod wal_sync;
 
+pub use agent_runtime::{
+    enable_agent_env, AgentState, ConsolidateReport, ToolObserveInput,
+};
 pub use autonomic::{AutonomicConfig, AutonomicState, TickReport};
+pub use conflict_lattice::ResolvedFact;
+pub use recall_router::{RecallMode, TemporalFilter, UnifiedRecallHit, UnifiedRecallResult};
+pub use retention_policy::{RetentionPolicy, RetentionReport, RetentionState};
+pub use wm_ring::{WmFlushReport, WmRing, WmSlot};
 pub use brain::{BrainStatus, FluctlightBrain};
 pub use cache::ActivationCache;
 pub use compact::CompactReport;
@@ -81,14 +98,27 @@ pub use development::{DevStage, DevelopmentState};
 pub use engram::Engram;
 pub use error::{Error, Result};
 pub use fovea::{scan_file, scan_text, FoveaConfig, FoveaPacket};
+pub use brain_snapshot::{
+    export_snapshot_json, import_snapshot, import_snapshot_json, BrainSnapshot,
+    SnapshotImportReport, SNAPSHOT_FORMAT, SNAPSHOT_VERSION,
+};
+pub use governance::{
+    AuditEntry, DeleteBySubjectReport, GovernanceState, PiiScrubReport,
+};
 pub use graph_export::GraphExport;
 pub use index::RecallIndex;
 pub use lattice::{Axis, GridCode, Lattice, LatticeCode, LatticeStore};
 pub use phase_parse::{Codebook, PhaseParser, PhaseVector};
 pub use photon::{PhotonCode, PhotonStore, SimHasher};
+pub use spectrum::{SpectrumSignature, DEFAULT_FULL_READOUT_MAX};
 pub use muon::{MuonHit, MuonImprintInput, MuonLane};
 pub use tau::{TauHit, TauLane, TauShard};
 pub use chronos::{Chronos, Event};
+pub use chorus::{
+    ChorusConfig, ChorusField, ChorusHit, ChorusImprintInput, ChorusRecallOpts, ChorusSleepReport,
+    ChorusTrace,
+    Complex as ChorusComplex, ProvenanceSheath,
+};
 pub use confidence::{recall_confidence, Evidence, SourceKind};
 pub use consensus::{Claim, Consensus, SharedMemory};
 pub use crystallize::{Crystal, Crystallizer};

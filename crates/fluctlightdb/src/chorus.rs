@@ -2,7 +2,7 @@
 //!
 //! Theoretical memory as phase interference on a θ–γ lattice:
 //! - **Imprint** = wavelet injection (sub-ms per item)
-//! - **Recall** = GRG (γ Resonance Gate): photon Hamming shortlist → analog cosine on survivors only
+//! - **Recall** = GRG (γ Resonance Gate): photon Hamming gate → **SPECTRUM** int8 readout
 //! - **π-inhibition** = anti-phase cancellation on overlap
 //! - **Eigenmode split** = degeneracy breaking (bit-separation)
 //! - **Sleep** = θ-sweep collapse into hippocampal engrams
@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::muon::count_sketch;
 use crate::photon::{PhotonCode, PhotonStore, SimHasher, DEFAULT_BITS};
+use crate::spectrum::{SpectrumSignature, DEFAULT_FULL_READOUT_MAX};
 
 pub const THETA_BINS: u8 = 8;
 pub const GAMMA_SLOTS: u8 = 32;
@@ -73,6 +74,9 @@ pub struct ChorusTrace {
     pub context: String,
     pub code: PhotonCode,
     pub vector: Option<Vec<f32>>,
+    /// SPECTRUM int16 readout — pairs with GRG for cosine-equivalent rank at int16 bandwidth.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spectrum: Option<SpectrumSignature>,
     pub theta: u8,
     pub gamma: u8,
     pub phi: u8,
@@ -111,7 +115,7 @@ pub struct ChorusRecallOpts {
 }
 
 impl ChorusRecallOpts {
-    /// IR path: pure cosine on all imprinted vectors (≤ ``grg_exact_hamming_max`` traces).
+    /// IR path: SPECTRUM int8 readout on all GRG-gated traces.
     pub fn ir_vector() -> Self {
         Self { fast: true }
     }
@@ -148,6 +152,8 @@ pub struct ChorusConfig {
     pub grg_lsh_rows: usize,
     /// Max embedding width for cached GRG hyperplanes (QBP).
     pub grg_max_dim: usize,
+    /// Full SPECTRUM readout on all traces up to this store size (no GRG shortlist cap).
+    pub spectrum_full_readout_max: usize,
 }
 
 impl Default for ChorusConfig {
@@ -164,6 +170,7 @@ impl Default for ChorusConfig {
             grg_lsh_bands: 32,
             grg_lsh_rows: 8,
             grg_max_dim: 512,
+            spectrum_full_readout_max: DEFAULT_FULL_READOUT_MAX,
         }
     }
 }
@@ -388,6 +395,13 @@ impl ChorusField {
         self.inject_wavelet(theta, gamma, phi, tau, salience, &taps, phase);
         self.apply_pi_inhibition(theta, gamma, phi, tau, self.config.inhibit_strength);
 
+        let norm_vec = input
+            .semantic_vector
+            .as_ref()
+            .filter(|v| !v.is_empty())
+            .map(|v| normalize_vector(v));
+        let spectrum = norm_vec.as_ref().map(|v| SpectrumSignature::from_vector(v));
+
         let trace = ChorusTrace {
             memory_id: input.memory_id.clone(),
             content: input.content.clone(),
@@ -397,11 +411,8 @@ impl ChorusField {
                 input.context.clone()
             },
             code: code.clone(),
-            vector: input
-                .semantic_vector
-                .as_ref()
-                .filter(|v| !v.is_empty())
-                .map(|v| normalize_vector(v)),
+            vector: norm_vec,
+            spectrum,
             theta,
             gamma,
             phi,
@@ -568,13 +579,24 @@ impl ChorusField {
             Some(v) => self.encode_vector(v),
             None => self.hasher.encode(&Self::wavelet_taps(cue, "", 64)),
         };
+        let query_spectrum = cue_unit
+            .as_deref()
+            .map(SpectrumSignature::from_vector);
 
-        // When embeddings are present and the store fits the exact-Hamming budget, score every
-        // trace by cosine — GRG shortlist would cap recall@100 on IR corpora (~5k docs).
-        let use_full_vector_scan = cue_unit.is_some()
-            && self.traces.len() <= self.config.grg_exact_hamming_max;
-        let candidate_ids: Vec<String> = if use_full_vector_scan {
+        // GRG gate: photon addressing. SPECTRUM readout scores all gated traces — no shortlist
+        // recall loss on IR corpora that fit the full-readout budget.
+        let spectrum_readout = query_spectrum.is_some();
+        let full_spectrum = spectrum_readout
+            && self.traces.len() <= self.config.spectrum_full_readout_max;
+        let candidate_ids: Vec<String> = if full_spectrum {
             self.trace_order.clone()
+        } else if spectrum_readout {
+            let gate_k = self
+                .config
+                .grg_shortlist_k
+                .max(k.saturating_mul(16))
+                .min(self.photon.len().max(1));
+            self.grg_shortlist(&query_code, gate_k)
         } else {
             let shortlist_k = self
                 .config
@@ -585,8 +607,10 @@ impl ChorusField {
         };
 
         let query_theta = self.theta_clock;
-        let lane = if use_full_vector_scan && opts.fast {
-            "grg-ir"
+        let lane = if full_spectrum && opts.fast {
+            "grg-spectrum"
+        } else if spectrum_readout && opts.fast {
+            "grg-spectrum-gated"
         } else if opts.fast {
             "grg-fast"
         } else {
@@ -596,28 +620,48 @@ impl ChorusField {
             .iter()
             .filter_map(|id| self.traces.get(id).or_else(|| self.find_trace_by_parent(id)))
             .map(|trace| {
+                let spectrum_sim = match (query_spectrum.as_ref(), trace.spectrum.as_ref()) {
+                    (Some(qs), Some(ts)) if !ts.is_empty() => Some(qs.dot_similarity(ts)),
+                    _ => None,
+                };
                 let (vector_sim, has_vector) = match (cue_unit.as_deref(), trace.vector.as_deref()) {
                     (Some(qv), Some(tv)) if !tv.is_empty() => (dot_similarity(qv, tv), true),
                     _ => (0.0, false),
                 };
-                if opts.fast && has_vector {
-                    return ChorusHit {
-                        memory_id: parent_memory_id(&trace.memory_id).to_string(),
-                        score: vector_sim,
-                        photon: 0.0,
-                        field: 0.0,
-                        lexical: 0.0,
-                        theta: trace.theta,
-                        lane: lane.into(),
-                        snippet: String::new(),
-                    };
+                if opts.fast {
+                    if let Some(sim) = spectrum_sim {
+                        return ChorusHit {
+                            memory_id: parent_memory_id(&trace.memory_id).to_string(),
+                            score: sim,
+                            photon: 0.0,
+                            field: 0.0,
+                            lexical: 0.0,
+                            theta: trace.theta,
+                            lane: lane.into(),
+                            snippet: String::new(),
+                        };
+                    }
+                    if has_vector {
+                        return ChorusHit {
+                            memory_id: parent_memory_id(&trace.memory_id).to_string(),
+                            score: vector_sim,
+                            photon: 0.0,
+                            field: 0.0,
+                            lexical: 0.0,
+                            theta: trace.theta,
+                            lane: lane.into(),
+                            snippet: String::new(),
+                        };
+                    }
                 }
                 let photon = ((query_code.estimated_cosine(&trace.code)) + 1.0) / 2.0;
                 let field = self.field_coherence(trace, query_theta);
                 let lexical = Self::lexical_overlap(cue, &trace.content);
                 let verified_boost = if trace.sheath.verified { 0.04 } else { 0.0 };
                 let replay_boost = (trace.replay_tag as f32 * 0.01).min(0.08);
-                let score = if has_vector {
+                let score = if let Some(sim) = spectrum_sim {
+                    sim + 0.01 * field + 0.01 * lexical + verified_boost + replay_boost
+                } else if has_vector {
                     vector_sim + 0.02 * photon + 0.01 * field + 0.01 * lexical
                         + verified_boost
                         + replay_boost
@@ -993,7 +1037,7 @@ mod tests {
     }
 
     #[test]
-    fn full_vector_scan_finds_exact_match_at_5k() {
+    fn spectrum_readout_finds_exact_match_at_5k() {
         let mut field = ChorusField::new(ChorusConfig {
             split_threshold: 1000.0,
             grg_shortlist_k: 64,
@@ -1014,7 +1058,7 @@ mod tests {
         let hits = field.recall_with_opts("topic 42", 100, Some(&cue), ChorusRecallOpts::ir_vector());
         assert!(!hits.is_empty());
         assert_eq!(hits[0].memory_id, "m42");
-        assert_eq!(hits[0].lane, "grg-ir");
+        assert_eq!(hits[0].lane, "grg-spectrum");
     }
 
     #[test]
