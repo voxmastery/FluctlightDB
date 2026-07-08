@@ -12,7 +12,7 @@ For fifty years, data systems have answered two questions. The relational model 
 
 We argue that long-term agent memory is not an application built on top of a database — it is a **third data model**, with its own write semantics (encoding, separation, consolidation, provenance) and its own read semantics (cue-driven activation across a linked memory graph). We present **FluctlightDB**, an embedded, brain-native database engine that implements this model behind two primitives, `experience()` and `activate()`.
 
-On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's hybrid index recalls **97.7%** of gold evidence (July 2026 certified rerun). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. Preference questions reach **96.7%** (29/30) with v4 pref-facts indexing. On BEIR SciFact (shared MiniLM embeddings) index mode scores nDCG@10 **0.634** vs Chroma **0.645**; agent mode improves Recall@100 to **0.941** (agent row: certified June 2025; harness supports July reruns). On FAMB, index macro is **100%** and agent macro **98%** (July 2026 rerun). The engine, harnesses, and frozen metrics are released under MIT.
+On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's hybrid index recalls **97.7%** of gold evidence (July 2026 certified rerun). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. Preference questions reach **96.7%** (29/30) with v4 pref-facts indexing. On BEIR SciFact (shared MiniLM embeddings) the **CHORUS Lane** scores nDCG@10 **0.642** vs Chroma **0.645** (2.2 ms/doc imprint, 11.6 s full SciFact). On FAMB, index macro is **100%** and agent macro **98%** (July 2026 certified rerun). The engine, harnesses, and frozen metrics are released under MIT.
 
 ## 1. Introduction
 
@@ -53,7 +53,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 ![Headline benchmark results](../assets/02-benchmark-summary.png)
 
-*Figure 2: LoCoMo 97.7%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR FluctlightDB index 0.634, FAMB index 100%.*
+*Figure 2: LoCoMo 97.7%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR CHORUS 0.642 nDCG@10, FAMB index 100%.*
 
 ![LongMemEval-S retrieval by question type](../assets/03-longmemeval-by-type.png)
 
@@ -69,15 +69,15 @@ Download all: [papers/figures/](https://github.com/voxmastery/FluctlightDB/tree/
 
 All experiments use `all-MiniLM-L6-v2` (ONNX CPU) unless noted. Every number is reproduced by a script in `benchmarks/` and frozen in `benchmarks/results/paper-2026-07-07.json`.
 
-### 4.1 BEIR SciFact — competitive with a tuned vector baseline (July 2026)
+### 4.1 BEIR SciFact — CHORUS Lane near parity with Chroma (July 2026)
 
 | System | nDCG@10 | R@10 | R@100 | Query (ms) |
 |--------|---------|------|-------|------------|
 | Chroma | 0.645 | 0.783 | 0.927 | 7 |
-| FluctlightDB (index) | 0.634 | 0.768 | 0.910 | 26 |
-| FluctlightDB (agent) | **0.651** | **0.790** | **0.941** | 15 |
+| FluctlightDB (index) | 0.630 | 0.764 | 0.906 | 68 |
+| **FluctlightDB (CHORUS)** | **0.642** | **0.777** | 0.912 | 3 |
 
-Index mode trails Chroma slightly on nDCG@10; agent mode improves deep recall (agent row from certified June 2025 run; rerun via `beir_bench.py --skip-index --agent-mode agent`).
+CHORUS uses `connect_chorus()` + `chorus_imprint_batch` (GRG resonance recall): **11.6 s** to imprint 5,183 docs vs hours for legacy per-doc `experience()`. Reproduce: `PYTHONPATH=sdks/python python benchmarks/beir_bench.py`.
 
 ### 4.2 LoCoMo — 97.7% evidence recall on the full set
 
