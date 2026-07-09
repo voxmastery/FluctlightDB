@@ -100,6 +100,38 @@ class TestReadmeQuickstart(unittest.TestCase):
             f"WM should be searchable before turn_end flush: {result!r}",
         )
 
+    def test_integrations_canonical_snippet(self) -> None:
+        from fluctlightdb import connect_agent
+
+        tmp = tempfile.mkdtemp(prefix="flct-integ-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        brain = connect_agent(os.path.join(tmp, "agent"))
+        brain.turn_begin()
+        brain.wm_push("Use pytest for tests", context="project", salience=0.7)
+        brain.turn_end(flush=True)
+        result = brain.recall("pytest", mode="auto")
+        self.assertTrue(_hits(result), f"INTEGRATIONS snippet failed: {result!r}")
+
+    def test_connect_agent_graph_wired_without_vector(self) -> None:
+        """connect_agent() must wire synapses on wm_push without semantic_vector."""
+        from fluctlightdb import connect_agent
+
+        tmp = tempfile.mkdtemp(prefix="flct-agent-graph-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        brain = connect_agent(os.path.join(tmp, "brain"))
+        brain.turn_begin()
+        brain.wm_push("User prefers dark mode", context="settings", salience=0.8)
+        brain.turn_end(flush=True)
+        status = brain.status()
+        synapses = status.get("synapses", 0) if isinstance(status, dict) else 0
+        self.assertGreater(
+            synapses,
+            0,
+            f"connect_agent must wire graph after wm flush without vector: {status!r}",
+        )
+        result = brain.recall("dark mode")
+        self.assertTrue(_hits(result), f"recall after flush failed: {result!r}")
+
     def test_readme_paraphrase_needs_vector_or_lexical_cue(self) -> None:
         """Paraphrase without semantic_vector needs embedder or overlapping tokens."""
         from fluctlightdb import connect_agent

@@ -7,9 +7,9 @@ from fluctlightdb import connect_agent
 
 brain = connect_agent("/data/my-agent.brain", retain_days=30)
 brain.turn_begin()
-brain.wm_push("User prefers pytest", context="preferences", salience=0.7)
-hits = brain.recall("testing framework", mode="auto")
-fact = brain.resolve("testing framework")
+brain.wm_push("Use pytest for tests", context="project", salience=0.7)
+hits = brain.recall("pytest", mode="auto")  # lexical overlap — not "testing framework"
+fact = brain.resolve("pytest")
 brain.turn_end(flush=True)
 ```
 

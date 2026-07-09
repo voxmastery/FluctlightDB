@@ -61,7 +61,8 @@ jobs:
   miri-unsafe-audit:
     name: miri (WAL / store paths)
     runs-on: ubuntu-latest
-    continue-on-error: true
+    env:
+      MIRIFLAGS: -Zmiri-disable-isolation
     steps:
       - uses: actions/checkout@v4
 
@@ -72,10 +73,8 @@ jobs:
       - name: Miri setup
         run: cargo miri setup
 
-      - name: Miri tests (wal + store)
-        run: |
-          cargo miri test -p fluctlightdb --lib wal_
-          cargo miri test -p fluctlightdb --lib persistence_roundtrip
+      - name: Miri tests (pure-Rust miri_* only; brain I/O uses sqlite3 FFI)
+        run: cargo miri test -p fluctlightdb --lib miri_
 
   chaos-jepsen:
     name: chaos / crash recovery (Jepsen-style)
@@ -182,24 +181,8 @@ jobs:
           else
             maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml
           fi
+          mkdir -p dist-native dist-sdk
           cd sdks/python && python -m build -o ../../dist-sdk
 
       - name: Install published-style artifacts (no source tree)
-        shell: bash
-        run: |
-          SMOKE_VENV="${RUNNER_TEMP:-/tmp}/flct-smoke"
-          python -m venv "$SMOKE_VENV"
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            PIP="$SMOKE_VENV/Scripts/pip.exe"
-            PY="$SMOKE_VENV/Scripts/python.exe"
-            NATIVE_WHL=$(ls dist-native/*.whl | head -1)
-            SDK_WHL=$(ls dist-sdk/*.whl | head -1)
-          else
-            PIP="$SMOKE_VENV/bin/pip"
-            PY="$SMOKE_VENV/bin/python"
-            NATIVE_WHL=$(ls dist-native/*.whl | head -1)
-            SDK_WHL=$(ls dist-sdk/*.whl | head -1)
-          fi
-          "$PIP" install --upgrade pip
-          "$PIP" install "$NATIVE_WHL" "$SDK_WHL"
-          "$PY" -c "import fluctlightdb_native; import fluctlightdb; print('ok', fluctlightdb_native.__name__)"
+        run: python scripts/pypi_wheel_smoke_install.py
