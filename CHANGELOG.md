@@ -11,14 +11,19 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+---
+
+## [0.5.7] - 2026-07-09
+
 ### Added
-- Reproduction issue template + **$50 bounty** per benchmark ([docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md))
-- `benchmarks/requirements-reproduce.txt` (pinned eval deps)
-- CI: `cargo-audit`, `cargo-deny` ([deny.toml](deny.toml)), Miri (WAL/store), WAL truncated-tail recovery test
-- Python SDK license aligned to **MIT OR Apache-2.0** (`LICENSE-APACHE` in `sdks/python/`)
+- **pyo3 0.29** native bindings (clears RUSTSEC pyo3 advisories)
+- BEAM retrieval smoke harness: `benchmarks/beam_eval.py`, `make reproduce-beam-smoke`
+- Crash recovery integration tests (`tests/crash_recovery.rs`) — WAL corrupt/truncate/kill simulation
+- GitHub label sync workflow (`.github/workflows/sync-labels.yml`)
 
 ### Changed
-- `reproduce-locomo.sh` pins `fluctlightdb[native]` to tag version from `pyproject.toml`
+- `cargo audit` passes (warnings only: bincode, memmap2)
+- Supply-chain CI no longer `continue-on-error`
 
 ---
 

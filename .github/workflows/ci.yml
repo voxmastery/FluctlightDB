@@ -43,7 +43,6 @@ jobs:
   supply-chain:
     name: rust supply chain (audit + deny)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
