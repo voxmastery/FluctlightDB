@@ -18,9 +18,11 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 ### Fixed
 - **`connect_agent()` quickstart broken**: fast ingest + vector-fast skipped graph/synapse wiring when `semantic_vector` was omitted — recall returned empty hits with no error. Fast vector path now requires an explicit vector; `connect_agent()` no longer sets `FLUCTLIGHT_VECTOR_FAST` by default.
 - README 30-second example uses lexical cue `dark mode` (offline path) and recalls after `turn_end(flush=True)` so WM is committed.
+- Doc snippets in `hub/paper/README.md`, `sdks/python/README.md`, `docs/EMBEDDINGS.md`, `docs/ONBOARDING.md` aligned to the same rules (lexical overlap + flush-before-recall for WM).
 
 ### Added
 - CI: `tests.test_quickstart` guards README quickstart on native wheel build.
+- CI: expanded doc-snippet regression tests (paper card, SDK README, EMBEDDINGS, ONBOARDING).
 
 ---
 

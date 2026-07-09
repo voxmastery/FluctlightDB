@@ -21,7 +21,7 @@ from fluctlightdb import connect_agent
 
 brain = connect_agent("/data/agent")
 brain.experience(content="User prefers dark mode", context="settings", salience=0.8)
-hits = brain.activate("theme preference")  # lexical + graph; no embedder built in
+hits = brain.activate("dark mode")  # lexical overlap required without an embedder
 ```
 
 To add semantic recall, pass embeddings explicitly:

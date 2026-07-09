@@ -49,7 +49,7 @@ from fluctlightdb import connect
 
 brain = connect("/tmp/agent-brain")
 brain.experience("User prefers dark mode", context="settings", salience=0.8)
-print(brain.activate("theme preference"))
+print(brain.activate("dark mode"))  # offline lexical cue (paraphrase needs semantic_vector)
 brain.checkpoint()
 ```
 
