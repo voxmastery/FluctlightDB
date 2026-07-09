@@ -52,6 +52,15 @@ NOISE_SNIPPETS = [
 DETERMINISM_FACT = "user upgraded postgres to version 15 last tuesday"
 DETERMINISM_CUE = "postgres upgrade version"
 
+# Per-subtest sample sizes (disclosed in paper / JSON freeze files).
+FAMB_SUITE_SIZES: dict[str, int] = {
+    "paraphrase_recall_at_1": len(PARAPHRASE_PAIRS),
+    "provenance_top1": 1,
+    "persistence_recall": 1,
+    "confusion_ingest": 1,
+    "determinism": 1,
+}
+
 
 def _top_engram_id(brain: Any, cue: str, vec: Optional[list[float]] = None) -> Optional[str]:
     raw = brain.activate(cue, semantic_vector=vec, limit=3)
@@ -135,6 +144,18 @@ def suite_paraphrase_chorus(brain: Any, *, noise: int) -> float:
     return hits / len(PARAPHRASE_PAIRS)
 
 
+def _chorus_sheath(
+    *,
+    verified: bool,
+    provenance_kind: int = 0,
+    source_uri: Optional[str] = None,
+) -> dict[str, Any]:
+    sheath: dict[str, Any] = {"verified": verified, "provenance_kind": provenance_kind}
+    if source_uri:
+        sheath["source_uri"] = source_uri
+    return sheath
+
+
 def suite_provenance_agent(brain: Any) -> float:
     ledger = brain.experience(
         "ledger verified: agent wallet balance is $0.00 at level 1",
@@ -163,6 +184,46 @@ def suite_provenance_agent(brain: Any) -> float:
     return 1.0 if top == str(ledger.get("engram_id")) else 0.0
 
 
+def _top_rag_doc_id(brain: Any, cue: str, vec: Optional[list[float]] = None) -> Optional[str]:
+    raw = brain.activate(cue, semantic_vector=vec, limit=3)
+    recalls = raw.get("recalls") if isinstance(raw, dict) else raw
+    if not recalls:
+        return None
+    ep = recalls[0].get("episode") or {}
+    rag = ep.get("rag") or {}
+    doc = rag.get("doc_id")
+    return str(doc) if doc else None
+
+
+def suite_provenance_chorus(brain: Any) -> float:
+    brain.chorus_imprint_batch(
+        [
+            {
+                "memory_id": "ledger",
+                "content": "ledger verified: agent wallet balance is $0.00 at level 1",
+                "context": "ledger:wallet",
+                "salience": 0.98,
+                "sheath": _chorus_sheath(
+                    verified=True,
+                    provenance_kind=3,
+                    source_uri="file://wallet.json",
+                ),
+            },
+            {
+                "memory_id": "chat",
+                "content": "I think my wallet balance is $60 from yesterday's chat",
+                "context": "chat:wallet",
+                "salience": 0.35,
+                "sheath": _chorus_sheath(verified=False, provenance_kind=0),
+            },
+        ]
+    )
+    # Promote verified ledger into hippocampus (CHORUS → durable engram path).
+    brain.chorus_sleep()
+    top = _top_rag_doc_id(brain, "what is my wallet balance")
+    return 1.0 if top == "ledger" else 0.0
+
+
 def suite_persistence_agent(mode: str) -> float:
     with tempfile.TemporaryDirectory() as td:
         path = os.path.join(td, "agent.brain")
@@ -178,6 +239,45 @@ def suite_persistence_agent(mode: str) -> float:
         b2 = open_lane("agent", path)
         top = _top_engram_id(b2, "does the user like dark mode", [0.77, 0.23, 0.0])
         return 1.0 if top == eid else 0.0
+
+
+def suite_persistence_chorus(mode: str) -> float:
+    with tempfile.TemporaryDirectory() as td:
+        path = os.path.join(td, "chorus.brain")
+        fact_vec, cue_vec = embed_minilm(
+            [
+                "user prefers dark mode in all applications",
+                "does the user like dark mode",
+            ]
+        )
+        b1 = open_lane("chorus", path)
+        b1.chorus_imprint_batch(
+            [
+                {
+                    "memory_id": "pref",
+                    "content": "user prefers dark mode in all applications",
+                    "context": "prefs:ui",
+                    "semantic_vector": fact_vec,
+                    "salience": 1.0,
+                    "sheath": _chorus_sheath(verified=True, provenance_kind=4),
+                }
+            ]
+        )
+        b1.chorus_sleep()
+        b1.checkpoint()
+        b2 = open_lane("chorus", path)
+        raw = b2.activate("does the user like dark mode", semantic_vector=cue_vec, limit=1)
+        recalls = raw.get("recalls") if isinstance(raw, dict) else raw
+        if not recalls:
+            return 0.0
+        eid = str(recalls[0].get("engram_id") or "")
+        b3 = open_lane("chorus", path)
+        raw2 = b3.activate("does the user like dark mode", semantic_vector=cue_vec, limit=1)
+        recalls2 = raw2.get("recalls") if isinstance(raw2, dict) else raw2
+        if not recalls2:
+            return 0.0
+        top = str(recalls2[0].get("engram_id") or "")
+        return 1.0 if top == eid and eid and not eid.startswith("00000000-") else 0.0
 
 
 def suite_confusion_agent(brain: Any) -> float:
@@ -294,8 +394,8 @@ def run_famb(mode: str, *, noise: int) -> dict[str, Any]:
     else:
         scores = {
             "paraphrase_recall_at_1": suite_paraphrase_chorus(open_lane("chorus"), noise=noise),
-            "provenance_top1": 1.0,
-            "persistence_recall": 1.0,
+            "provenance_top1": suite_provenance_chorus(open_lane("chorus")),
+            "persistence_recall": suite_persistence_chorus(mode),
             "confusion_ingest": suite_confusion_chorus(open_lane("chorus")),
             "determinism": suite_determinism_chorus(open_lane("chorus")),
         }
@@ -305,6 +405,8 @@ def run_famb(mode: str, *, noise: int) -> dict[str, Any]:
         "mode": mode,
         "lane": lane,
         "noise_distractors": noise,
+        "suite_sizes": dict(FAMB_SUITE_SIZES),
+        "note": "Internal regression suite (not peer benchmark); macro = mean of sub-scores.",
         "scores": scores,
         "macro": round(macro, 4),
         "wall_s": round(time.perf_counter() - t0, 2),

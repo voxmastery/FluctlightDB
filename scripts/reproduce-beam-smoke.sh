@@ -15,7 +15,7 @@ source "$VENV/bin/activate"
 pip install -q --upgrade pip
 pip install -q -r benchmarks/requirements-reproduce.txt
 
-NATIVE_VER="$(python3 -c "import tomllib; print(tomllib.load(open('crates/fluctlight-py/pyproject.toml','rb'))['project']['version'])")"
+NATIVE_VER="$(python3 -c "import importlib.util; p='crates/fluctlight-py/pyproject.toml'; import re; print(re.search(r'version\\s*=\\s*\"([^\"]+)\"', open(p).read()).group(1))")"
 pip install -q "fluctlightdb[native]==${NATIVE_VER}" || {
   pip install -q maturin
   maturin build --release -o "$ROOT/dist-beam" --manifest-path crates/fluctlight-py/Cargo.toml

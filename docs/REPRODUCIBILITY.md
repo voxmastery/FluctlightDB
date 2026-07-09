@@ -101,7 +101,7 @@ LongMemEval E2E is **excluded** (locked maintainer run; OpenAI cost).
 | LongMemEval E2E QA | `e2e-cert-paper-v2-2026-07-07.json` | `benchmarks/e2e_certify.sh` (OpenAI) | Yes — **97.4%** | **None** — run locked |
 | BEIR SciFact nDCG@10 | `paper-2026-07-09.json` | `benchmarks/beir_bench.py` | Yes — **0.645** | **None published** |
 | FAMB macro | `paper-2026-07-09.json` | `benchmarks/famb_bench.py` | Yes — **100%** | **None published** |
-| BEAM context recall (smoke) | — | `make reproduce-beam-smoke` | In progress | **None published** |
+| BEAM context recall (smoke) | `paper-2026-07-09.json` | `make reproduce-beam-smoke` | Yes — **33.3%** (6/18 on 100K/1) | **None published** |
 
 **Bottom line:** Harnesses are open and numbers are frozen, but **all headline metrics are maintainer-reported until an external group publishes a reproduction** (issue, blog, paper, or fork).
 
@@ -153,4 +153,4 @@ Partial reproductions (e.g. within ±0.5% due to embedding drift) are still valu
 - Peer review of benchmark methodology (paper is preprint)
 - Independent audit of correctness or security
 - Leaderboard registration on a third-party site — see [LEADERBOARD.md](LEADERBOARD.md) (no neutral agent-memory registry exists)
-- BEAM results yet (harness planned)
+- BEAM smoke frozen in `beam-smoke-2026-07-09.json` (retrieval layer only)

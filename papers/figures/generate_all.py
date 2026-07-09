@@ -207,7 +207,7 @@ def fig_third_model(ax) -> None:
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    _panel_label(ax, "g", "Third data model")
+    _panel_label(ax, "g", "Candidate third model")
 
     cols = [
         ("Relational", ["Typed rows", "Predicate match", "No episode graph"], "#F1F5F9"),
@@ -250,30 +250,27 @@ def fig_benchmark_summary() -> None:
     locomo_pct = m["locomo"]["mean_evidence_recall"] * 100
     beir_sys = m["beir_scifact"]["systems"]
     beir_ndcg = beir_sys["fluctlightdb_chorus"]["ndcg_at_10"]
-    famb_pct = m["famb"]["agent_macro"] * 100
 
     labels = [
         "LoCoMo\nevidence recall",
         "LongMemEval-S\nsession@8 (retrieval)",
         "LongMemEval-S\nE2E QA (OpenAI)",
         "BEIR SciFact\nCHORUS nDCG@10",
-        "FAMB\nmacro (agent)",
     ]
-    values = [locomo_pct, retr_pct, e2e_pct, beir_ndcg * 100, famb_pct]
-    colors = ["#4C78A8", "#72B7B2", "#59A14F", "#E15759", "#B07AA1"]
+    values = [locomo_pct, retr_pct, e2e_pct, beir_ndcg * 100]
+    colors = ["#4C78A8", "#72B7B2", "#59A14F", "#E15759"]
     display = [
         f"{locomo_pct:.1f}%",
         f"{retr_pct:.1f}%",
         f"{e2e_pct:.1f}%",
         f"{beir_ndcg:.3f}",
-        f"{famb_pct:.0f}%",
     ]
 
-    fig, ax = plt.subplots(figsize=(10, 4.5), facecolor="white")
+    fig, ax = plt.subplots(figsize=(9, 4.5), facecolor="white")
     bars = ax.bar(labels, values, color=colors, edgecolor=C_BORDER, linewidth=0.8)
     ax.set_ylim(0, 105)
     ax.set_ylabel("Score (% scale; BEIR nDCG×100)")
-    ax.set_title("Figure 2 — FluctlightDB headline benchmark results (July 2026)")
+    ax.set_title("Figure 2 — External benchmark results (internally reproduced July 2026)")
     ax.axhline(90, color="#888", linestyle="--", linewidth=0.8, label="90% reference")
     for bar, txt in zip(bars, display):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5, txt,
@@ -307,7 +304,7 @@ def fig_longmemeval_by_type() -> None:
     ax.set_ylim(0, 105)
     ax.set_ylabel("session_recall@8 (%)")
     ax.set_title(
-        f"Figure 3 — LongMemEval-S retrieval session@8 by type ({hits} overall = {overall_pct:.1f}%)"
+        f"Figure 3 — LongMemEval-S retrieval session@8 by type (FluctlightDB only; {hits} = {overall_pct:.1f}%)"
     )
     ax.axhline(90, color="#888", linestyle="--", linewidth=0.8)
     for bar, v in zip(bars, values):
