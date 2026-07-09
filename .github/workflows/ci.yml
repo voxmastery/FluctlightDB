@@ -75,6 +75,17 @@ jobs:
       - name: Miri tests (wal + store)
         run: cargo miri test -p fluctlightdb --lib wal_ persistence_roundtrip
 
+  chaos-jepsen:
+    name: chaos / crash recovery (Jepsen-style)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run jepsen-chaos suite
+        run: bash scripts/jepsen-chaos.sh
+
   python-sdk:
     name: python-sdk (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

@@ -16,7 +16,9 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 ## [0.5.7] - 2026-07-09
 
 ### Added
-- **pyo3 0.29** native bindings (clears RUSTSEC pyo3 advisories)
+- Jepsen-style chaos harness: `tests/chaos_jepsen.rs`, `scripts/jepsen-chaos.sh`, CI `chaos-jepsen`
+- [docs/LEADERBOARD.md](docs/LEADERBOARD.md) — public results policy (no neutral agent-memory registry)
+
 - BEAM retrieval smoke harness: `benchmarks/beam_eval.py`, `make reproduce-beam-smoke`
 - Crash recovery integration tests (`tests/crash_recovery.rs`) — WAL corrupt/truncate/kill simulation
 - GitHub label sync workflow (`.github/workflows/sync-labels.yml`)
