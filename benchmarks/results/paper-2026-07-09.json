@@ -73,17 +73,6 @@
     "frozen_source_agent": "famb-agent-2026-07-09.json",
     "frozen_source_chorus": "famb-chorus-2026-07-09.json"
   },
-  "beam_smoke": {
-    "benchmark": "beam",
-    "metric": "context_recall@32",
-    "chat_size": "100K",
-    "chat_id": "1",
-    "questions_scored": 18,
-    "context_hits": 6,
-    "context_recall": 0.3333,
-    "note": "Retrieval-layer smoke only; not BEAM LLM rubric score",
-    "frozen_source": "beam-smoke-2026-07-09.json"
-  },
   "longmemeval_s": {
     "dataset": "longmemeval_s_cleaned.json (Wu et al., ICLR 2025)",
     "metric": "session_recall@8",

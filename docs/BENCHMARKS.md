@@ -109,29 +109,7 @@ Historical index-mode run (June 2026): 98.1% — superseded by CHORUS cert; see 
 
 ---
 
-### 3. BEAM (long-context memory, ICLR 2026)
-
-| Field | Value |
-|---|---|
-| **What** | 100 multi-domain chats (128K–10M tokens), 2,000 human-validated probing questions across 10 memory abilities |
-| **Official metric** | LLM rubric grading per question type (requires model API) |
-| **FluctlightDB metric** | **Context recall @k** — gold turn ids / rubric terms in CHORUS top-k (retrieval layer, like LoCoMo evidence) |
-| **Paper** | Tavakoli et al., *Beyond a Million Tokens: Benchmarking and Enhancing Long-Term Memory in LLMs*, ICLR 2026 |
-| **Upstream** | https://github.com/mohammadtavakoli78/BEAM |
-| **In-repo** | `benchmarks/beam_eval.py` |
-| **Smoke (2026-07-09)** | Chat `100K/1`, 18 questions, **33.3%** context recall@32 (`beam-smoke-2026-07-09.json`) |
-
-**Smoke (one 100K chat, no LLM keys):**
-
-```bash
-make reproduce-beam-smoke
-```
-
-Full BEAM LLM eval: use upstream `src/evaluation/run_evaluation.py` with your memory backend feeding context.
-
----
-
-### 4. LongMemEval (multi-session agent abilities)
+### 3. LongMemEval (multi-session agent abilities)
 
 | Field | Value |
 |---|---|
@@ -190,6 +168,7 @@ Leaderboard context: gbrain 97.6% R@5 (hybrid + text-embedding-3-large); YourMem
 
 | Benchmark | Focus | Notes |
 |---|---|---|
+| **BEAM (ICLR 2026)** | 128K–10M token chats; LLM-rubric E2E | Experimental harness: `benchmarks/beam_eval.py`, `make reproduce-beam-smoke` — **not in paper freeze** (smoke scores too low to cite pre-arXiv) |
 | **Evo-Memory / EvoMemBench** | Evolving memory under distribution shift | Good for consolidation / forgetting claims |
 | **MemoryArena (2026)** | Head-to-head memory modules | Useful for related-work positioning |
 | **FindingDory** | Embodied episodic memory | If claiming spatial / embodied recall |
@@ -239,7 +218,6 @@ Headline numbers in `benchmarks/results/paper-2026-07-09.json` were frozen as fo
 | FAMB agent/chorus | 2026-07-09 | `famb-*-2026-07-09.json` | Replaced hardcoded CHORUS sub-scores with measured suites |
 | LongMemEval-S v4 | 2026-07-04 | `longmemeval-colab-v2-full-2026-07-04.json` | Unified 500; pref-facts ablation on preference slice only during dev |
 | LongMemEval E2E | 2026-07-07 | `e2e-cert-paper-v2-2026-07-07.json` | Reader/judge profile frozen before cert |
-| BEAM smoke | 2026-07-09 | `beam-smoke-2026-07-09.json` | Single 100K chat; context recall@32 |
 
 Dev iterations (07-07–07-09) were harness fixes and regression reruns on the suites above—not post-hoc edits to frozen JSON fields.
 
@@ -281,6 +259,6 @@ pip install chromadb pytrec-eval-terrier fluctlightdb[native]
 
 | Date | Change |
 |---|---|
-| 2026-07-09 | FAMB: measured CHORUS provenance/persistence suites; BEAM smoke context recall 33.3% (6/18); freeze protocol table |
+| 2026-07-09 | FAMB: measured CHORUS provenance/persistence suites; freeze protocol table |
 | 2026-07 | LongMemEval-S: **97.6%** session@8 unified v4 (488/500); preference **96.7%** (29/30); frozen in `paper-2026-07-04.json` |
 | 2025-06 | Initial BENCHMARKS.md: BEIR harness in-repo, FAMB, Tier-1 citation table, connect vs connect_index |

@@ -301,15 +301,6 @@ provenance and persistence suites call \texttt{chorus\_sleep()} before
 FAMB alongside LoCoMo/BEIR in headline figures---it is author-designed regression,
 not external validation.
 
-\subsection{BEAM smoke: context recall on one 100K chat}
-BEAM (Tavakoli et al., ICLR 2026; \texttt{arxiv:2510.27246}) tests ten
-long-horizon memory abilities with an official LLM-rubric end-to-end score. Our
-in-repo harness (\texttt{benchmarks/beam\_eval.py}) measures \emph{context
-recall@32} on probing questions (gold turn ids in CHORUS top-$k$), analogous to
-LoCoMo evidence recall. On the published smoke slice (chat \texttt{100K/1}, 18
-scored questions, no LLM keys) we score \textbf{33.3\%} (6/18); full BEAM E2E is
-left to upstream tooling.
-
 \subsection{LongMemEval-S: 97.6\% session recall@8 (v4 unified 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
 questions. The official \emph{retrieval} metric is \texttt{session\_recall@$K$}:
@@ -546,8 +537,7 @@ these claims.
 \section*{Artifacts}
 Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
 \texttt{benchmarks/longmemeval\_bench.py}, \texttt{benchmarks/longmemeval\_colab.ipynb},
-\texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py},
-\texttt{benchmarks/beam\_eval.py}.
+\texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py}.
 Frozen metrics: \texttt{benchmarks/results/paper-2026-07-09.json}. E2E:
 \texttt{benchmarks/longmemeval\_e2e.py};
 \texttt{benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}. Preprint DOI:
