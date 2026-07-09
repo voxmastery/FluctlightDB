@@ -55,8 +55,8 @@ from fluctlightdb import connect_agent
 brain = connect_agent()
 brain.turn_begin()
 brain.wm_push("Use pytest for tests", context="project", salience=0.7)
-print(brain.recall("test framework"))
 brain.turn_end(flush=True)
+print(brain.recall("pytest"))  # recall after flush; cue needs token overlap offline
 ```
 
 Multi-agent project brains still use `connect_project()` for handoffs — see [MULTI_AGENT.md](MULTI_AGENT.md).
