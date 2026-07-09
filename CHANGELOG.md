@@ -13,6 +13,17 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ---
 
+## [0.5.8] - 2026-07-09
+
+### Fixed
+- **`connect_agent()` quickstart broken**: fast ingest + vector-fast skipped graph/synapse wiring when `semantic_vector` was omitted — recall returned empty hits with no error. Fast vector path now requires an explicit vector; `connect_agent()` no longer sets `FLUCTLIGHT_VECTOR_FAST` by default.
+- README 30-second example uses lexical cue `dark mode` (offline path) and recalls after `turn_end(flush=True)` so WM is committed.
+
+### Added
+- CI: `tests.test_quickstart` guards README quickstart on native wheel build.
+
+---
+
 ## [0.5.7] - 2026-07-09
 
 ### Added

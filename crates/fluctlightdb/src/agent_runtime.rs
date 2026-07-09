@@ -421,7 +421,7 @@ pub fn enable_agent_env() {
     std::env::set_var("FLUCTLIGHT_CHORUS", "1");
     std::env::set_var("FLUCTLIGHT_CHORUS_FAST", "1");
     std::env::set_var("FLUCTLIGHT_FAST_INGEST", "1");
-    std::env::set_var("FLUCTLIGHT_VECTOR_FAST", "1");
+    std::env::remove_var("FLUCTLIGHT_VECTOR_FAST");
     std::env::set_var("FLUCTLIGHT_AGENT_FAST", "1");
     std::env::set_var("FLUCTLIGHT_CANDIDATE_CAP", "512");
 }
@@ -449,5 +449,28 @@ mod tests {
             .unwrap();
         let out = brain.recall_unified("wallet balance", None, RecallMode::Auto, 4, None);
         assert!(!out.hits.is_empty());
+    }
+
+    #[test]
+    fn agent_env_wm_recall_without_semantic_vector() {
+        enable_agent_env();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("agent.brain.flct");
+        let mut brain = FluctlightBrain::open(&path).unwrap();
+        brain.turn_begin();
+        brain.wm_push("User prefers dark mode", "settings", 0.8, None);
+        brain.turn_end(true).unwrap();
+        let status = brain.status();
+        assert!(
+            status.synapses > 0,
+            "expected graph synapses after wm_push without vector, got {:?}",
+            status
+        );
+        let out = brain.recall_unified("dark mode", None, RecallMode::Auto, 8, None);
+        assert!(
+            !out.hits.is_empty(),
+            "connect_agent-style env should recall lexical wm content: {:?}",
+            out
+        );
     }
 }
