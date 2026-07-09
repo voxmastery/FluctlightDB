@@ -3,3 +3,6 @@ contact_links:
   - name: Security report
     url: https://github.com/voxmastery/FluctlightDB/security/advisories/new
     about: Report a vulnerability privately (do not open a public issue)
+  - name: Benchmark reproduction
+    url: https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml
+    about: Report independent benchmark reproduction (bounty eligible)

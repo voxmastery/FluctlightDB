@@ -12,8 +12,13 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 ## [Unreleased]
 
 ### Added
-- Transparency docs: `MAINTAINER.md`, `docs/REPRODUCIBILITY.md`, `CHANGELOG.md`
-- Security policy: explicit audit/CVE status in `SECURITY.md`
+- Reproduction issue template + **$50 bounty** per benchmark ([docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md))
+- `benchmarks/requirements-reproduce.txt` (pinned eval deps)
+- CI: `cargo-audit`, `cargo-deny` ([deny.toml](deny.toml)), Miri (WAL/store), WAL truncated-tail recovery test
+- Python SDK license aligned to **MIT OR Apache-2.0** (`LICENSE-APACHE` in `sdks/python/`)
+
+### Changed
+- `reproduce-locomo.sh` pins `fluctlightdb[native]` to tag version from `pyproject.toml`
 
 ---
 

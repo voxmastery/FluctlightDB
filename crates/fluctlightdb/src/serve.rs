@@ -338,6 +338,9 @@ impl BrainServer {
 
     pub fn serve(&self, addr: &str) -> Result<()> {
         enforce_bind_auth(addr, &self.auth)?;
+        // SAFETY: POSIX signal handlers for graceful shutdown on SIGTERM/SIGINT.
+        // Registers process-global handlers; no Rust invariants are violated beyond
+        // setting an AtomicBool. Not exercised under Miri (Unix-only, signal API).
         #[cfg(unix)]
         unsafe {
             libc::signal(
