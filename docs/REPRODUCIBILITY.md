@@ -2,6 +2,19 @@
 
 FluctlightDB publishes benchmark numbers in the paper, README, and frozen JSON under `benchmarks/results/`. This document separates **what you can reproduce yourself** from **what has been independently verified**.
 
+## Why independent reproduction benefits us
+
+| Benefit | What it unlocks |
+|---------|-----------------|
+| **Credibility** | Moves headline metrics from “maintainer blog post” to “anyone can verify” — rare in the agent-memory space |
+| **Adoption** | Enterprise / research integrators can pin versions and run `make reproduce-locomo` in CI before trusting recall claims |
+| **Differentiation** | Honest `REPRODUCIBILITY.md` + open harness vs competitors’ self-reported leaderboard percentages |
+| **Co-maintainers** | External reproducers are the best pipeline for triage contributors and named reviewers |
+| **Head-to-head posts** | Mem0/Zep comparisons stay **blocked until** the first external LoCoMo match — then a protocol-identical post is credible, not more noise |
+| **Paper & press** | “Independently reproduced by X” is citable; self-reported 99% alone is not |
+
+We pay a **$50 gift card + public credit** per first external match (see bounty below) because that work is marketing + QA we cannot buy from vendors.
+
 ## Will you get the same %?
 
 **LoCoMo (CHORUS @ k=150): yes — when you follow the pinned protocol.**
@@ -48,7 +61,7 @@ FluctlightDB's differentiation is honesty + open harnesses:
 - This doc states **self-reported until independently verified**
 - **No** Mem0/Zep head-to-head post until an external reproduction lands (would add noise before that)
 
-**Planned:** [BEAM](https://arxiv.org/abs/2406.19371) benchmark harness (newer memory eval, less saturation than LoCoMo/LongMemEval clustering at 90%+). Track progress in GitHub Issues labeled `benchmark`.
+**BEAM (ICLR 2026):** retrieval smoke harness shipped — `make reproduce-beam-smoke` ([`benchmarks/beam_eval.py`](../benchmarks/beam_eval.py)). Measures **context recall @k** on probing questions, not the official BEAM LLM-rubric score. Paper: [arxiv:2510.27246](https://arxiv.org/abs/2510.27246).
 
 ---
 
@@ -88,6 +101,7 @@ LongMemEval E2E is **excluded** (locked maintainer run; OpenAI cost).
 | LongMemEval E2E QA | `e2e-cert-paper-v2-2026-07-07.json` | `benchmarks/e2e_certify.sh` (OpenAI) | Yes — **97.4%** | **None** — run locked |
 | BEIR SciFact nDCG@10 | `paper-2026-07-09.json` | `benchmarks/beir_bench.py` | Yes — **0.645** | **None published** |
 | FAMB macro | `paper-2026-07-09.json` | `benchmarks/famb_bench.py` | Yes — **100%** | **None published** |
+| BEAM context recall (smoke) | — | `make reproduce-beam-smoke` | In progress | **None published** |
 
 **Bottom line:** Harnesses are open and numbers are frozen, but **all headline metrics are maintainer-reported until an external group publishes a reproduction** (issue, blog, paper, or fork).
 

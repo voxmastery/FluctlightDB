@@ -109,7 +109,28 @@ Historical index-mode run (June 2026): 98.1% — superseded by CHORUS cert; see 
 
 ---
 
-### 3. LongMemEval (multi-session agent abilities)
+### 3. BEAM (long-context memory, ICLR 2026)
+
+| Field | Value |
+|---|---|
+| **What** | 100 multi-domain chats (128K–10M tokens), 2,000 human-validated probing questions across 10 memory abilities |
+| **Official metric** | LLM rubric grading per question type (requires model API) |
+| **FluctlightDB metric** | **Context recall @k** — gold turn ids / rubric terms in CHORUS top-k (retrieval layer, like LoCoMo evidence) |
+| **Paper** | Tavakoli et al., *Beyond a Million Tokens: Benchmarking and Enhancing Long-Term Memory in LLMs*, ICLR 2026 |
+| **Upstream** | https://github.com/mohammadtavakoli78/BEAM |
+| **In-repo** | `benchmarks/beam_eval.py` |
+
+**Smoke (one 100K chat, no LLM keys):**
+
+```bash
+make reproduce-beam-smoke
+```
+
+Full BEAM LLM eval: use upstream `src/evaluation/run_evaluation.py` with your memory backend feeding context.
+
+---
+
+### 4. LongMemEval (multi-session agent abilities)
 
 | Field | Value |
 |---|---|

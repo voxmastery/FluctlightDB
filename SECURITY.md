@@ -15,11 +15,12 @@ CI `cargo audit` currently reports (as of July 2026):
 
 | Crate | Issue | Mitigation |
 |-------|-------|------------|
-| `pyo3` 0.23.x | RUSTSEC-2025-0020, RUSTSEC-2026-0177 | Upgrade to pyo3 ≥0.29 in `fluctlight-py` (planned) |
 | `bincode` 1.3 | Unmaintained (RUSTSEC-2025-0141) | Evaluate migration to bincode 2 or alternative |
 | `memmap2` 0.9.10 | Unsound advisory (RUSTSEC-2026-0186) | Bump when fixed upstream |
 
-The supply-chain job may show as failed until these are resolved; advisories are listed here intentionally.
+**Resolved:** `pyo3` upgraded to **0.29** in `fluctlight-py` (RUSTSEC-2025-0020, RUSTSEC-2026-0177).
+
+The supply-chain job may show warnings until bincode/memmap2 are resolved.
 
 FluctlightDB has **not** undergone a professional penetration test or formal security audit. Production multi-tenant HTTP serve and governance APIs exist but are documented as **not production-hardened** — see [docs/STABILITY.md](docs/STABILITY.md).
 

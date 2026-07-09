@@ -36,7 +36,7 @@ FluctlightDB is **early-stage open source**. This page states facts reviewers an
 | Check | Status |
 |-------|--------|
 | `cargo audit` + `cargo-deny` | CI job on every `main` push ([`deny.toml`](../deny.toml)) |
-| Known advisories | **pyo3 0.23.x** (native bindings) — upgrade tracked; see [SECURITY.md](SECURITY.md) |
+| Known advisories | **bincode**, **memmap2** warnings — see [SECURITY.md](SECURITY.md); **pyo3 0.29** ✅ |
 | Miri (WAL/store) | CI job (best-effort) |
 | WAL fault injection | Unit test: truncated tail + corrupt line recovery (`wal.rs`) |
 | Full Jepsen / kill -9 harness | **Not yet** — unit-level simulation only |

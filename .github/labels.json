@@ -1,0 +1,17 @@
+[
+  {
+    "name": "reproduction",
+    "color": "1D76DB",
+    "description": "Independent benchmark reproduction report (bounty eligible)"
+  },
+  {
+    "name": "benchmark",
+    "color": "FBCA04",
+    "description": "Benchmark harness or eval work"
+  },
+  {
+    "name": "supply-chain",
+    "color": "5319E7",
+    "description": "cargo-audit, cargo-deny, dependency upgrades"
+  }
+]

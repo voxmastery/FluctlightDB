@@ -83,6 +83,7 @@ impl PyBrain {
     #[pyo3(signature = (cue, semantic_vector=None, agent_id=None, limit=None))]
     fn activate(
         &self,
+        py: Python<'_>,
         cue: &str,
         semantic_vector: Option<Vec<f32>>,
         agent_id: Option<String>,
@@ -96,18 +97,21 @@ impl PyBrain {
             top_k,
         );
         api_slim::slim_activation_for_api(&mut result, limit);
-        Python::with_gil(|py| {
-            let dict = PyDict::new(py);
-            dict.set_item("recalls", json_val_to_py(py, &result.recalls)?)?;
-            dict.set_item("active_neurons", result.active_neurons)?;
-            dict.set_item("hops", result.hops)?;
-            dict.set_item("myelinated", result.myelinated)?;
-            Ok(dict.into())
-        })
+        let dict = PyDict::new(py);
+        dict.set_item("recalls", json_val_to_py(py, &result.recalls)?)?;
+        dict.set_item("active_neurons", result.active_neurons)?;
+        dict.set_item("hops", result.hops)?;
+        dict.set_item("myelinated", result.myelinated)?;
+        Ok(dict.into())
     }
 
     #[pyo3(signature = (batch_json, limit=None))]
-    fn activate_batch_json(&self, batch_json: &str, limit: Option<usize>) -> PyResult<Py<PyAny>> {
+    fn activate_batch_json(
+        &self,
+        py: Python<'_>,
+        batch_json: &str,
+        limit: Option<usize>,
+    ) -> PyResult<Py<PyAny>> {
         let items: Vec<ActivateItem> =
             serde_json::from_str(batch_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         let batch: Vec<(String, Option<Vec<f32>>, Option<String>)> = items
@@ -119,15 +123,13 @@ impl PyBrain {
         for r in &mut results {
             api_slim::slim_activation_for_api(r, limit);
         }
-        Python::with_gil(|py| {
-            let dict = PyDict::new(py);
-            dict.set_item("results", json_val_to_py(py, &results)?)?;
-            dict.set_item("count", results.len())?;
-            Ok(dict.into())
-        })
+        let dict = PyDict::new(py);
+        dict.set_item("results", json_val_to_py(py, &results)?)?;
+        dict.set_item("count", results.len())?;
+        Ok(dict.into())
     }
 
-    fn experience(&mut self, episode_json: &str) -> PyResult<Py<PyAny>> {
+    fn experience(&mut self, py: Python<'_>, episode_json: &str) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
         let episode: Episode = serde_json::from_str(episode_json)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
@@ -135,7 +137,7 @@ impl PyBrain {
             .inner
             .experience(episode)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Python::with_gil(|py| json_val_to_py(py, &report))
+        json_val_to_py(py, &report)
     }
 
     #[pyo3(signature = (engram_id, provenance_kind=None, source_uri=None, confidence=None))]
@@ -155,47 +157,47 @@ impl PyBrain {
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
-    fn sleep(&mut self) -> PyResult<Py<PyAny>> {
+    fn sleep(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
         let report = self
             .inner
             .sleep()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Python::with_gil(|py| json_val_to_py(py, &report))
+        json_val_to_py(py, &report)
     }
 
     #[pyo3(signature = (n=None))]
-    fn tick(&mut self, n: Option<u64>) -> PyResult<Py<PyAny>> {
+    fn tick(&mut self, py: Python<'_>, n: Option<u64>) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
         let reports = self
             .inner
             .tick_n(n.unwrap_or(1))
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Python::with_gil(|py| json_val_to_py(py, &reports))
+        json_val_to_py(py, &reports)
     }
 
     #[pyo3(signature = (goal, steps=None))]
-    fn preplay(&self, goal: &str, steps: Option<u32>) -> PyResult<Py<PyAny>> {
+    fn preplay(&self, py: Python<'_>, goal: &str, steps: Option<u32>) -> PyResult<Py<PyAny>> {
         let report = self.inner.preplay(goal, steps.unwrap_or(4));
-        Python::with_gil(|py| json_val_to_py(py, &report))
+        json_val_to_py(py, &report)
     }
 
-    fn neurogenesis_pulse(&mut self) -> PyResult<Py<PyAny>> {
+    fn neurogenesis_pulse(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
         let report = self
             .inner
             .neurogenesis_pulse()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Python::with_gil(|py| json_val_to_py(py, &report))
+        json_val_to_py(py, &report)
     }
 
-    fn compact(&mut self) -> PyResult<Py<PyAny>> {
+    fn compact(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
         let report = self
             .inner
             .compact()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Python::with_gil(|py| json_val_to_py(py, &report))
+        json_val_to_py(py, &report)
     }
 
     #[pyo3(signature = (magnitude=None))]
@@ -216,13 +218,13 @@ impl PyBrain {
     }
 
     #[pyo3(signature = (cause=None))]
-    fn death(&mut self, cause: Option<String>) -> PyResult<Py<PyAny>> {
+    fn death(&mut self, py: Python<'_>, cause: Option<String>) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
         let life_id = self
             .inner
             .death(cause.as_deref().unwrap_or("api"))
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Python::with_gil(|py| json_val_to_py(py, &life_id))
+        json_val_to_py(py, &life_id)
     }
 
     fn status(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -255,10 +257,15 @@ impl PyBrain {
     }
 
     #[pyo3(signature = (cue, limit=None))]
-    fn complete(&self, cue: &str, limit: Option<usize>) -> PyResult<Option<Py<PyAny>>> {
+    fn complete(
+        &self,
+        py: Python<'_>,
+        cue: &str,
+        limit: Option<usize>,
+    ) -> PyResult<Option<Py<PyAny>>> {
         let _ = limit;
         match self.inner.complete(cue) {
-            Some(engram) => Python::with_gil(|py| {
+            Some(engram) => {
                 let ep = &engram.episode;
                 let dict = PyDict::new(py);
                 dict.set_item("engram_id", engram.id.to_string())?;
@@ -267,7 +274,7 @@ impl PyBrain {
                 dict.set_item("salience", engram.salience)?;
                 dict.set_item("separation_index", engram.separation_index)?;
                 Ok(Some(dict.into()))
-            }),
+            }
             None => Ok(None),
         }
     }
@@ -601,7 +608,7 @@ impl PyBrain {
             .inner
             .delete_by_agent_id(agent_id)
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        Ok(n.into_py(py))
+        Ok(n.into_pyobject(py)?.into())
     }
 
     fn audit_log_json(&self, py: Python<'_>, limit: Option<usize>) -> PyResult<Py<PyAny>> {
