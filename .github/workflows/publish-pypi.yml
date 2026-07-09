@@ -61,10 +61,21 @@ jobs:
         include:
           - id: linux-x86_64
             os: ubuntu-latest
+            platform: linux
+            sdist: true
+          - id: linux-aarch64
+            os: ubuntu-24.04-arm
+            platform: linux
+            sdist: false
           - id: macos-universal2
             os: macos-latest
+            platform: macos
           - id: windows-x64
             os: windows-latest
+            platform: windows
+          - id: windows-arm64
+            os: windows-11-arm
+            platform: windows
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,23 +83,27 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Build Linux manylinux abi3 wheel + sdist
-        if: runner.os == 'Linux'
+      - name: Build Linux manylinux abi3 wheel
+        if: matrix.platform == 'linux'
         working-directory: crates/fluctlight-py
         run: |
           pip install maturin
-          maturin build --release --out dist --sdist
+          if [[ "${{ matrix.sdist }}" == "true" ]]; then
+            maturin build --release --out dist --sdist
+          else
+            maturin build --release --out dist
+          fi
 
       - name: Build macOS universal2 abi3 wheel
-        if: runner.os == 'macOS'
+        if: matrix.platform == 'macos'
         working-directory: crates/fluctlight-py
         run: |
           pip install maturin
           rustup target add aarch64-apple-darwin x86_64-apple-darwin
           maturin build --release --out dist --target universal2-apple-darwin
 
-      - name: Build Windows x64 abi3 wheel
-        if: runner.os == 'Windows'
+      - name: Build Windows abi3 wheel
+        if: matrix.platform == 'windows'
         working-directory: crates/fluctlight-py
         shell: bash
         run: |

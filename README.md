@@ -8,7 +8,7 @@
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install "fluctlightdb[native]>=0.5.5"   # Linux / macOS / Windows x64; abi3 wheel for Python 3.9–3.13
+pip install "fluctlightdb[native]>=0.5.6"   # Linux / macOS / Windows (x64 + arm64); abi3 wheel for Python 3.9–3.13
 ```
 
 **Stability:** [docs/STABILITY.md](docs/STABILITY.md) · **Embeddings / offline:** [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md)
