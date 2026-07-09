@@ -84,6 +84,20 @@ LongMemEval E2E is **excluded** (locked maintainer run; OpenAI cost).
 |------|-----|-----------|--------|-------|
 | — | *none yet* | — | — | — |
 
+### Outreach log (maintainer)
+
+Honest tracking of bounty promotion — **silence is data**.
+
+| Date | Channel | Post / link | Attempts reported | Notes |
+|------|---------|-------------|-------------------|-------|
+| 2026-07-09 | *pending* | r/LocalLLaMA, HN Show HN, agent-memory Discords | **0** | Bounty live; use template below |
+
+**Copy-paste outreach (maintainer):**
+
+> LoCoMo 99.0% evidence recall — reproducible in one command. First external match gets **$50 + credit** in our repo. `git clone … && make reproduce-locomo` — details: https://github.com/voxmastery/FluctlightDB/blob/main/docs/REPRODUCIBILITY.md
+
+Update this table after each post and when anyone files a reproduction issue (success or fail).
+
 ---
 
 ## Verification status (honest summary)

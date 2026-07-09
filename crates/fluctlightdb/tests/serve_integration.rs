@@ -2,12 +2,14 @@
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::{Arc, Barrier};
+use std::sync::{Arc, Barrier, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use fluctlightdb::{request_shutdown, BrainServer};
+use fluctlightdb::{request_shutdown, reset_shutdown_for_tests, BrainServer};
 use tempfile::tempdir;
+
+static SERVE_ITEST_LOCK: Mutex<()> = Mutex::new(());
 
 fn post(port: u16, path: &str, body: &str, token: Option<&str>) -> (u16, String) {
     let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).expect("connect");
@@ -37,11 +39,13 @@ fn post(port: u16, path: &str, body: &str, token: Option<&str>) -> (u16, String)
 
 #[test]
 fn serve_auth_and_consolidate() {
+    let _guard = SERVE_ITEST_LOCK.lock().unwrap();
     let prev_keys = std::env::var("FLUCTLIGHT_API_KEYS").ok();
     let prev_req = std::env::var("FLUCTLIGHT_REQUIRE_AUTH").ok();
     std::env::set_var("FLUCTLIGHT_API_KEYS", "default:testkey:admin");
     std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", "true");
     std::env::set_var("FLUCTLIGHT_WAL_FSYNC", "always");
+    reset_shutdown_for_tests();
 
     let dir = tempdir().unwrap();
     let brain = dir.path().join("brain");
@@ -79,6 +83,98 @@ fn serve_auth_and_consolidate() {
 
     request_shutdown();
     let _ = handle.join();
+
+    match prev_keys {
+        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
+        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
+    }
+    match prev_req {
+        Some(v) => std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", v),
+        None => std::env::remove_var("FLUCTLIGHT_REQUIRE_AUTH"),
+    }
+}
+
+fn start_server(
+    brain: std::path::PathBuf,
+    keys: &str,
+    port: u16,
+) -> (std::thread::JoinHandle<()>, Arc<Barrier>) {
+    reset_shutdown_for_tests();
+    std::env::set_var("FLUCTLIGHT_API_KEYS", keys);
+    std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", "true");
+    let server = BrainServer::open(brain).unwrap();
+    let addr = format!("127.0.0.1:{port}");
+    let barrier = Arc::new(Barrier::new(2));
+    let b = barrier.clone();
+    let handle = thread::spawn(move || {
+        b.wait();
+        let _ = server.serve(&addr);
+    });
+    barrier.wait();
+    thread::sleep(Duration::from_millis(300));
+    (handle, barrier)
+}
+
+#[test]
+fn serve_cross_tenant_path_forbidden() {
+    let _guard = SERVE_ITEST_LOCK.lock().unwrap();
+    let prev_keys = std::env::var("FLUCTLIGHT_API_KEYS").ok();
+    let prev_req = std::env::var("FLUCTLIGHT_REQUIRE_AUTH").ok();
+    let dir = tempdir().unwrap();
+    let port = 18793u16;
+    let handle = start_server(
+        dir.path().join("brain"),
+        "tenant_a:key_a:write,tenant_b:key_b:write",
+        port,
+    );
+
+    let exp = r#"{"content":"tenant a secret","context":"iso","salience":0.8}"#;
+    let (s_write, _) = post(port, "/api/v1/experience", exp, Some("key_a"));
+    assert_eq!(s_write, 200);
+
+    let (s_forbidden, body) = post(
+        port,
+        "/api/v1/tenants/tenant_a/status",
+        "{}",
+        Some("key_b"),
+    );
+    assert_eq!(s_forbidden, 403, "tenant_b must not read tenant_a: {body}");
+
+    request_shutdown();
+    let _ = handle.0.join();
+
+    match prev_keys {
+        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
+        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
+    }
+    match prev_req {
+        Some(v) => std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", v),
+        None => std::env::remove_var("FLUCTLIGHT_REQUIRE_AUTH"),
+    }
+}
+
+#[test]
+fn serve_read_role_cannot_write() {
+    let _guard = SERVE_ITEST_LOCK.lock().unwrap();
+    let prev_keys = std::env::var("FLUCTLIGHT_API_KEYS").ok();
+    let prev_req = std::env::var("FLUCTLIGHT_REQUIRE_AUTH").ok();
+    let dir = tempdir().unwrap();
+    let port = 18794u16;
+    let handle = start_server(
+        dir.path().join("brain"),
+        "tenant_a:read_only:read",
+        port,
+    );
+
+    let (s_status, _) = post(port, "/api/v1/status", "{}", Some("read_only"));
+    assert_eq!(s_status, 200);
+
+    let exp = r#"{"content":"should fail","context":"rbac","salience":0.5}"#;
+    let (s_write, body) = post(port, "/api/v1/experience", exp, Some("read_only"));
+    assert_eq!(s_write, 403, "read role must not write: {body}");
+
+    request_shutdown();
+    let _ = handle.0.join();
 
     match prev_keys {
         Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),

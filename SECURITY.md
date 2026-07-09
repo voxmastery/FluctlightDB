@@ -15,12 +15,12 @@ CI `cargo audit` currently reports (as of July 2026):
 
 | Crate | Issue | Mitigation |
 |-------|-------|------------|
-| `bincode` 1.3 | Unmaintained (RUSTSEC-2025-0141) | Evaluate migration to bincode 2 or alternative |
-| `memmap2` 0.9.10 | Unsound advisory (RUSTSEC-2026-0186) | Bump when fixed upstream |
+| `bincode` 1.3 | Unmaintained (RUSTSEC-2025-0141) | **Accepted** — on-disk wire format; explicit `deny.toml` ignore + migration tracked |
+| `memmap2` 0.9.10 | Unsound (RUSTSEC-2026-0186) | **Accepted** — transitive via `fast-hnsw`; explicit `deny.toml` ignore until upstream bump |
 
 **Resolved:** `pyo3` upgraded to **0.29** in `fluctlight-py` (RUSTSEC-2025-0020, RUSTSEC-2026-0177).
 
-The supply-chain job may show warnings until bincode/memmap2 are resolved.
+The supply-chain job runs `cargo deny check` with **documented** `deny.toml` ignores for the two advisories above (not silent suppression).
 
 FluctlightDB has **not** undergone a professional penetration test or formal security audit. Production multi-tenant HTTP serve and governance APIs exist but are documented as **not production-hardened** — see [docs/STABILITY.md](docs/STABILITY.md).
 

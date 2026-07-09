@@ -137,6 +137,7 @@ pub use replicate::{open_replica_brain, sync_once, ReplicaStatus};
 pub use semantic::{SemanticField, DEFAULT_SEMANTIC_DIM};
 pub use separation_gate::SeparationGateResult;
 pub use serve::request_shutdown;
+pub use serve::reset_shutdown_for_tests;
 pub use serve::BrainServer;
 pub use stage_schedule::StageConsolidationReport;
 pub use storage::{default_brain_path, default_tenant_brain_dir, StorageFormat};

@@ -1,0 +1,32 @@
+name: Auth / storage reviewer
+description: Volunteer for scoped read-only review of auth and WAL PRs
+title: "[Reviewer] Auth + storage PR review volunteer"
+labels: ["help wanted", "security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Scoped **read-only review** (~2–4 h/month) for `serve.rs`, `auth*.rs`, `store.rs`, `wal.rs`.
+        See [docs/SEEKING_AUTH_REVIEWER.md](https://github.com/voxmastery/FluctlightDB/blob/main/docs/SEEKING_AUTH_REVIEWER.md).
+  - type: textarea
+    id: background
+    attributes:
+      label: Background (Rust, security, databases)
+      placeholder: e.g. shipped auth at X, familiar with WAL/fsync
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Areas you can review
+      options:
+        - label: HTTP auth / tenant isolation
+        - label: WAL / crash recovery
+        - label: On-disk format / migrations
+  - type: checkboxes
+    id: agree
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: I understand this is volunteer review, not a paid audit or production certification
+          required: true

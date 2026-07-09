@@ -5,13 +5,16 @@
 all-features = true
 
 [advisories]
-vulnerability = "warn"
-unmaintained = "warn"
-unsound = "warn"
-yanked = "warn"
+db-urls = ["https://github.com/RustSec/advisory-db"]
+# Documented accepted risks — see SECURITY.md (not silent gaps).
 ignore = [
-  # Track upgrades in issues; do not silently ignore new IDs.
+  { id = "RUSTSEC-2025-0141", reason = "bincode 1.x is the on-disk engram wire format; migration to bincode 2 is a breaking storage change tracked in SECURITY.md" },
+  { id = "RUSTSEC-2026-0186", reason = "transitive via fast-hnsw/memmap2 0.9.10 until upstream fix — mmap paths in Miri CI" },
 ]
+unmaintained = "all"
+unsound = "all"
+yanked = "warn"
+unused-ignored-advisory = "allow"
 
 [licenses]
 allow = [
@@ -20,6 +23,7 @@ allow = [
   "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause",
   "BSD-3-Clause",
+  "BSL-1.0",
   "ISC",
   "Unicode-3.0",
   "Zlib",
