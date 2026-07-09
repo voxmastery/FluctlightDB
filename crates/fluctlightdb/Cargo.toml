@@ -18,6 +18,11 @@ fast-hnsw = "1.0.1"
 sha2 = "0.10"
 fs2 = "0.4"
 
+[[bin]]
+name = "fluctlight-chaos-worker"
+path = "src/bin/chaos_worker.rs"
+test = false
+
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 

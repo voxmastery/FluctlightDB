@@ -170,6 +170,7 @@ docker run -p 8792:8792 \
 | [EMBEDDINGS.md](docs/EMBEDDINGS.md) | Offline vs benchmark embed deps |
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Paper protocol + citations |
 | [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) | Verification status + reproduce scripts |
+| [LEADERBOARD.md](docs/LEADERBOARD.md) | Public results policy (no third-party agent-memory registry) |
 | [INTEGRATIONS.md](docs/INTEGRATIONS.md) | LangChain, LlamaIndex, OpenAI Agents |
 | [MULTI_AGENT.md](docs/MULTI_AGENT.md) | Hub + spoke, MCP, handoffs |
 | [Manifesto.md](docs/Manifesto.md) | Brain-native design (vision) |

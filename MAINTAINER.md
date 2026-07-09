@@ -39,7 +39,8 @@ FluctlightDB is **early-stage open source**. This page states facts reviewers an
 | Known advisories | **bincode**, **memmap2** warnings — see [SECURITY.md](SECURITY.md); **pyo3 0.29** ✅ |
 | Miri (WAL/store) | CI job (best-effort) |
 | WAL fault injection | Unit test: truncated tail + corrupt line recovery (`wal.rs`) |
-| Full Jepsen / kill -9 harness | **Not yet** — unit-level simulation only |
+| Full Jepsen / kill -9 harness | **Done (embedded model)** — `scripts/jepsen-chaos.sh`, `tests/chaos_jepsen.rs`, CI job `chaos-jepsen` |
+| Distributed multi-node Raft Jepsen | **N/A** — embedded brain + optional primary→replica WAL sync, not a consensus cluster |
 
 ## Becoming a co-maintainer
 

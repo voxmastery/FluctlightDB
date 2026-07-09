@@ -152,5 +152,5 @@ Partial reproductions (e.g. within ±0.5% due to embedding drift) are still valu
 
 - Peer review of benchmark methodology (paper is preprint)
 - Independent audit of correctness or security
-- Leaderboard registration on a third-party site
+- Leaderboard registration on a third-party site — see [LEADERBOARD.md](LEADERBOARD.md) (no neutral agent-memory registry exists)
 - BEAM results yet (harness planned)
