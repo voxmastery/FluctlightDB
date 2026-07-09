@@ -6,16 +6,31 @@ FluctlightDB is **beta** (`0.5.x`). This page sets expectations for teams shippi
 
 | Use case | Verdict |
 |----------|---------|
-| **Single agent, embedded brain on disk** (your process owns the `.brain` directory) | Reasonable to ship with pinning + backups |
+| **Single agent, embedded brain on disk** (your process owns the `.brain` directory) | **Use `connect_embedded()`** — see [EMBEDDED.md](EMBEDDED.md) |
 | **Single-tenant HTTP serve** on localhost or private network with `FLUCTLIGHT_API_KEYS` | OK with auth enabled; see [SECURITY.md](../SECURITY.md) |
 | **Multi-tenant shared HTTP serve** | **Experimental** — adversarial tests exist but no third-party security audit |
+
+## Embedded quick path
+
+```python
+from fluctlightdb import connect_embedded
+
+brain = connect_embedded("/data/agent/brain")
+brain.turn_begin()
+brain.wm_push("User prefers dark mode", context="settings", salience=0.8)
+brain.recall("dark mode")          # works before flush (WM lane, 0.5.9+)
+brain.turn_end(flush=True)         # durable commit — required for restart survival
+brain.checkpoint()
+```
+
+Full guide: [EMBEDDED.md](EMBEDDED.md).
 
 ## Version pinning
 
 Pin **exact** versions in production. Do not float `>=` in deploy manifests.
 
 ```bash
-pip install "fluctlightdb[native]==0.5.8" "fluctlightdb-native==0.5.8"
+pip install "fluctlightdb[native]==0.5.9" "fluctlightdb-native==0.5.9"
 ```
 
 Before any upgrade:
@@ -29,10 +44,11 @@ Before any upgrade:
 ## Deployment checklist
 
 - [ ] Pin `fluctlightdb` + `fluctlightdb-native` versions
+- [ ] Embedded agents: use **`connect_embedded(path)`** ([EMBEDDED.md](EMBEDDED.md))
 - [ ] Enable auth for non-localhost HTTP: `FLUCTLIGHT_API_KEYS=tenant:key:role,...`
 - [ ] Never commit `auth.env` or brain directories to git
 - [ ] Schedule `checkpoint()` / backups for brain directories
-- [ ] For `connect_agent()` + WM: **`turn_end(flush=True)` before `recall()`** on WM content
+- [ ] WM: **`turn_end(flush=True)`** for durable persistence; pre-flush `recall()` hits WM lexically (0.5.9+)
 - [ ] Offline lexical recall needs **token overlap** or pass `semantic_vector=` (see [EMBEDDINGS.md](EMBEDDINGS.md))
 - [ ] Monitor disk growth; run soak test locally if you expect high write volume ([SOAK_RESULTS.md](SOAK_RESULTS.md))
 

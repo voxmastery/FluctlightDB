@@ -11,20 +11,22 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install "fluctlightdb[native]>=0.5.8"   # Linux / macOS / Windows (x64 + arm64); abi3 wheel for Python 3.9–3.13
 ```
 
-**Stability:** [docs/STABILITY.md](docs/STABILITY.md) · **Production:** [docs/PRODUCTION.md](docs/PRODUCTION.md) · **Embeddings / offline:** [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md)
+**Stability:** [docs/STABILITY.md](docs/STABILITY.md) · **Production / embedded:** [docs/PRODUCTION.md](docs/PRODUCTION.md) · [docs/EMBEDDED.md](docs/EMBEDDED.md) · **Embeddings / offline:** [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md)
 
 ## API (30 seconds)
 
 ```python
-from fluctlightdb import connect_agent
+from fluctlightdb import connect_embedded
 
-brain = connect_agent("/tmp/my-agent-brain")
+brain = connect_embedded("/tmp/my-agent-brain")
 brain.turn_begin()
 brain.wm_push("User prefers dark mode", context="settings", salience=0.8)
-brain.turn_end(flush=True)
-print(brain.recall("dark mode"))   # offline lexical recall (no embedder required)
+print(brain.recall("dark mode"))   # WM lexical recall (same turn, no embedder)
+brain.turn_end(flush=True)         # durable commit for restart / graph recall
 brain.checkpoint()
 ```
+
+(`connect_agent()` is equivalent for experiments; prefer `connect_embedded()` in shipped agents.)
 
 | Operation | Method | When |
 |-----------|--------|------|
@@ -33,7 +35,7 @@ brain.checkpoint()
 | Trust ground truth | `verified=True`, provenance | Ledger/file beats chat |
 | Persist | `checkpoint()` | Survive restart |
 
-**Modes:** `connect_agent()` (live agents) · `connect_chorus()` (bulk IR/LoCoMo) · `connect_index()` (vector-fast baseline) · `connect_project()` (multi-tool monorepo).
+**Modes:** `connect_embedded()` (production single-agent) · `connect_agent()` · `connect_chorus()` (bulk IR/LoCoMo) · `connect_index()` (vector-fast baseline) · `connect_project()` (multi-tool monorepo).
 
 **Integrations:** [INTEGRATIONS.md](docs/INTEGRATIONS.md) · MCP: `pip install "fluctlightdb[mcp]"`
 
