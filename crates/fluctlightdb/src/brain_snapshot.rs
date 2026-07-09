@@ -56,13 +56,19 @@ pub fn export_snapshot_json(brain: &FluctlightBrain) -> Result<String> {
     serde_json::to_string_pretty(&snap).map_err(|e| crate::error::Error::Serde(e.to_string()))
 }
 
-pub fn import_snapshot_json(brain: &mut FluctlightBrain, json: &str) -> Result<SnapshotImportReport> {
+pub fn import_snapshot_json(
+    brain: &mut FluctlightBrain,
+    json: &str,
+) -> Result<SnapshotImportReport> {
     let snap: BrainSnapshot =
         serde_json::from_str(json).map_err(|e| crate::error::Error::Serde(e.to_string()))?;
     import_snapshot(brain, &snap)
 }
 
-pub fn import_snapshot(brain: &mut FluctlightBrain, snap: &BrainSnapshot) -> Result<SnapshotImportReport> {
+pub fn import_snapshot(
+    brain: &mut FluctlightBrain,
+    snap: &BrainSnapshot,
+) -> Result<SnapshotImportReport> {
     if snap.format != SNAPSHOT_FORMAT {
         return Err(crate::error::Error::Serde(format!(
             "unknown snapshot format: {}",

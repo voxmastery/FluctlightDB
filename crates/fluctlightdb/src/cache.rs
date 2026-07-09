@@ -45,7 +45,13 @@ impl ActivationCache {
         })
     }
 
-    pub fn put(&mut self, cue: &str, agent_id: Option<&str>, top_k: usize, result: ActivationResult) {
+    pub fn put(
+        &mut self,
+        cue: &str,
+        agent_id: Option<&str>,
+        top_k: usize,
+        result: ActivationResult,
+    ) {
         if !cache_enabled() {
             return;
         }

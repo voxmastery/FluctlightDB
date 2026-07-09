@@ -27,7 +27,12 @@ pub struct Claim {
 }
 
 impl Claim {
-    pub fn public(agent_id: impl Into<String>, value: impl Into<String>, confidence: f32, tick: u64) -> Self {
+    pub fn public(
+        agent_id: impl Into<String>,
+        value: impl Into<String>,
+        confidence: f32,
+        tick: u64,
+    ) -> Self {
         Self {
             agent_id: agent_id.into(),
             value: value.into(),
@@ -174,7 +179,10 @@ mod tests {
     #[test]
     fn access_scoping_hides_private_claims() {
         let mut m = SharedMemory::default();
-        m.assert("salary", Claim::public("hr", "100k", 0.9, 1).scoped(vec!["hr".into()]));
+        m.assert(
+            "salary",
+            Claim::public("hr", "100k", 0.9, 1).scoped(vec!["hr".into()]),
+        );
         // Public viewer can't see the scoped claim.
         assert!(m.readable_claims("salary", None).is_empty());
         assert!(m.resolve("salary", None).is_none());
@@ -186,7 +194,10 @@ mod tests {
     fn contested_detection_respects_scope() {
         let mut m = SharedMemory::default();
         m.assert("plan", Claim::public("a1", "Pro", 0.7, 1));
-        m.assert("plan", Claim::public("a2", "Free", 0.7, 2).scoped(vec!["admin".into()]));
+        m.assert(
+            "plan",
+            Claim::public("a2", "Free", 0.7, 2).scoped(vec!["admin".into()]),
+        );
         // Public sees only one value → not contested.
         assert!(!m.is_contested("plan", None));
         // Admin sees both → contested.

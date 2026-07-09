@@ -23,6 +23,10 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 - HTTP serve test shutdown/env races; soak script path argument.
 
 ### Added
+- CI: `tests.test_quickstart` guards README quickstart on native wheel build.
+- CI: expanded doc-snippet regression tests (paper card, SDK README, EMBEDDINGS, ONBOARDING).
+- `docs/PRODUCTION.md`, `scripts/soak_brain.sh`, `docs/SOAK_RESULTS.md`.
+- Adversarial auth/tenant tests; auth-reviewer GitHub issue template.
 
 ---
 

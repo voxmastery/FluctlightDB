@@ -247,7 +247,11 @@ mod tests {
         let a = PhaseVector::from_token("apple", DEFAULT_DIM);
         let b = PhaseVector::from_token("bicycle", DEFAULT_DIM);
         assert!((a.similarity(&a) - 1.0).abs() < 1e-4);
-        assert!(a.similarity(&b).abs() < 0.15, "unrelated sim {}", a.similarity(&b));
+        assert!(
+            a.similarity(&b).abs() < 0.15,
+            "unrelated sim {}",
+            a.similarity(&b)
+        );
     }
 
     #[test]
@@ -260,7 +264,11 @@ mod tests {
         assert!(bound.similarity(&b).abs() < 0.15);
         // Unbinding one operand exactly recovers the other.
         let recovered = bound.unbind(&a);
-        assert!(recovered.similarity(&b) > 0.99, "recovered sim {}", recovered.similarity(&b));
+        assert!(
+            recovered.similarity(&b) > 0.99,
+            "recovered sim {}",
+            recovered.similarity(&b)
+        );
     }
 
     #[test]
@@ -269,7 +277,11 @@ mod tests {
         let fwd = p.encode_sequence(&["user", "upgraded", "plan"]);
         let rev = p.encode_sequence(&["plan", "upgraded", "user"]);
         // Same words, different order → dissimilar structures and different signatures.
-        assert!(fwd.similarity(&rev) < 0.6, "orderings too similar: {}", fwd.similarity(&rev));
+        assert!(
+            fwd.similarity(&rev) < 0.6,
+            "orderings too similar: {}",
+            fwd.similarity(&rev)
+        );
         assert_ne!(fwd.structural_signature(), rev.structural_signature());
     }
 
@@ -301,8 +313,14 @@ mod tests {
         for t in ["user", "upgraded", "plan", "cancelled", "account", "agent"] {
             cb.intern(t, p.dim);
         }
-        assert_eq!(p.readout_role(&structure, "subject", &cb).unwrap().0, "user");
-        assert_eq!(p.readout_role(&structure, "verb", &cb).unwrap().0, "upgraded");
+        assert_eq!(
+            p.readout_role(&structure, "subject", &cb).unwrap().0,
+            "user"
+        );
+        assert_eq!(
+            p.readout_role(&structure, "verb", &cb).unwrap().0,
+            "upgraded"
+        );
         assert_eq!(p.readout_role(&structure, "object", &cb).unwrap().0, "plan");
     }
 
@@ -349,11 +367,16 @@ mod tests {
 
         let struct_fwd = lat.encode_structure(sig_fwd);
         let struct_rev = lat.encode_structure(sig_rev);
-        assert_ne!(struct_fwd, struct_rev, "role swap must move on Structure axis");
+        assert_ne!(
+            struct_fwd, struct_rev,
+            "role swap must move on Structure axis"
+        );
 
         // Same bag of words → same Semantic coordinate regardless of role order.
-        let sem_fwd = lat.encode_axes(&[(Axis::Semantic, "user plan")]).axes[&Axis::Semantic].clone();
-        let sem_rev = lat.encode_axes(&[(Axis::Semantic, "user plan")]).axes[&Axis::Semantic].clone();
+        let sem_fwd =
+            lat.encode_axes(&[(Axis::Semantic, "user plan")]).axes[&Axis::Semantic].clone();
+        let sem_rev =
+            lat.encode_axes(&[(Axis::Semantic, "user plan")]).axes[&Axis::Semantic].clone();
         assert_eq!(sem_fwd, sem_rev, "semantic axis must ignore role order");
     }
 }

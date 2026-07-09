@@ -35,7 +35,12 @@ impl FluctlightBrain {
         self.tau_recall_rrf_typed(cues, k, "")
     }
 
-    pub fn tau_recall_rrf_typed(&self, cues: &[&str], k: usize, question_type: &str) -> Vec<TauHit> {
+    pub fn tau_recall_rrf_typed(
+        &self,
+        cues: &[&str],
+        k: usize,
+        question_type: &str,
+    ) -> Vec<TauHit> {
         if !tau_enabled() {
             return Vec::new();
         }
@@ -46,7 +51,9 @@ impl FluctlightBrain {
     pub fn tau_crystallize_shard(&mut self, shard_id: &str) -> crate::error::Result<uuid::Uuid> {
         use crate::types::Episode;
         if !tau_enabled() {
-            return Err(crate::error::Error::Store("FLUCTLIGHT_TAU=1 required".into()));
+            return Err(crate::error::Error::Store(
+                "FLUCTLIGHT_TAU=1 required".into(),
+            ));
         }
         let Some(shard) = self.tau.get_shard(shard_id) else {
             return Err(crate::error::Error::Store(format!(

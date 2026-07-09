@@ -112,16 +112,16 @@ pub fn merge_hits(mut lanes: Vec<Vec<UnifiedRecallHit>>, k: usize) -> Vec<Unifie
                 .or_insert((hit, combined));
         }
     }
-    let mut out: Vec<(f32, UnifiedRecallHit)> = scores
-        .into_values()
-        .map(|(h, s)| (s, h))
-        .collect();
+    let mut out: Vec<(f32, UnifiedRecallHit)> = scores.into_values().map(|(h, s)| (s, h)).collect();
     out.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
     out.into_iter().take(k).map(|(_, h)| h).collect()
 }
 
 pub fn lanes_from_activation(act: &ActivationResult) -> Vec<UnifiedRecallHit> {
-    act.recalls.iter().map(UnifiedRecallHit::from_episodic).collect()
+    act.recalls
+        .iter()
+        .map(UnifiedRecallHit::from_episodic)
+        .collect()
 }
 
 /// Heuristic: pick recall mode from cue shape and brain fill levels.

@@ -215,7 +215,11 @@ impl Lattice {
         if period < 2 {
             return false;
         }
-        if self.scales.iter().any(|&p| gcd(p as u64, period as u64) != 1) {
+        if self
+            .scales
+            .iter()
+            .any(|&p| gcd(p as u64, period as u64) != 1)
+        {
             return false;
         }
         self.scales.push(period);
@@ -264,7 +268,10 @@ impl Lattice {
         let mut axes = HashMap::new();
         axes.insert(Axis::Semantic, self.encode_position(pos));
         for &(axis, feat) in other {
-            axes.insert(axis, self.encode_position(self.position_from_feature(axis, feat)));
+            axes.insert(
+                axis,
+                self.encode_position(self.position_from_feature(axis, feat)),
+            );
         }
         LatticeCode { axes }
     }
@@ -418,7 +425,10 @@ mod tests {
             coarse_near > coarse_far,
             "coarse near {coarse_near} should beat far {coarse_far}"
         );
-        assert!(coarse_near > 0.8, "near should be coarse-similar: {coarse_near}");
+        assert!(
+            coarse_near > 0.8,
+            "near should be coarse-similar: {coarse_near}"
+        );
 
         // The near point is NOT an exact match — fine scales still separate them.
         assert!(!sa.exact(&near_s));
@@ -455,12 +465,18 @@ mod tests {
         let mut store = LatticeStore::default();
         let n = 5000u64;
         for i in 0..n {
-            store.insert(format!("m{i}"), lat.encode_axes(&[(Axis::Semantic, &format!("fact-{i}"))]));
+            store.insert(
+                format!("m{i}"),
+                lat.encode_axes(&[(Axis::Semantic, &format!("fact-{i}"))]),
+            );
         }
         // Exact query for a specific stored code returns exactly that memory.
         let target = lat.encode_axes(&[(Axis::Semantic, "fact-4242")]);
         let hits = store.query_exact(&target);
-        assert!(hits.contains(&"m4242".to_string()), "exact recall failed: {hits:?}");
+        assert!(
+            hits.contains(&"m4242".to_string()),
+            "exact recall failed: {hits:?}"
+        );
     }
 
     #[test]
@@ -470,10 +486,7 @@ mod tests {
         let mut store = LatticeStore::default();
         // A cluster of semantically-near items around 0.3, plus a far item.
         for (i, u) in [0.3000, 0.3000003, 0.3000006, 0.80].iter().enumerate() {
-            store.insert(
-                format!("s{i}"),
-                lat.encode_with_semantic_position(*u, &[]),
-            );
+            store.insert(format!("s{i}"), lat.encode_with_semantic_position(*u, &[]));
         }
         let cue = lat.encode_with_semantic_position(0.30000015, &[]);
         let weights = [(Axis::Semantic, 1.0)];
@@ -481,7 +494,10 @@ mod tests {
         // Top coarse hits are the near cluster (s0..s2), not the far item s3.
         let top_ids: Vec<&str> = coarse.iter().map(|(id, _)| id.as_str()).collect();
         assert!(top_ids.contains(&"s0") || top_ids.contains(&"s1") || top_ids.contains(&"s2"));
-        assert!(!top_ids.contains(&"s3"), "far item leaked into coarse top-3: {top_ids:?}");
+        assert!(
+            !top_ids.contains(&"s3"),
+            "far item leaked into coarse top-3: {top_ids:?}"
+        );
     }
 
     #[test]
@@ -500,6 +516,9 @@ mod tests {
         let cue = lat.encode_with_semantic_position(0.4200002, &[(Axis::Context, "session-A")]);
         let weights = [(Axis::Semantic, 1.0), (Axis::Context, 2.0)];
         let ranked = store.query_coarse(&cue, &lat.scales, &weights, 2);
-        assert_eq!(ranked[0].0, "right", "context-weighted recall failed: {ranked:?}");
+        assert_eq!(
+            ranked[0].0, "right",
+            "context-weighted recall failed: {ranked:?}"
+        );
     }
 }

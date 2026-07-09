@@ -132,12 +132,7 @@ fn serve_cross_tenant_path_forbidden() {
     let (s_write, _) = post(port, "/api/v1/experience", exp, Some("key_a"));
     assert_eq!(s_write, 200);
 
-    let (s_forbidden, body) = post(
-        port,
-        "/api/v1/tenants/tenant_a/status",
-        "{}",
-        Some("key_b"),
-    );
+    let (s_forbidden, body) = post(port, "/api/v1/tenants/tenant_a/status", "{}", Some("key_b"));
     assert_eq!(s_forbidden, 403, "tenant_b must not read tenant_a: {body}");
 
     request_shutdown();
@@ -160,11 +155,7 @@ fn serve_read_role_cannot_write() {
     let prev_req = std::env::var("FLUCTLIGHT_REQUIRE_AUTH").ok();
     let dir = tempdir().unwrap();
     let port = 18794u16;
-    let handle = start_server(
-        dir.path().join("brain"),
-        "tenant_a:read_only:read",
-        port,
-    );
+    let handle = start_server(dir.path().join("brain"), "tenant_a:read_only:read", port);
 
     let (s_status, _) = post(port, "/api/v1/status", "{}", Some("read_only"));
     assert_eq!(s_status, 200);

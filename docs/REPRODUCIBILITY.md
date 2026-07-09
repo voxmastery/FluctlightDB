@@ -13,7 +13,7 @@ FluctlightDB publishes benchmark numbers in the paper, README, and frozen JSON u
 | **Head-to-head posts** | Mem0/Zep comparisons stay **blocked until** the first external LoCoMo match — then a protocol-identical post is credible, not more noise |
 | **Paper & press** | “Independently reproduced by X” is citable; self-reported 99% alone is not |
 
-We pay a **$50 gift card + public credit** per first external match (see bounty below) because that work is marketing + QA we cannot buy from vendors.
+We welcome independent reproductions and list **public credit** in this doc (no cash bounty — maintainer-funded rewards are not offered).
 
 ## Will you get the same %?
 
@@ -47,7 +47,7 @@ That is the same headline **99.0%** (1970/1982), not a rounded approximation.
 
 **LongMemEval / BEIR:** More moving parts (mpnet server, Chroma versions, rerank flags). Exact float match is harder; report your numbers via the reproduction issue template even if not bit-identical.
 
-**We have not yet had an external party confirm a match** — if you are first, use the template below and claim the bounty.
+**We have not yet had an external party confirm a match** — if you reproduce (or disprove) a frozen cert, use the issue template below.
 
 ---
 
@@ -65,38 +65,24 @@ FluctlightDB's differentiation is honesty + open harnesses:
 
 ---
 
-## Reproduction bounty
+## Independent reproduction (public credit)
 
-| Benchmark | First external reproduction | Reward |
-|-----------|----------------------------|--------|
-| LoCoMo CHORUS @150 | Not yet claimed | **$50 USD** gift card + permanent credit in this doc |
-| LongMemEval-S session@8 | Not yet claimed | Same |
-| BEIR SciFact nDCG@10 | Not yet claimed | Same |
-| FAMB macro | Not yet claimed | Same |
+| Benchmark | First external reproduction | Recognition |
+|-----------|----------------------------|-------------|
+| LoCoMo CHORUS @150 | Not yet | Permanent credit in this doc + README |
+| LongMemEval-S session@8 | Not yet | Same |
+| BEIR SciFact nDCG@10 | Not yet | Same |
+| FAMB macro | Not yet | Same |
 
 LongMemEval E2E is **excluded** (locked maintainer run; OpenAI cost).
 
-**How to claim:** open a [**Benchmark reproduction** issue](https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml), check the bounty box, include environment + output JSON. Maintainer verifies and updates the table below.
+**How to report:** open a [**Benchmark reproduction** issue](https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml), include environment + output JSON. Maintainer verifies and updates the table below.
 
 ### Confirmed external reproductions
 
 | Date | Who | Benchmark | Result | Match |
 |------|-----|-----------|--------|-------|
 | — | *none yet* | — | — | — |
-
-### Outreach log (maintainer)
-
-Honest tracking of bounty promotion — **silence is data**.
-
-| Date | Channel | Post / link | Attempts reported | Notes |
-|------|---------|-------------|-------------------|-------|
-| 2026-07-09 | *pending* | r/LocalLLaMA, HN Show HN, agent-memory Discords | **0** | Bounty live; use template below |
-
-**Copy-paste outreach (maintainer):**
-
-> LoCoMo 99.0% evidence recall — reproducible in one command. First external match gets **$50 + credit** in our repo. `git clone … && make reproduce-locomo` — details: https://github.com/voxmastery/FluctlightDB/blob/main/docs/REPRODUCIBILITY.md
-
-Update this table after each post and when anyone files a reproduction issue (success or fail).
 
 ---
 

@@ -289,8 +289,7 @@ mod tests {
                 })
                 .unwrap();
             brain.checkpoint().unwrap();
-            let result =
-                brain.activate_with_semantic("dark mode", Some(&[0.77, 0.23, 0.0]));
+            let result = brain.activate_with_semantic("dark mode", Some(&[0.77, 0.23, 0.0]));
             assert!(!result.recalls.is_empty());
             result.recalls[0].engram_id
         };

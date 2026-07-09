@@ -311,10 +311,7 @@ impl ChorusField {
     }
 
     fn pack_addr(theta: u8, gamma: u8, phi: u8, tau: u8) -> u32 {
-        ((theta as u32) << 17)
-            | ((gamma as u32) << 12)
-            | ((phi as u32) << 4)
-            | (tau as u32)
+        ((theta as u32) << 17) | ((gamma as u32) << 12) | ((phi as u32) << 4) | (tau as u32)
     }
 
     fn address_for(
@@ -381,7 +378,8 @@ impl ChorusField {
     fn maybe_split(&mut self, trace: &ChorusTrace) -> Option<ChorusTrace> {
         let addr = Self::pack_addr(trace.theta, trace.gamma, trace.phi, trace.tau);
         let norm = self.cells.get(&addr).copied().unwrap_or_default().norm_sq();
-        if norm < self.config.split_threshold || trace.split_generation >= self.config.max_splits_per_imprint
+        if norm < self.config.split_threshold
+            || trace.split_generation >= self.config.max_splits_per_imprint
         {
             return None;
         }
@@ -421,10 +419,12 @@ impl ChorusField {
             if !v.is_empty() {
                 self.encode_vector(v)
             } else {
-                self.hasher.encode(&Self::wavelet_taps(&input.content, &input.context, 64))
+                self.hasher
+                    .encode(&Self::wavelet_taps(&input.content, &input.context, 64))
             }
         } else {
-            self.hasher.encode(&Self::wavelet_taps(&input.content, &input.context, 64))
+            self.hasher
+                .encode(&Self::wavelet_taps(&input.content, &input.context, 64))
         };
 
         if let Some((_, nearest)) = self.photon.nearest(&code) {
@@ -518,10 +518,7 @@ impl ChorusField {
         }
         let dim = vector.len().min(self.config.grg_max_dim);
         let bits = self.config.photon_bits;
-        let mut cache = self
-            .plane_cache
-            .lock()
-            .unwrap_or_else(|e| e.into_inner());
+        let mut cache = self.plane_cache.lock().unwrap_or_else(|e| e.into_inner());
         let planes = cache.entry(dim).or_insert_with(|| {
             let seed = self.hasher.seed;
             (0..bits)
@@ -551,10 +548,7 @@ impl ChorusField {
                 words[b / 64] |= 1u64 << (b % 64);
             }
         }
-        PhotonCode {
-            words,
-            bits,
-        }
+        PhotonCode { words, bits }
     }
 
     /// C-7 GRG — γ Resonance Gate: binary Hamming coincidence opens analog cosine lane.
@@ -568,9 +562,9 @@ impl ChorusField {
         } else {
             let cap = k.saturating_mul(4);
             let probe_bits = self.config.grg_multi_probe_bits;
-            let mut cand_idx = self
-                .photon
-                .ivf_coarse_candidates(cue, cap, self.config.grg_ivf_neighbor_bits);
+            let mut cand_idx =
+                self.photon
+                    .ivf_coarse_candidates(cue, cap, self.config.grg_ivf_neighbor_bits);
             if cand_idx.len() < k {
                 cand_idx = self.photon.multi_probe_candidates(cue, cap, probe_bits);
             }
@@ -579,9 +573,9 @@ impl ChorusField {
                 let mut scored: Vec<(String, u32)> = cand_idx
                     .into_iter()
                     .filter_map(|i| {
-                        self.photon.entry_at(i).map(|(id, code)| {
-                            (id.to_string(), cue.hamming(code))
-                        })
+                        self.photon
+                            .entry_at(i)
+                            .map(|(id, code)| (id.to_string(), cue.hamming(code)))
                     })
                     .collect();
                 for (id, ham) in exact {
@@ -596,9 +590,9 @@ impl ChorusField {
                 let mut scored: Vec<(String, u32)> = cand_idx
                     .into_iter()
                     .filter_map(|i| {
-                        self.photon.entry_at(i).map(|(id, code)| {
-                            (id.to_string(), cue.hamming(code))
-                        })
+                        self.photon
+                            .entry_at(i)
+                            .map(|(id, code)| (id.to_string(), cue.hamming(code)))
                     })
                     .collect();
                 scored.sort_by_key(|(_, h)| *h);
@@ -613,8 +607,7 @@ impl ChorusField {
         let mut best: HashMap<String, u32> = HashMap::new();
         for (id, ham) in entries {
             let parent = parent_memory_id(&id).to_string();
-            best
-                .entry(parent)
+            best.entry(parent)
                 .and_modify(|h| *h = (*h).min(ham))
                 .or_insert(ham);
         }
@@ -652,9 +645,7 @@ impl ChorusField {
         if self.traces.is_empty() {
             return Vec::new();
         }
-        let cue_unit = cue_vector
-            .filter(|v| !v.is_empty())
-            .map(as_unit_vector);
+        let cue_unit = cue_vector.filter(|v| !v.is_empty()).map(as_unit_vector);
 
         // PRISM: RaBitQ popcount rank on all gated traces + SPECTRUM certify top-M only.
         if opts.fast
@@ -739,15 +730,13 @@ impl ChorusField {
             Some(v) => self.encode_vector(v),
             None => self.hasher.encode(&Self::wavelet_taps(cue, "", 64)),
         };
-        let query_spectrum = cue_unit
-            .as_deref()
-            .map(SpectrumSignature::from_vector);
+        let query_spectrum = cue_unit.as_deref().map(SpectrumSignature::from_vector);
 
         // GRG gate: photon addressing. SPECTRUM readout scores all gated traces — no shortlist
         // recall loss on IR corpora that fit the full-readout budget.
         let spectrum_readout = query_spectrum.is_some();
-        let full_spectrum = spectrum_readout
-            && self.traces.len() <= self.config.spectrum_full_readout_max;
+        let full_spectrum =
+            spectrum_readout && self.traces.len() <= self.config.spectrum_full_readout_max;
         let candidate_ids: Vec<String> = if full_spectrum {
             self.trace_order.clone()
         } else if spectrum_readout {
@@ -778,13 +767,18 @@ impl ChorusField {
         };
         let mut hits: Vec<ChorusHit> = candidate_ids
             .iter()
-            .filter_map(|id| self.traces.get(id).or_else(|| self.find_trace_by_parent(id)))
+            .filter_map(|id| {
+                self.traces
+                    .get(id)
+                    .or_else(|| self.find_trace_by_parent(id))
+            })
             .map(|trace| {
                 let spectrum_sim = match (query_spectrum.as_ref(), trace.spectrum.as_ref()) {
                     (Some(qs), Some(ts)) if !ts.is_empty() => Some(qs.dot_similarity(ts)),
                     _ => None,
                 };
-                let (vector_sim, has_vector) = match (cue_unit.as_deref(), trace.vector.as_deref()) {
+                let (vector_sim, has_vector) = match (cue_unit.as_deref(), trace.vector.as_deref())
+                {
                     (Some(qv), Some(tv)) if !tv.is_empty() => (dot_similarity(qv, tv), true),
                     _ => (0.0, false),
                 };
@@ -822,7 +816,10 @@ impl ChorusField {
                 let score = if let Some(sim) = spectrum_sim {
                     sim + 0.01 * field + 0.01 * lexical + verified_boost + replay_boost
                 } else if has_vector {
-                    vector_sim + 0.02 * photon + 0.01 * field + 0.01 * lexical
+                    vector_sim
+                        + 0.02 * photon
+                        + 0.01 * field
+                        + 0.01 * lexical
                         + verified_boost
                         + replay_boost
                 } else {
@@ -925,8 +922,7 @@ impl ChorusField {
                 pruned += 1;
             }
         }
-        self.trace_order
-            .retain(|id| self.traces.contains_key(id));
+        self.trace_order.retain(|id| self.traces.contains_key(id));
         self.photon.retain(|id| self.traces.contains_key(id));
         pruned
     }
@@ -974,10 +970,7 @@ impl ChorusField {
                 }
             }
         }
-        ranked.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     }
 }
 
@@ -1232,7 +1225,8 @@ mod tests {
             .collect();
         field.imprint_batch(&batch);
         let cue = vec_unit(42, 32);
-        let hits = field.recall_with_opts("topic 42", 100, Some(&cue), ChorusRecallOpts::ir_vector());
+        let hits =
+            field.recall_with_opts("topic 42", 100, Some(&cue), ChorusRecallOpts::ir_vector());
         assert!(!hits.is_empty());
         assert_eq!(hits[0].memory_id, "m42");
         assert_eq!(hits[0].lane, "grg-prism-exact");

@@ -58,8 +58,13 @@ impl Evidence {
     /// This source's standalone reliability, discounted by recency.
     fn reliability(&self) -> f32 {
         // Recency discounts, but never below a floor for verified ground truth.
-        let floor = if self.kind == SourceKind::Verified { 0.6 } else { 0.0 };
-        (self.kind.base_reliability() * (0.4 + 0.6 * self.recency)).max(floor * self.recency.max(0.5))
+        let floor = if self.kind == SourceKind::Verified {
+            0.6
+        } else {
+            0.0
+        };
+        (self.kind.base_reliability() * (0.4 + 0.6 * self.recency))
+            .max(floor * self.recency.max(0.5))
     }
 }
 
@@ -69,7 +74,10 @@ pub fn recall_confidence(evidence: &[Evidence]) -> f32 {
     if evidence.is_empty() {
         return 0.0;
     }
-    let prod_err: f32 = evidence.iter().map(|e| 1.0 - e.reliability().clamp(0.0, 0.999)).product();
+    let prod_err: f32 = evidence
+        .iter()
+        .map(|e| 1.0 - e.reliability().clamp(0.0, 0.999))
+        .product();
     (1.0 - prod_err).clamp(0.0, 1.0)
 }
 
@@ -99,7 +107,10 @@ mod tests {
             Evidence::new(SourceKind::UserStated, 1.0),
             Evidence::new(SourceKind::UserStated, 1.0),
         ]);
-        assert!(triple > single, "corroboration should raise confidence: {single} -> {triple}");
+        assert!(
+            triple > single,
+            "corroboration should raise confidence: {single} -> {triple}"
+        );
         assert!(triple <= 1.0);
     }
 
@@ -114,7 +125,10 @@ mod tests {
     fn verified_stays_trusted_even_when_stale() {
         let stale_verified = recall_confidence(&[Evidence::new(SourceKind::Verified, 0.2)]);
         let fresh_unknown = recall_confidence(&[Evidence::new(SourceKind::Unknown, 1.0)]);
-        assert!(stale_verified > fresh_unknown, "ground truth should resist decay");
+        assert!(
+            stale_verified > fresh_unknown,
+            "ground truth should resist decay"
+        );
     }
 
     #[test]

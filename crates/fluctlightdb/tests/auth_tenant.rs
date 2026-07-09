@@ -72,7 +72,10 @@ fn auth_store_garbage_token_never_authorizes() {
     let store = AuthStore::open(dir.path().join("auth.db")).unwrap();
     let _ = store.issue_key("tenant_a", Role::Admin).unwrap();
     for garbage in ["", "fld_not-real", "tenant_a:fake:admin", "\0"] {
-        assert!(store.lookup(garbage).is_none(), "unexpected hit for {garbage:?}");
+        assert!(
+            store.lookup(garbage).is_none(),
+            "unexpected hit for {garbage:?}"
+        );
     }
     assert!(store.lookup(&" ".repeat(64)).is_none());
 }

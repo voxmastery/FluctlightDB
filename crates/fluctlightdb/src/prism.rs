@@ -171,11 +171,7 @@ pub fn fht_unit_pad(v: &[f32]) -> Vec<f32> {
         buf[i] = v[i];
         norm += v[i] * v[i];
     }
-    let scale = if norm > 1e-8 {
-        1.0 / norm.sqrt()
-    } else {
-        1.0
-    };
+    let scale = if norm > 1e-8 { 1.0 / norm.sqrt() } else { 1.0 };
     for x in buf.iter_mut().take(n) {
         *x *= scale;
     }
@@ -406,10 +402,8 @@ mod tests {
             .collect();
         let query_v = unit(42, 384);
         let (qc, qq, qcert) = query_from_vector(&query_v);
-        let refs: Vec<(String, &PrismSignature)> = batch
-            .iter()
-            .map(|(id, sig)| (id.clone(), sig))
-            .collect();
+        let refs: Vec<(String, &PrismSignature)> =
+            batch.iter().map(|(id, sig)| (id.clone(), sig)).collect();
         let top = rank_and_certify(&refs, &qc, &qq, &qcert, 10, DEFAULT_CERTIFY_M);
         assert_eq!(top[0].0, "m42");
         assert!(top[0].1 > 0.99);
@@ -425,10 +419,8 @@ mod tests {
             .collect();
         let query_v = unit(77, 384);
         let (qc, qq, qcert) = query_from_vector(&query_v);
-        let refs: Vec<(String, &PrismSignature)> = batch
-            .iter()
-            .map(|(id, sig)| (id.clone(), sig))
-            .collect();
+        let refs: Vec<(String, &PrismSignature)> =
+            batch.iter().map(|(id, sig)| (id.clone(), sig)).collect();
         let top = rank_and_certify(&refs, &qc, &qq, &qcert, 64, DEFAULT_CERTIFY_M);
         assert_eq!(top[0].0, "m77");
     }

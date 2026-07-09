@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::brain::FluctlightBrain;
 use crate::error::Result;
-use crate::query::{forget_engram, forget_before};
+use crate::query::{forget_before, forget_engram};
 
 /// One governance action for compliance audit logs.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -242,7 +242,11 @@ impl FluctlightBrain {
                 removed += 1;
             }
         }
-        self.audit("delete_by_agent_id", format!("agent_id={agent_id}"), removed);
+        self.audit(
+            "delete_by_agent_id",
+            format!("agent_id={agent_id}"),
+            removed,
+        );
         Ok(removed)
     }
 

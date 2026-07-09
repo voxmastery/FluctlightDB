@@ -27,9 +27,9 @@ FluctlightDB is **early-stage open source**. This page states facts reviewers an
 - Foundation governance (CNCF, Apache, etc.)
 - Named informal reviewers for auth/storage PRs — **[Issue #1](https://github.com/voxmastery/FluctlightDB/issues/1)** · [docs/SEEKING_AUTH_REVIEWER.md](docs/SEEKING_AUTH_REVIEWER.md)
 
-## Reproduction bounty
+## Independent reproduction
 
-**$50 USD gift card** (or regional equivalent) + public credit for the **first verified external reproduction** of each major benchmark. Details and claim form: [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) · [issue template](https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml).
+**Public credit** in [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for the first verified external reproduction of each major benchmark (no cash bounty). Issue template: [reproduction.yml](https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml).
 
 ## Supply chain & crash recovery (CI)
 

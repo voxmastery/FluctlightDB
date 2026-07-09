@@ -21,13 +21,7 @@ impl FluctlightBrain {
     }
 
     /// Penetrative imprint of one session (no hippocampal encode, no embed HTTP).
-    pub fn muon_imprint(
-        &mut self,
-        session_id: &str,
-        date: &str,
-        body: &str,
-        user_keys: &str,
-    ) {
+    pub fn muon_imprint(&mut self, session_id: &str, date: &str, body: &str, user_keys: &str) {
         if !muon_enabled() {
             return;
         }

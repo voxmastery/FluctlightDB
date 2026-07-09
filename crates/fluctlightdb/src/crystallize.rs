@@ -47,8 +47,10 @@ impl Crystallizer {
         let mut code = self
             .lattice
             .encode_with_semantic_position(semantic_scalar, &[]);
-        code.axes
-            .insert(Axis::Structure, self.lattice.encode_structure(structure_signature));
+        code.axes.insert(
+            Axis::Structure,
+            self.lattice.encode_structure(structure_signature),
+        );
         code
     }
 
@@ -111,8 +113,14 @@ mod tests {
 
         let gist = c.recall_gist(0.400_001, 2);
         let ids: Vec<&str> = gist.iter().map(|(id, _)| id.as_str()).collect();
-        assert!(ids.contains(&"upgrade_a") && ids.contains(&"upgrade_b"), "gist: {ids:?}");
-        assert!(!ids.contains(&"weather"), "unrelated leaked into gist: {ids:?}");
+        assert!(
+            ids.contains(&"upgrade_a") && ids.contains(&"upgrade_b"),
+            "gist: {ids:?}"
+        );
+        assert!(
+            !ids.contains(&"weather"),
+            "unrelated leaked into gist: {ids:?}"
+        );
     }
 
     #[test]
@@ -122,7 +130,10 @@ mod tests {
         c.crystallize("plan_upgraded_user", 0.5, 0xBBBB);
         // Query with one structure signature → the matching relation ranks first.
         let hits = c.recall_exact_structure(0.5, 0xAAAA, 2);
-        assert_eq!(hits[0].0, "user_upgraded_plan", "structure disambiguation failed: {hits:?}");
+        assert_eq!(
+            hits[0].0, "user_upgraded_plan",
+            "structure disambiguation failed: {hits:?}"
+        );
     }
 
     #[test]

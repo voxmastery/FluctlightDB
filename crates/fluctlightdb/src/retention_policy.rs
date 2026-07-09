@@ -81,7 +81,11 @@ impl RetentionState {
         let Some(days) = self.policy.retain_days else {
             return false;
         };
-        let encoded = self.engram_ticks.get(&engram_id).copied().unwrap_or(now_tick);
+        let encoded = self
+            .engram_ticks
+            .get(&engram_id)
+            .copied()
+            .unwrap_or(now_tick);
         let age_ticks = now_tick.saturating_sub(encoded);
         age_ticks > days as u64 * self.policy.ticks_per_day
     }

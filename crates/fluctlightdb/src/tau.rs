@@ -120,15 +120,7 @@ impl TauLane {
         self.muon.imprint(session_id, date, body, user_keys);
         let sketch_dim = self.sketch_dim;
         let hasher = self.hasher.clone();
-        fission_session(
-            self,
-            session_id,
-            date,
-            body,
-            user_keys,
-            sketch_dim,
-            &hasher,
-        );
+        fission_session(self, session_id, date, body, user_keys, sketch_dim, &hasher);
     }
 
     pub fn imprint_batch(&mut self, sessions: &[MuonImprintInput]) -> (usize, usize) {
@@ -172,7 +164,10 @@ impl TauLane {
 
         let session_cap = if matches!(
             profile,
-            "single-session-preference" | "temporal-reasoning" | "multi-session" | "knowledge-update"
+            "single-session-preference"
+                | "temporal-reasoning"
+                | "multi-session"
+                | "knowledge-update"
         ) {
             self.muon.len().min(80)
         } else {
@@ -247,10 +242,7 @@ impl TauLane {
             partial.push((i, cheap, photon, lexical.max(woverlap)));
         }
 
-        partial.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        partial.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         partial.truncate(FULL_SCORE_CAP);
 
         let mut scored: Vec<TauHit> = partial
@@ -325,10 +317,13 @@ impl TauLane {
         let mut rrf_scores: HashMap<String, f32> = HashMap::new();
         let mut best_hit: HashMap<String, TauHit> = HashMap::new();
         for cue in cues {
-            for (rank, hit) in self.recall_typed(cue, pool_k, profile).into_iter().enumerate() {
+            for (rank, hit) in self
+                .recall_typed(cue, pool_k, profile)
+                .into_iter()
+                .enumerate()
+            {
                 let sid = hit.session_id.clone();
-                *rrf_scores.entry(sid.clone()).or_default() +=
-                    1.0 / (RRF_K + rank as f32 + 1.0);
+                *rrf_scores.entry(sid.clone()).or_default() += 1.0 / (RRF_K + rank as f32 + 1.0);
                 best_hit
                     .entry(sid)
                     .and_modify(|prev| {
@@ -340,10 +335,7 @@ impl TauLane {
             }
         }
         let mut ordered: Vec<(String, f32)> = rrf_scores.into_iter().collect();
-        ordered.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        ordered.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         ordered
             .into_iter()
             .take(k)
@@ -494,82 +486,194 @@ const DOMAIN_TAGS: &[(&str, &[&str])] = &[
     (
         "photography",
         &[
-            "camera", "flash", "lens", "sony", "canon", "tripod", "godox", "photography",
-            "nikon", "fuji", "mirrorless", "a7r",
+            "camera",
+            "flash",
+            "lens",
+            "sony",
+            "canon",
+            "tripod",
+            "godox",
+            "photography",
+            "nikon",
+            "fuji",
+            "mirrorless",
+            "a7r",
         ],
     ),
     (
         "cooking_garden",
         &[
-            "homegrown", "garden", "harvest", "tomato", "herb", "basil", "mint", "dinner",
-            "ingredients", "zucchini", "vegetable",
+            "homegrown",
+            "garden",
+            "harvest",
+            "tomato",
+            "herb",
+            "basil",
+            "mint",
+            "dinner",
+            "ingredients",
+            "zucchini",
+            "vegetable",
         ],
     ),
     (
         "mixology",
-        &["cocktail", "mixology", "pimm", "drink", "bar", "spirit", "gin", "rum"],
+        &[
+            "cocktail", "mixology", "pimm", "drink", "bar", "spirit", "gin", "rum",
+        ],
     ),
     (
         "baking",
-        &["cookie", "chocolate", "turbinado", "baking", "dessert", "oven", "flour"],
+        &[
+            "cookie",
+            "chocolate",
+            "turbinado",
+            "baking",
+            "dessert",
+            "oven",
+            "flour",
+        ],
     ),
     (
         "phone_battery",
         &[
-            "battery life", "power bank", "charging", "phone battery", "portable charger",
+            "battery life",
+            "power bank",
+            "charging",
+            "phone battery",
+            "portable charger",
         ],
     ),
     (
         "music",
         &[
-            "music store", "guitar", "instrument", "vinyl", "piano", "amp", "pedal",
+            "music store",
+            "guitar",
+            "instrument",
+            "vinyl",
+            "piano",
+            "amp",
+            "pedal",
         ],
     ),
-    ("travel", &[
-        "denver", "trip", "flight", "hotel", "vacation", "itinerary", "camping", "yosemite",
-        "sierra", "national park", "solo camping",
-    ]),
+    (
+        "travel",
+        &[
+            "denver",
+            "trip",
+            "flight",
+            "hotel",
+            "vacation",
+            "itinerary",
+            "camping",
+            "yosemite",
+            "sierra",
+            "national park",
+            "solo camping",
+        ],
+    ),
     (
         "reunion",
-        &["high school", "reunion", "nostalgic", "debate team", "classmate"],
+        &[
+            "high school",
+            "reunion",
+            "nostalgic",
+            "debate team",
+            "classmate",
+        ],
     ),
     (
         "commute",
-        &["commute", "podcast", "audiobook", "driving to work", "train ride"],
+        &[
+            "commute",
+            "podcast",
+            "audiobook",
+            "driving to work",
+            "train ride",
+        ],
     ),
     (
         "tokyo",
-        &["tokyo", "japan", "shibuya", "subway", "train pass", "getting around"],
+        &[
+            "tokyo",
+            "japan",
+            "shibuya",
+            "subway",
+            "train pass",
+            "getting around",
+        ],
     ),
     (
         "medical",
         &[
-            "doctor", "physician", "dermatologist", "dermatology", "ent ", "specialist",
-            "appointment", "clinic", "primary care", "dr. smith", "dr smith", "therapist",
-            "counselor", "psychologist",
+            "doctor",
+            "physician",
+            "dermatologist",
+            "dermatology",
+            "ent ",
+            "specialist",
+            "appointment",
+            "clinic",
+            "primary care",
+            "dr. smith",
+            "dr smith",
+            "therapist",
+            "counselor",
+            "psychologist",
         ],
     ),
     (
         "education",
-        &["college", "graduated", "degree", "university", "diploma", "campus"],
+        &[
+            "college",
+            "graduated",
+            "degree",
+            "university",
+            "diploma",
+            "campus",
+        ],
     ),
     (
         "kitchen",
         &[
-            "air fryer", "kitchen gadget", "appliance", "blender", "instant pot", "toaster",
-            "smoker", "grill", "bbq", "oven",
+            "air fryer",
+            "kitchen gadget",
+            "appliance",
+            "blender",
+            "instant pot",
+            "toaster",
+            "smoker",
+            "grill",
+            "bbq",
+            "oven",
         ],
     ),
     (
         "sports_events",
         &[
-            "marathon", "triathlon", "5k", "race", "tournament", "championship", "cycling",
-            "sprint", "midsummer", "personal best", "bike route",
+            "marathon",
+            "triathlon",
+            "5k",
+            "race",
+            "tournament",
+            "championship",
+            "cycling",
+            "sprint",
+            "midsummer",
+            "personal best",
+            "bike route",
         ],
     ),
     (
         "art_events",
-        &["art gallery", "exhibition", "museum", "sculpture", "art fair", "art show"],
+        &[
+            "art gallery",
+            "exhibition",
+            "museum",
+            "sculpture",
+            "art fair",
+            "art show",
+        ],
     ),
     (
         "aquarium",
@@ -580,18 +684,31 @@ const DOMAIN_TAGS: &[(&str, &[&str])] = &[
     (
         "furniture",
         &[
-            "furniture", "bedroom", "dresser", "mid-century", "rearrang", "nightstand",
+            "furniture",
+            "bedroom",
+            "dresser",
+            "mid-century",
+            "rearrang",
+            "nightstand",
             "bookshelf",
         ],
     ),
     (
         "tablet",
-        &["ipad", "tablet", "case", "arrived", "delivery", "shipping", "ordered"],
+        &[
+            "ipad", "tablet", "case", "arrived", "delivery", "shipping", "ordered",
+        ],
     ),
     (
         "business",
         &[
-            "milestone", "business", "client", "contract", "freelance", "launched", "website",
+            "milestone",
+            "business",
+            "client",
+            "contract",
+            "freelance",
+            "launched",
+            "website",
             "signed",
         ],
     ),
@@ -656,7 +773,8 @@ fn type_boost(profile: &str, cue: &str, shard: &TauShard) -> f32 {
                 b += 0.10;
             }
             if cl.contains("furniture") || cl.contains("bedroom") || cl.contains("rearrang") {
-                if shard.chunk_id.starts_with("domain-furniture") || ct.contains("dresser")
+                if shard.chunk_id.starts_with("domain-furniture")
+                    || ct.contains("dresser")
                     || ct.contains("bedroom")
                 {
                     b += 0.16;
@@ -667,7 +785,9 @@ fn type_boost(profile: &str, cue: &str, shard: &TauShard) -> f32 {
             if shard.is_fact || shard.role == "user" {
                 b += 0.04;
             }
-            if cl.contains("order") && (ct.contains("triathlon") || ct.contains("5k") || ct.contains("race")) {
+            if cl.contains("order")
+                && (ct.contains("triathlon") || ct.contains("5k") || ct.contains("race"))
+            {
                 b += 0.14;
             }
             if cl.contains("sports") && shard.chunk_id.starts_with("domain-sports") {
@@ -691,7 +811,9 @@ fn type_boost(profile: &str, cue: &str, shard: &TauShard) -> f32 {
                 }
             }
             if cl.contains("dr ") || cl.contains("doctor") {
-                if ct.contains("dr.") || ct.contains("doctor") || ct.contains("therapist")
+                if ct.contains("dr.")
+                    || ct.contains("doctor")
+                    || ct.contains("therapist")
                     || ct.contains("session")
                 {
                     b += 0.16;
@@ -793,7 +915,10 @@ fn temporal_cue_boost(cue: &str, shard: &TauShard) -> f32 {
     let ct = &shard.content_lower;
     let mut b = 0.0f32;
     if cl.contains("order")
-        && (ct.contains("triathlon") || ct.contains("5k") || ct.contains("marathon") || ct.contains("race"))
+        && (ct.contains("triathlon")
+            || ct.contains("5k")
+            || ct.contains("marathon")
+            || ct.contains("race"))
     {
         b += 0.14;
     }
@@ -801,7 +926,9 @@ fn temporal_cue_boost(cue: &str, shard: &TauShard) -> f32 {
         b += 0.12;
     }
     if (cl.contains("milestone") || cl.contains("four weeks"))
-        && (shard.chunk_id.starts_with("domain-business") || ct.contains("client") || ct.contains("contract"))
+        && (shard.chunk_id.starts_with("domain-business")
+            || ct.contains("client")
+            || ct.contains("contract"))
     {
         b += 0.16;
     }
@@ -968,7 +1095,11 @@ fn parse_ymd(s: &str) -> Option<(i32, u32, u32)> {
     if parts.len() < 3 {
         return None;
     }
-    Some((parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?))
+    Some((
+        parts[0].parse().ok()?,
+        parts[1].parse().ok()?,
+        parts[2].parse().ok()?,
+    ))
 }
 
 fn subtract_days(y: i32, m: u32, d: u32, days: u32) -> String {
@@ -1033,8 +1164,7 @@ fn push_shard(
     let shard_id = format!("{session_id}#{chunk_id}");
     let idx = lane.shards.len();
     lane.shard_by_id.insert(shard_id.clone(), idx);
-    lane.shard_prefilter
-        .insert(shard_id.clone(), code.clone());
+    lane.shard_prefilter.insert(shard_id.clone(), code.clone());
     lane.shards.push(TauShard {
         shard_id,
         session_id: session_id.to_string(),
@@ -1065,10 +1195,33 @@ fn extract_atomic_facts(content: &str, date: &str) -> Vec<String> {
         format!("[{date}] ")
     };
     let cues = [
-        "bought", "purchased", "graduated", "commute", "volunteer", "coupon", "mbps", "yoga",
-        "degree", "redeemed", "upgraded", "playlist", "spotify", "created", "redeemed", "wallet",
-        "tennis", "repainted", "name", "favorite", "created", "attended", "occupation", "spent",
-        "recommend", "called", "listening",
+        "bought",
+        "purchased",
+        "graduated",
+        "commute",
+        "volunteer",
+        "coupon",
+        "mbps",
+        "yoga",
+        "degree",
+        "redeemed",
+        "upgraded",
+        "playlist",
+        "spotify",
+        "created",
+        "redeemed",
+        "wallet",
+        "tennis",
+        "repainted",
+        "name",
+        "favorite",
+        "created",
+        "attended",
+        "occupation",
+        "spent",
+        "recommend",
+        "called",
+        "listening",
     ];
     let first_person = [" i ", " i'm ", " i've ", " my ", " we ", " our "];
     let mut out = Vec::new();
