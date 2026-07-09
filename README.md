@@ -61,6 +61,8 @@ make reproduce-locomo          # downloads data, runs CHORUS eval, checks frozen
 
 Full protocol: [docs/BENCHMARKS.md](docs/BENCHMARKS.md) · [benchmarks/README.md](benchmarks/README.md)
 
+> **Verification:** Harnesses are open; headline numbers are **maintainer self-reported** until an independent group publishes a reproduction. See [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) · [MAINTAINER.md](MAINTAINER.md).
+
 ---
 
 ## Why this exists
@@ -167,10 +169,13 @@ docker run -p 8792:8792 \
 | [STABILITY.md](docs/STABILITY.md) | Stable vs experimental APIs |
 | [EMBEDDINGS.md](docs/EMBEDDINGS.md) | Offline vs benchmark embed deps |
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Paper protocol + citations |
+| [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) | Verification status + reproduce scripts |
 | [INTEGRATIONS.md](docs/INTEGRATIONS.md) | LangChain, LlamaIndex, OpenAI Agents |
 | [MULTI_AGENT.md](docs/MULTI_AGENT.md) | Hub + spoke, MCP, handoffs |
 | [Manifesto.md](docs/Manifesto.md) | Brain-native design (vision) |
 | [PUBLISHING.md](docs/PUBLISHING.md) | PyPI release (maintainers) |
+| [MAINTAINER.md](MAINTAINER.md) | Bus factor, co-maintainer path |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Rust/Python contributors |
 
 ---
@@ -179,7 +184,7 @@ docker run -p 8792:8792 \
 
 **Using Fluctlight in an agent?** `pip install fluctlightdb` — no Rust required.
 
-**Changing the engine?** [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md)
+**Changing the engine?** [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [MAINTAINER.md](MAINTAINER.md)
 
 ## License
 

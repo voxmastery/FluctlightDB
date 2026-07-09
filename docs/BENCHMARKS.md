@@ -2,6 +2,8 @@
 
 This document lists **trusted, citable benchmarks** for evaluating agent memory systems, what we run in-repo, and how to cite them in a research paper.
 
+> **Verification status:** All frozen headline numbers are **maintainer-reported**. Open harnesses exist (`make reproduce-locomo`, Colab notebooks, bench scripts) but **no independent third-party reproduction has been published yet**. See [REPRODUCIBILITY.md](REPRODUCIBILITY.md) and [MAINTAINER.md](../MAINTAINER.md).
+
 ## Memory layer vs database
 
 | | **Database** (Postgres, Chroma, Pinecone) | **Memory layer** (FluctlightDB) |

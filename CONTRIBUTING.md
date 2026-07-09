@@ -35,6 +35,8 @@ git config user.email "roppashreeganesh@gmail.com"
 
 Do not commit with host-specific emails (e.g. server `@hstgr.cloud` addresses) — GitHub counts those as separate contributors.
 
+**Project health:** Solo maintainer today — see [MAINTAINER.md](MAINTAINER.md) for bus-factor status and how to become a co-maintainer.
+
 ---
 
 ## Rust setup (core / CLI contributors)
