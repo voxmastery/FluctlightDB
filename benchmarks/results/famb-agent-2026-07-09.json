@@ -3,6 +3,14 @@
   "mode": "agent",
   "lane": "agent_unified",
   "noise_distractors": 200,
+  "suite_sizes": {
+    "paraphrase_recall_at_1": 10,
+    "provenance_top1": 1,
+    "persistence_recall": 1,
+    "confusion_ingest": 1,
+    "determinism": 1
+  },
+  "note": "Internal regression suite (not peer benchmark); macro = mean of sub-scores.",
   "scores": {
     "paraphrase_recall_at_1": 1.0,
     "provenance_top1": 1.0,
@@ -11,5 +19,5 @@
     "determinism": 1.0
   },
   "macro": 1.0,
-  "wall_s": 4.81
+  "wall_s": 4.94
 }

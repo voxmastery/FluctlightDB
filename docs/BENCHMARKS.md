@@ -119,6 +119,7 @@ Historical index-mode run (June 2026): 98.1% — superseded by CHORUS cert; see 
 | **Paper** | Tavakoli et al., *Beyond a Million Tokens: Benchmarking and Enhancing Long-Term Memory in LLMs*, ICLR 2026 |
 | **Upstream** | https://github.com/mohammadtavakoli78/BEAM |
 | **In-repo** | `benchmarks/beam_eval.py` |
+| **Smoke (2026-07-09)** | Chat `100K/1`, 18 questions, **33.3%** context recall@32 (`beam-smoke-2026-07-09.json`) |
 
 **Smoke (one 100K chat, no LLM keys):**
 
@@ -211,17 +212,36 @@ Leaderboard context: gbrain 97.6% R@5 (hybrid + text-embedding-3-large); YourMem
 ```bash
 pip install chromadb fluctlightdb[native]
 PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode agent
-PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode index --json-out /tmp/famb.json
+PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode chorus --json-out /tmp/famb-chorus.json
 ```
 
-**Macro score** = mean of suite scores (0–1). Report both `agent` and `index` modes separately.
+**Macro score** = mean of suite scores (0–1). Report both `agent` and `chorus` modes separately.
 
-**Latest runs (2025-06, noise=2000):**
+FAMB is an **internal regression suite** (not LoCoMo-scale external validation): paraphrase $n=10$; provenance, persistence, confusion, and determinism are each one pass/fail scenario ($n=1$). CHORUS provenance/persistence suites call `chorus_sleep()` then `activate()` so durable hippocampal engrams participate (in-memory CHORUS traces alone are not checkpointed).
+
+**Latest runs (2026-07-09, noise=200, measured suites):**
 
 | Mode | paraphrase@1 | provenance | persistence | confusion | determinism | **MACRO** |
 |---|---:|---:|---:|---:|---:|---:|
-| agent | 83% | 100% | 100% | 100% | 100% | **97%** |
-| index | 92% | 100% | 100% | 100% | 100% | **98%** |
+| agent | 100% | 100% | 100% | 100% | 100% | **100%** |
+| chorus | 100% | 100% | 100% | 100% | 100% | **100%** |
+
+---
+
+## Development protocol (freeze dates)
+
+Headline numbers in `benchmarks/results/paper-2026-07-09.json` were frozen as follows:
+
+| Benchmark | Config frozen | Final cert JSON | Notes |
+|---|---|---|---|
+| LoCoMo CHORUS | 2026-07-08 | `locomo-chorus-2026-07-08.json` | No dev-slice tuning on test convs |
+| BEIR SciFact PRISM | 2026-07-08 | `beir-prism-prod-2026-07-08.json` | Shared MiniLM; Chroma baseline in same harness |
+| FAMB agent/chorus | 2026-07-09 | `famb-*-2026-07-09.json` | Replaced hardcoded CHORUS sub-scores with measured suites |
+| LongMemEval-S v4 | 2026-07-04 | `longmemeval-colab-v2-full-2026-07-04.json` | Unified 500; pref-facts ablation on preference slice only during dev |
+| LongMemEval E2E | 2026-07-07 | `e2e-cert-paper-v2-2026-07-07.json` | Reader/judge profile frozen before cert |
+| BEAM smoke | 2026-07-09 | `beam-smoke-2026-07-09.json` | Single 100K chat; context recall@32 |
+
+Dev iterations (07-07–07-09) were harness fixes and regression reruns on the suites above—not post-hoc edits to frozen JSON fields.
 
 ---
 
@@ -261,5 +281,6 @@ pip install chromadb pytrec-eval-terrier fluctlightdb[native]
 
 | Date | Change |
 |---|---|
+| 2026-07-09 | FAMB: measured CHORUS provenance/persistence suites; BEAM smoke context recall 33.3% (6/18); freeze protocol table |
 | 2026-07 | LongMemEval-S: **97.6%** session@8 unified v4 (488/500); preference **96.7%** (29/30); frozen in `paper-2026-07-04.json` |
 | 2025-06 | Initial BENCHMARKS.md: BEIR harness in-repo, FAMB, Tier-1 citation table, connect vs connect_index |

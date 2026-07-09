@@ -74,13 +74,18 @@ def iter_turns(batches: list[dict]) -> list[dict[str, str]]:
                 content = (turn.get("content") or "").strip()
                 if not content:
                     continue
-                idx = str(turn.get("index") or turn.get("id") or len(rows))
+                idx = turn.get("id")
+                if idx is None:
+                    idx = turn.get("index")
+                if idx is None:
+                    idx = len(rows)
+                memory_id = str(idx)
                 role = turn.get("role") or "user"
                 rows.append(
                     {
-                        "memory_id": idx,
-                        "body": f"[{idx}] {role}: {content[:1200]}",
-                        "context": f"beam:{idx}",
+                        "memory_id": memory_id,
+                        "body": f"[{memory_id}] {role}: {content[:1200]}",
+                        "context": f"beam:{memory_id}",
                     }
                 )
     return rows

@@ -3,7 +3,7 @@
   "harness": "FluctlightDB benchmark suite (paper v2)",
   "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
   "doi": "10.5281/zenodo.20949890",
-  "arxiv": "cs.DB (pending)",
+  "arxiv": "preprint (cs.DB; arXiv submission pending)",
   "reproduce": "benchmarks/README.md, docs/BENCHMARKS.md, benchmarks/longmemeval_colab_v2.ipynb",
   "beir_scifact": {
     "embedder": "all-MiniLM-L6-v2 ONNX CPU",
@@ -48,6 +48,14 @@
     "chorus_macro": 1.0,
     "agent_lane": "agent_unified",
     "chorus_lane": "chorus_grg",
+    "suite_sizes": {
+      "paraphrase_recall_at_1": 10,
+      "provenance_top1": 1,
+      "persistence_recall": 1,
+      "confusion_ingest": 1,
+      "determinism": 1
+    },
+    "note": "Internal regression suite (not peer benchmark); macro = mean of sub-scores.",
     "agent_scores": {
       "paraphrase_recall_at_1": 1.0,
       "provenance_top1": 1.0,
@@ -62,8 +70,19 @@
       "confusion_ingest": 1.0,
       "determinism": 1.0
     },
-    "frozen_source_agent": "famb-agent-2026-07-08.json",
-    "frozen_source_chorus": "famb-chorus-2026-07-08.json"
+    "frozen_source_agent": "famb-agent-2026-07-09.json",
+    "frozen_source_chorus": "famb-chorus-2026-07-09.json"
+  },
+  "beam_smoke": {
+    "benchmark": "beam",
+    "metric": "context_recall@32",
+    "chat_size": "100K",
+    "chat_id": "1",
+    "questions_scored": 18,
+    "context_hits": 6,
+    "context_recall": 0.3333,
+    "note": "Retrieval-layer smoke only; not BEAM LLM rubric score",
+    "frozen_source": "beam-smoke-2026-07-09.json"
   },
   "longmemeval_s": {
     "dataset": "longmemeval_s_cleaned.json (Wu et al., ICLR 2025)",
