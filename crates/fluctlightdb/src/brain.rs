@@ -226,8 +226,12 @@ impl FluctlightBrain {
         let salience =
             (episode.salience_hint + self.amygdala.weight_for(Uuid::nil())).clamp(0.0, 1.0);
 
-        // Index-mode IR benchmarks: O(1) ingest per doc (sidecar upsert + semantic field).
-        if crate::activation::fast_ingest_mode() && crate::activation::vector_fast_mode() {
+        // Index-mode IR benchmarks: O(1) ingest per doc when caller supplies a dense vector.
+        // Without semantic_vector, fall through to dentate/graph wiring so lexical recall works.
+        if crate::activation::fast_ingest_mode()
+            && crate::activation::vector_fast_mode()
+            && episode.semantic_vector.is_some()
+        {
             let tick = self.development.metrics.ticks;
             let engram_id = Uuid::new_v4();
             let rich = crate::tokenize::tokenize_rich(

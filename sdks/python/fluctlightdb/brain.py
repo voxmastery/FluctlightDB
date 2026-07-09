@@ -96,7 +96,7 @@ class FluctlightBrain:
         os.environ["FLUCTLIGHT_CHORUS_FAST"] = "1"
         os.environ.setdefault("FLUCTLIGHT_CHORUS_FLOAT_RERANK", "1")
         os.environ["FLUCTLIGHT_FAST_INGEST"] = "1"
-        os.environ["FLUCTLIGHT_VECTOR_FAST"] = "1"
+        os.environ.pop("FLUCTLIGHT_VECTOR_FAST", None)
         os.environ["FLUCTLIGHT_AGENT_FAST"] = "1"
         os.environ.setdefault("FLUCTLIGHT_CANDIDATE_CAP", "512")
 

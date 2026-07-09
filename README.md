@@ -21,8 +21,8 @@ from fluctlightdb import connect_agent
 brain = connect_agent("/tmp/my-agent-brain")
 brain.turn_begin()
 brain.wm_push("User prefers dark mode", context="settings", salience=0.8)
-print(brain.recall("theme preference"))
 brain.turn_end(flush=True)
+print(brain.recall("dark mode"))   # offline lexical recall (no embedder required)
 brain.checkpoint()
 ```
 

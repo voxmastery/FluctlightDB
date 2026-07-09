@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluctlightdb"
-version = "0.5.7"
+version = "0.5.8"
 description = "Embedded memory engine for AI agents — third data model (experience/activate), provenance, benchmarks. Goal: SQLite for agent memory."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -45,7 +45,7 @@ Paper = "https://github.com/voxmastery/FluctlightDB/tree/main/papers/arxiv-v1"
 Benchmarks = "https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/paper-2026-07-09.json"
 
 [project.optional-dependencies]
-native = ["fluctlightdb-native>=0.5.7"]
+native = ["fluctlightdb-native>=0.5.8"]
 mcp = ["mcp>=1.0"]
 langchain = ["langchain-core>=0.2.0", "fluctlightdb[native]"]
 llamaindex = ["llama-index-core>=0.10.0", "fluctlightdb[native]"]

@@ -133,7 +133,9 @@ jobs:
 
       - name: Run native integration tests
         working-directory: sdks/python
-        run: python -m unittest tests.test_project.TestProjectInit.test_connect_and_handoff -v
+        run: |
+          python -m unittest tests.test_project.TestProjectInit.test_connect_and_handoff -v
+          python -m unittest tests.test_quickstart -v
 
   pypi-wheel-smoke:
     name: pypi-wheel-smoke (${{ matrix.os }}, py${{ matrix.python }})
