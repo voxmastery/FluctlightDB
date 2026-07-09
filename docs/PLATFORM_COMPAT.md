@@ -7,7 +7,7 @@ FluctlightDB project brains (`fluctlight-project init`, `connect_project()`) are
 | Feature | Linux | macOS | Windows |
 |---------|-------|-------|---------|
 | `fluctlight-project init` | Yes | Yes | Yes |
-| Embedded native brain (`fluctlightdb-native`) | Yes — abi3 manylinux x86_64 | Yes — abi3 universal2 (Intel + Apple Silicon) | Yes — abi3 win_amd64 |
+| Embedded native brain (`fluctlightdb-native`) | Yes — abi3 manylinux x86_64 + aarch64 | Yes — abi3 universal2 (Intel + Apple Silicon) | Yes — abi3 win_amd64 + win_arm64 |
 | Cross-process locks | `filelock` + Rust `fs2` | Same | Same |
 | Cursor MCP + hooks | Yes | Yes | Yes (`.cmd` wrappers + `py -3`) |
 | Claude MCP (settings.json) | Yes | Yes | Yes |
@@ -39,14 +39,16 @@ Both use the same cross-platform locking stack (`filelock` in Python, `fs2` in R
 | Platform | Wheel tag | Python |
 |----------|-----------|--------|
 | Linux x86_64 | `manylinux_2_17_x86_64` | 3.9–3.13 (abi3) |
+| Linux arm64 (aarch64) | `manylinux_2_17_aarch64` | 3.9–3.13 (abi3) |
 | macOS | `macosx_*_universal2` | 3.9–3.13 (abi3) |
 | Windows x64 | `win_amd64` | 3.9–3.13 (abi3) |
+| Windows arm64 | `win_arm64` | 3.9–3.13 (abi3) |
 
 ```bash
-pip install "fluctlightdb[native]>=0.5.5"
+pip install "fluctlightdb[native]>=0.5.6"
 ```
 
-**Linux arm64** and **Windows arm64**: no prebuilt wheel yet — use **sdist** (`pip install fluctlightdb-native --no-binary :all:`) with Rust installed, or HTTP-only `pip install fluctlightdb` (no native extension).
+**Unsupported arches** (e.g. 32-bit): use **sdist** (`pip install fluctlightdb-native --no-binary :all:`) with Rust installed, or HTTP-only `pip install fluctlightdb` (no native extension).
 
 ## macOS notes
 

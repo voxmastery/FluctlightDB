@@ -29,13 +29,15 @@ Alternative: store `PYPI_API_TOKEN` as a repository secret and remove `id-token:
 
    Native wheels use **stable ABI (abi3, cp39 tag)** — one wheel per OS family for Python **3.9–3.13**:
 
-| OS | CI publish job | Wheel |
-|----|----------------|-------|
-| Linux x86_64 | `publish-native-linux` | manylinux abi3 |
-| macOS (Intel + Apple Silicon) | `publish-native-macos` | universal2 abi3 |
-| Windows x64 | `publish-native-windows` | win_amd64 abi3 |
+| OS | CI build job | Wheel |
+|----|--------------|-------|
+| Linux x86_64 | `build-native (linux-x86_64)` | manylinux abi3 + sdist |
+| Linux arm64 | `build-native (linux-aarch64)` | manylinux aarch64 abi3 |
+| macOS (Intel + Apple Silicon) | `build-native (macos-universal2)` | universal2 abi3 |
+| Windows x64 | `build-native (windows-x64)` | win_amd64 abi3 |
+| Windows arm64 | `build-native (windows-arm64)` | win_arm64 abi3 |
 
-Plus **sdist** (from Linux job) for source builds on unsupported arches.
+All wheels upload in a single `publish-native` job. **sdist** (from linux-x86_64) covers unsupported arches.
 
 2. Verify locally:
 
