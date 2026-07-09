@@ -20,6 +20,12 @@ pub fn request_shutdown() {
     SHUTDOWN_REQUESTED.store(true, AtomicOrdering::SeqCst);
 }
 
+/// Reset serve shutdown flag between integration tests.
+#[doc(hidden)]
+pub fn reset_shutdown_for_tests() {
+    SHUTDOWN_REQUESTED.store(false, AtomicOrdering::SeqCst);
+}
+
 use serde::Deserialize;
 use serde_json::Value;
 use uuid::Uuid;

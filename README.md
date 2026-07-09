@@ -11,7 +11,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install "fluctlightdb[native]>=0.5.8"   # Linux / macOS / Windows (x64 + arm64); abi3 wheel for Python 3.9–3.13
 ```
 
-**Stability:** [docs/STABILITY.md](docs/STABILITY.md) · **Embeddings / offline:** [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md)
+**Stability:** [docs/STABILITY.md](docs/STABILITY.md) · **Production:** [docs/PRODUCTION.md](docs/PRODUCTION.md) · **Embeddings / offline:** [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md)
 
 ## API (30 seconds)
 
@@ -167,6 +167,7 @@ docker run -p 8792:8792 \
 |-----|-----|
 | [GETTING_STARTED.md](docs/GETTING_STARTED.md) | Paths, storage, FAQ |
 | [STABILITY.md](docs/STABILITY.md) | Stable vs experimental APIs |
+| [PRODUCTION.md](docs/PRODUCTION.md) | Pinning, deploy checklist, soak expectations |
 | [EMBEDDINGS.md](docs/EMBEDDINGS.md) | Offline vs benchmark embed deps |
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Paper protocol + citations |
 | [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) | Verification status + reproduce scripts |

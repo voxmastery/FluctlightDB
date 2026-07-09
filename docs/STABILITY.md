@@ -25,7 +25,7 @@ These are the APIs agent developers should pin to. Breaking changes require a **
 | **Neuroscience-named modules** | `amygdala`, `dentate`, `hippocampus`, `prefrontal`, `muon`, `tau`, `chorus`, `prism`, `spectrum` | Rust `crates/fluctlightdb/src/*.rs` — not re-exported as stable Python API |
 | **Recall Fabric** | `FLUCTLIGHT_FABRIC=1`, lattice, phase_parse, chronos | Opt-in env flag; off by default |
 | **Governance / snapshot** | `brain_snapshot`, `governance`, `retention_policy`, `wm_ring` | New in 0.5.x; API may evolve |
-| **Auth / multi-tenant** | `auth.rs`, `tenant.rs`, `auth_store.rs` | Exists; not audited for production multi-tenant yet |
+| **Auth / multi-tenant** | `auth.rs`, `tenant.rs`, `auth_store.rs` | **Adversarial tests in CI** (`tests/auth_tenant.rs`, `tests/serve_integration.rs`); **not** third-party audited for production multi-tenant |
 | **Benchmark harnesses** | `benchmarks/*.py`, frozen JSON filenames | Metrics are frozen claims; harness flags change |
 
 ## Version alignment

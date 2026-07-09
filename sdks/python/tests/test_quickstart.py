@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import tempfile
 import unittest
 from typing import Any
+
+_HAS_NATIVE = importlib.util.find_spec("fluctlightdb_native") is not None
 
 
 def _hits(result: Any) -> list[Any]:
@@ -15,12 +18,10 @@ def _hits(result: Any) -> list[Any]:
     return list(result.get("hits") or result.get("recalls") or [])
 
 
+@unittest.skipUnless(_HAS_NATIVE, "fluctlightdb[native] not installed")
 class TestReadmeQuickstart(unittest.TestCase):
     def test_readme_30_second_quickstart(self) -> None:
-        try:
-            from fluctlightdb import connect_agent
-        except ImportError:
-            self.skipTest("fluctlightdb[native] not installed")
+        from fluctlightdb import connect_agent
 
         tmp = tempfile.mkdtemp(prefix="flct-readme-")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
@@ -44,10 +45,7 @@ class TestReadmeQuickstart(unittest.TestCase):
         self.assertIn("dark", joined)
 
     def test_hub_paper_connect_snippet(self) -> None:
-        try:
-            from fluctlightdb import connect
-        except ImportError:
-            self.skipTest("fluctlightdb[native] not installed")
+        from fluctlightdb import connect
 
         tmp = tempfile.mkdtemp(prefix="flct-paper-")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
@@ -57,10 +55,7 @@ class TestReadmeQuickstart(unittest.TestCase):
         self.assertTrue(_hits(result), f"hub/paper README snippet failed: {result!r}")
 
     def test_sdks_python_readme_snippet(self) -> None:
-        try:
-            from fluctlightdb import connect
-        except ImportError:
-            self.skipTest("fluctlightdb[native] not installed")
+        from fluctlightdb import connect
 
         tmp = tempfile.mkdtemp(prefix="flct-sdk-readme-")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
@@ -70,10 +65,7 @@ class TestReadmeQuickstart(unittest.TestCase):
         self.assertTrue(_hits(result), f"sdks/python/README snippet failed: {result!r}")
 
     def test_embeddings_lexical_snippet(self) -> None:
-        try:
-            from fluctlightdb import connect_agent
-        except ImportError:
-            self.skipTest("fluctlightdb[native] not installed")
+        from fluctlightdb import connect_agent
 
         tmp = tempfile.mkdtemp(prefix="flct-embed-")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
@@ -83,10 +75,7 @@ class TestReadmeQuickstart(unittest.TestCase):
         self.assertTrue(_hits(result), f"docs/EMBEDDINGS lexical snippet failed: {result!r}")
 
     def test_onboarding_wm_snippet(self) -> None:
-        try:
-            from fluctlightdb import connect_agent
-        except ImportError:
-            self.skipTest("fluctlightdb[native] not installed")
+        from fluctlightdb import connect_agent
 
         tmp = tempfile.mkdtemp(prefix="flct-onboard-")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
@@ -99,10 +88,7 @@ class TestReadmeQuickstart(unittest.TestCase):
 
     def test_readme_paraphrase_needs_vector_or_lexical_cue(self) -> None:
         """Paraphrase without semantic_vector needs embedder or overlapping tokens."""
-        try:
-            from fluctlightdb import connect_agent
-        except ImportError:
-            self.skipTest("fluctlightdb[native] not installed")
+        from fluctlightdb import connect_agent
 
         tmp = tempfile.mkdtemp(prefix="flct-readme-para-")
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)

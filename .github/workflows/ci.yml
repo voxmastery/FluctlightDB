@@ -137,6 +137,11 @@ jobs:
           python -m unittest tests.test_project.TestProjectInit.test_connect_and_handoff -v
           python -m unittest tests.test_quickstart -v
 
+      - name: Short brain soak (native)
+        run: |
+          chmod +x scripts/soak_brain.sh
+          FLUCTLIGHT_SOAK_CYCLES=1500 bash scripts/soak_brain.sh /tmp/ci-soak-brain
+
   pypi-wheel-smoke:
     name: pypi-wheel-smoke (${{ matrix.os }}, py${{ matrix.python }})
     runs-on: ${{ matrix.os }}
