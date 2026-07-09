@@ -209,3 +209,37 @@ pub fn filter_hits_by_tick(
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn miri_merge_hits_prefers_higher_score() {
+        let lanes = vec![
+            vec![UnifiedRecallHit {
+                memory_id: "a".into(),
+                score: 0.9,
+                lane: "episodic".into(),
+                content: "alpha".into(),
+                context: String::new(),
+                verified: false,
+                engram_id: None,
+                snippet: None,
+            }],
+            vec![UnifiedRecallHit {
+                memory_id: "b".into(),
+                score: 0.4,
+                lane: "chorus".into(),
+                content: "bravo".into(),
+                context: String::new(),
+                verified: false,
+                engram_id: None,
+                snippet: None,
+            }],
+        ];
+        let merged = merge_hits(lanes, 2);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].memory_id, "a");
+    }
+}

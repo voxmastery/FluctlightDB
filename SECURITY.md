@@ -24,6 +24,15 @@ The supply-chain job runs `cargo deny check` with **documented** `deny.toml` ign
 
 FluctlightDB has **not** undergone a professional penetration test or formal security audit. Production multi-tenant HTTP serve and governance APIs exist but are documented as **not production-hardened** — see [docs/STABILITY.md](docs/STABILITY.md).
 
+### `unsafe` inventory (July 2026)
+
+| Location | Scope | Miri / CI |
+|----------|--------|-----------|
+| `serve.rs` — `libc::signal` (SIGTERM/SIGINT) | Unix HTTP serve shutdown only | Not exercised by `cargo miri test --lib miri_*` |
+| `chaos_jepsen.rs` — `libc::kill` | Integration test (subprocess crash) | Not in `--lib` Miri suite |
+
+All other production paths are safe Rust. Miri CI runs **`miri_*` tests only** (pure serde/router); brain I/O tests that call `sqlite3` FFI are `#[cfg_attr(miri, ignore)]`.
+
 **Researchers & auditors:** We welcome coordinated review. Report findings via the process below; for audit sponsorship or extended disclosure windows, contact the maintainer through GitHub.
 
 ## Supported versions

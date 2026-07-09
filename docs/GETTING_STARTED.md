@@ -12,7 +12,7 @@
 ├─────────────────────────────────────────────────────────┤
 │  Default — in-process (like sqlite3)                  │
 │  pip install "fluctlightdb[native]"                   │
-│  from fluctlightdb import connect                     │
+│  from fluctlightdb import connect_embedded              │
 ├─────────────────────────────────────────────────────────┤
 │  Shared / remote / multi-agent                        │
 │  pip install fluctlightdb + FluctlightClient (HTTP)   │
@@ -44,15 +44,15 @@ On modern Linux (Debian 12+, Ubuntu 23.04+), use a venv — not `sudo pip` ([PEP
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install "fluctlightdb[native]"
+pip install "fluctlightdb[native]==0.5.9"
 ```
 
 ```python
-from fluctlightdb import connect
+from fluctlightdb import connect_embedded
 
-brain = connect("/tmp/my-agent-brain")
+brain = connect_embedded("/tmp/my-agent-brain")
 brain.experience("User prefers dark mode", context="settings", salience=0.7)
-print(brain.activate("dark mode"))
+print(brain.activate("dark mode"))  # offline: cue needs token overlap
 brain.checkpoint()
 ```
 

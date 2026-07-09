@@ -241,6 +241,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
     fn wal_replays_experience_after_checkpoint_gap() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.flct");
@@ -272,6 +273,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
     fn wal_skips_corrupt_line() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.flct");
@@ -310,6 +312,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
     fn wal_recovers_after_truncated_tail() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("test.flct");
@@ -349,5 +352,31 @@ mod tests {
         drop(brain);
         let replay_brain = FluctlightBrain::open(&path).unwrap();
         assert!(replay_brain.activate("before truncate").recalls.len() >= 1);
+    }
+
+    /// Miri-safe: WAL JSON wire format (no sqlite / filesystem brain).
+    #[test]
+    fn miri_wal_record_json_roundtrip() {
+        let record = WalRecord {
+            seq: 42,
+            idempotency_key: Some("idem-1".into()),
+            entry: WalEntry::Experience {
+                episode: Episode {
+                    content: "miri wal line".into(),
+                    context: "test".into(),
+                    outcome: None,
+                    salience_hint: 0.5,
+                    semantic_vector: None,
+                    agent_id: None,
+                    tenant_id: None,
+                    rag: None,
+                    provenance: None,
+                },
+            },
+        };
+        let line = serde_json::to_string(&record).unwrap();
+        let back: WalRecord = serde_json::from_str(&line).unwrap();
+        assert_eq!(back.seq, 42);
+        assert!(matches!(back.entry, WalEntry::Experience { .. }));
     }
 }

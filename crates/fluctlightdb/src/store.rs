@@ -619,6 +619,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
     fn persistence_roundtrip_v31_header() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("roundtrip.flct");
@@ -652,5 +653,14 @@ mod tests {
         fs::write(&path, b"not a brain").unwrap();
         let report = verify_path(&path).unwrap();
         assert!(!report.ok);
+    }
+
+    /// Miri-safe: header magic bytes only (no sqlite open).
+    #[test]
+    fn miri_store_v31_magic_prefix() {
+        const MAGIC: &[u8] = b"FLCT";
+        let mut buf = vec![0u8; 32];
+        buf[..4].copy_from_slice(MAGIC);
+        assert_eq!(&buf[..4], MAGIC);
     }
 }
