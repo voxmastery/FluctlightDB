@@ -33,4 +33,4 @@ Out of scope unless you opt in: benchmarks, Python SDK ergonomics, paper figures
 - Paid compensation (volunteer / academic / portfolio credit only)
 - Production security guarantee — review reduces risk, does not certify
 
-Maintainer contact: open the issue or GitHub Discussion on the repo.
+Maintainer contact: comment on **[GitHub Issue #1](https://github.com/voxmastery/FluctlightDB/issues/1)** or open a Discussion.

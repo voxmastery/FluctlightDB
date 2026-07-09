@@ -25,7 +25,7 @@ FluctlightDB is **early-stage open source**. This page states facts reviewers an
 - Co-maintainer or steering committee
 - Corporate backing or paid support SLA
 - Foundation governance (CNCF, Apache, etc.)
-- Named informal reviewers for auth/storage PRs — see [docs/SEEKING_AUTH_REVIEWER.md](docs/SEEKING_AUTH_REVIEWER.md)
+- Named informal reviewers for auth/storage PRs — **[Issue #1](https://github.com/voxmastery/FluctlightDB/issues/1)** · [docs/SEEKING_AUTH_REVIEWER.md](docs/SEEKING_AUTH_REVIEWER.md)
 
 ## Reproduction bounty
 
