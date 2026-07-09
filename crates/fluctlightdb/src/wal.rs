@@ -308,4 +308,45 @@ mod tests {
         let replay_brain = FluctlightBrain::open(&path).unwrap();
         assert!(replay_brain.activate("after corrupt").recalls.len() >= 1);
     }
+
+    #[test]
+    fn wal_recovers_after_truncated_tail() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.flct");
+        let mut brain = FluctlightBrain::open(&path).unwrap();
+        brain.checkpoint().unwrap();
+        let wal = active_segment(&path);
+        {
+            let mut f = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&wal)
+                .unwrap();
+            let good = WalRecord {
+                seq: 1,
+                idempotency_key: None,
+                entry: WalEntry::Experience {
+                    episode: Episode {
+                        content: "before truncate".into(),
+                        context: "t".into(),
+                        outcome: None,
+                        salience_hint: 0.5,
+                        semantic_vector: None,
+                        agent_id: None,
+                        tenant_id: None,
+                        rag: None,
+                        provenance: None,
+                    },
+                },
+            };
+            let line = serde_json::to_string(&good).unwrap();
+            writeln!(f, "{line}").unwrap();
+            // Simulate torn write: partial JSON line at EOF (kill -9 mid-append).
+            f.write_all(b"{\"seq\":2,\"entry\":{\"Experience\":").unwrap();
+            f.sync_all().unwrap();
+        }
+        drop(brain);
+        let replay_brain = FluctlightBrain::open(&path).unwrap();
+        assert!(replay_brain.activate("before truncate").recalls.len() >= 1);
+    }
 }

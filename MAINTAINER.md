@@ -25,6 +25,21 @@ FluctlightDB is **early-stage open source**. This page states facts reviewers an
 - Co-maintainer or steering committee
 - Corporate backing or paid support SLA
 - Foundation governance (CNCF, Apache, etc.)
+- Named informal reviewers for auth/storage PRs (**seeking volunteers** — comment on [CONTRIBUTING.md](CONTRIBUTING.md) issues if interested)
+
+## Reproduction bounty
+
+**$50 USD gift card** (or regional equivalent) + public credit for the **first verified external reproduction** of each major benchmark. Details and claim form: [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) · [issue template](https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml).
+
+## Supply chain & crash recovery (CI)
+
+| Check | Status |
+|-------|--------|
+| `cargo audit` + `cargo-deny` | CI job on every `main` push ([`deny.toml`](../deny.toml)) |
+| Known advisories | **pyo3 0.23.x** (native bindings) — upgrade tracked; see [SECURITY.md](SECURITY.md) |
+| Miri (WAL/store) | CI job (best-effort) |
+| WAL fault injection | Unit test: truncated tail + corrupt line recovery (`wal.rs`) |
+| Full Jepsen / kill -9 harness | **Not yet** — unit-level simulation only |
 
 ## Becoming a co-maintainer
 

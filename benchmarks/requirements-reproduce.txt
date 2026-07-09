@@ -1,0 +1,6 @@
+# Pinned deps for benchmark reproduction (LoCoMo / BEIR harnesses).
+# Install: pip install -r benchmarks/requirements-reproduce.txt
+# Keep in sync with scripts/reproduce-locomo.sh and docs/REPRODUCIBILITY.md.
+chromadb>=0.5.5,<2
+pytrec-eval-terrier>=0.5.6
+# fluctlightdb[native] version is pinned by reproduce-locomo.sh from crates/fluctlight-py/pyproject.toml

@@ -36,16 +36,17 @@ pip install -q --upgrade pip
 
 if [[ "${REPRODUCE_FROM_SOURCE:-0}" == "1" ]]; then
   echo "==> Installing from source (maturin + editable SDK)"
-  pip install -q maturin chromadb pytrec-eval-terrier
+  pip install -q -r benchmarks/requirements-reproduce.txt maturin
   maturin build --release -o "$ROOT/dist-reproduce" --manifest-path crates/fluctlight-py/Cargo.toml
   pip install -q -e sdks/python
   pip install -q "$ROOT"/dist-reproduce/*.whl
 else
-  echo "==> Installing from PyPI-style deps (chromadb + fluctlightdb[native])"
-  pip install -q chromadb pytrec-eval-terrier "fluctlightdb[native]>=0.5.2" || {
-    echo "WARN: PyPI native wheel not yet published for this version."
+  NATIVE_VER="$(python3 -c "import tomllib; print(tomllib.load(open('crates/fluctlight-py/pyproject.toml','rb'))['project']['version'])")"
+  echo "==> Installing pinned deps (fluctlightdb[native]==${NATIVE_VER})"
+  pip install -q -r benchmarks/requirements-reproduce.txt "fluctlightdb[native]==${NATIVE_VER}" || {
+    echo "WARN: PyPI native wheel not yet published for ${NATIVE_VER}."
     echo "      Falling back to source build (set REPRODUCE_FROM_SOURCE=1 to skip this message)."
-    pip install -q maturin
+    pip install -q maturin -r benchmarks/requirements-reproduce.txt
     maturin build --release -o "$ROOT/dist-reproduce" --manifest-path crates/fluctlight-py/Cargo.toml
     pip install -q -e sdks/python
     pip install -q "$ROOT"/dist-reproduce/*.whl

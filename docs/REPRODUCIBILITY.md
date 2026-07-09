@@ -2,6 +2,77 @@
 
 FluctlightDB publishes benchmark numbers in the paper, README, and frozen JSON under `benchmarks/results/`. This document separates **what you can reproduce yourself** from **what has been independently verified**.
 
+## Will you get the same %?
+
+**LoCoMo (CHORUS @ k=150): yes — when you follow the pinned protocol.**
+
+`make reproduce-locomo` exits **0** only if your output JSON matches the frozen cert **exactly** on:
+
+- `evidence_hits` (string, e.g. `"1970/1982"`)
+- `mean_evidence_recall` (float, e.g. `0.990201277587756`)
+
+That is the same headline **99.0%** (1970/1982), not a rounded approximation.
+
+| Requirement | Why it matters |
+|-------------|----------------|
+| **Git tag** matching the cert (e.g. `v0.5.6`) | Recall logic lives in `fluctlightdb-native` |
+| **`fluctlightdb[native]==<tag version>`** | Script pins from `crates/fluctlight-py/pyproject.toml` |
+| **`benchmarks/requirements-reproduce.txt`** | Pins Chroma / eval deps (embeddings) |
+| **`--mode chorus --top-k 150`** | Default in `reproduce-locomo.sh` |
+| **Official `locomo10.json`** | Auto-downloaded from snap-research/locomo |
+
+**What can still differ (without changing the pass/fail check):** `wall_s`, embed cache hit counts, absolute paths in JSON metadata.
+
+**What can cause a mismatch:**
+
+| Cause | Typical symptom |
+|-------|-----------------|
+| Unpinned / newer **chromadb** (ONNX MiniLM drift) | `evidence_hits` off by a few spans |
+| Wrong **native** version or building from arbitrary `main` | Recall ranking changes |
+| Wrong lane (`agent` vs `chorus`) or `top_k` | Very different % |
+| Modified dataset file | Any divergence |
+
+**LongMemEval / BEIR:** More moving parts (mpnet server, Chroma versions, rerank flags). Exact float match is harder; report your numbers via the reproduction issue template even if not bit-identical.
+
+**We have not yet had an external party confirm a match** — if you are first, use the template below and claim the bounty.
+
+---
+
+## Leaderboards (industry context)
+
+There is **no canonical live leaderboard** for LoCoMo or LongMemEval maintained by a neutral third party. Headline numbers from Mem0, Zep, ByteRover, Hindsight, Memobase, etc. are overwhelmingly **vendor blog posts or self-published tables**, not audited rankings.
+
+FluctlightDB's differentiation is honesty + open harnesses:
+
+- Frozen JSON + `make reproduce-locomo` (not just a percentage in a README)
+- This doc states **self-reported until independently verified**
+- **No** Mem0/Zep head-to-head post until an external reproduction lands (would add noise before that)
+
+**Planned:** [BEAM](https://arxiv.org/abs/2406.19371) benchmark harness (newer memory eval, less saturation than LoCoMo/LongMemEval clustering at 90%+). Track progress in GitHub Issues labeled `benchmark`.
+
+---
+
+## Reproduction bounty
+
+| Benchmark | First external reproduction | Reward |
+|-----------|----------------------------|--------|
+| LoCoMo CHORUS @150 | Not yet claimed | **$50 USD** gift card + permanent credit in this doc |
+| LongMemEval-S session@8 | Not yet claimed | Same |
+| BEIR SciFact nDCG@10 | Not yet claimed | Same |
+| FAMB macro | Not yet claimed | Same |
+
+LongMemEval E2E is **excluded** (locked maintainer run; OpenAI cost).
+
+**How to claim:** open a [**Benchmark reproduction** issue](https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml), check the bounty box, include environment + output JSON. Maintainer verifies and updates the table below.
+
+### Confirmed external reproductions
+
+| Date | Who | Benchmark | Result | Match |
+|------|-----|-----------|--------|-------|
+| — | *none yet* | — | — | — |
+
+---
+
 ## Verification status (honest summary)
 
 | Status | Meaning |
@@ -24,6 +95,7 @@ FluctlightDB publishes benchmark numbers in the paper, README, and frozen JSON u
 
 ```bash
 git clone https://github.com/voxmastery/FluctlightDB.git && cd FluctlightDB
+git checkout v0.5.6   # or tag matching the frozen cert you compare against
 make reproduce-locomo
 ```
 
@@ -34,6 +106,7 @@ Options:
 ```bash
 REPRODUCE_FROM_SOURCE=1 make reproduce-locomo   # build native wheel from source
 OUT=benchmarks/results/my-run.json bash scripts/reproduce-locomo.sh
+pip install -r benchmarks/requirements-reproduce.txt   # deps only
 ```
 
 ## Other benchmarks
@@ -55,16 +128,15 @@ Full protocol: [BENCHMARKS.md](BENCHMARKS.md) · [benchmarks/README.md](../bench
 
 ## Report your reproduction
 
-If you independently reproduce (or fail to reproduce) a frozen number:
+Use the [**Benchmark reproduction** issue template](https://github.com/voxmastery/FluctlightDB/issues/new?template=reproduction.yml) (label: `reproduction`).
 
-1. Open a [GitHub Issue](https://github.com/voxmastery/FluctlightDB/issues) titled `Reproduction: <benchmark> <your result>`
-2. Include: commit hash, OS, Python version, `fluctlightdb` / `fluctlightdb-native` versions, output JSON path, diff vs frozen cert
-3. We will link confirmed external reproductions from this doc and `MAINTAINER.md`
+Include: commit hash, OS, Python version, `fluctlightdb` / `fluctlightdb-native` versions, output JSON path, diff vs frozen cert.
 
-Partial reproductions (e.g. within ±0.5% due to embedding nondeterminism) are still valuable — report them.
+Partial reproductions (e.g. within ±0.5% due to embedding drift) are still valuable — report them.
 
 ## What we do not claim
 
 - Peer review of benchmark methodology (paper is preprint)
 - Independent audit of correctness or security
 - Leaderboard registration on a third-party site
+- BEAM results yet (harness planned)

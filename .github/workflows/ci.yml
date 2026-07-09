@@ -40,6 +40,42 @@ jobs:
       - name: Format check
         run: cargo fmt --all -- --check
 
+  supply-chain:
+    name: rust supply chain (audit + deny)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cargo-audit
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit
+
+      - name: cargo-deny
+        run: |
+          cargo install cargo-deny --locked
+          cargo deny check
+
+  miri-unsafe-audit:
+    name: miri (WAL / store paths)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+
+      - name: Miri setup
+        run: cargo miri setup
+
+      - name: Miri tests (wal + store)
+        run: cargo miri test -p fluctlightdb --lib wal_ persistence_roundtrip
+
   python-sdk:
     name: python-sdk (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

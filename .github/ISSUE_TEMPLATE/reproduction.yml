@@ -1,0 +1,107 @@
+name: Benchmark reproduction
+description: Report an independent re-run of a frozen benchmark (match or mismatch)
+title: "Reproduction: "
+labels:
+  - reproduction
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for independently reproducing (or attempting) a frozen benchmark.
+        See [docs/REPRODUCIBILITY.md](https://github.com/voxmastery/FluctlightDB/blob/main/docs/REPRODUCIBILITY.md).
+
+        **First verified external reproduction** per benchmark earns public credit in
+        `REPRODUCIBILITY.md` + `MAINTAINER.md` and a **$50 USD gift card** (or equivalent
+        in your region). One bounty per benchmark row (LoCoMo, LongMemEval-S, BEIR SciFact, FAMB).
+
+  - type: dropdown
+    id: benchmark
+    attributes:
+      label: Benchmark
+      options:
+        - LoCoMo (CHORUS evidence recall @150)
+        - LongMemEval-S (session@8)
+        - LongMemEval E2E QA
+        - BEIR SciFact (nDCG@10)
+        - FAMB macro
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Outcome vs frozen cert
+      options:
+        - Exact match (all compared fields identical)
+        - Close match (within ±0.5% or ≤2 spans on LoCoMo)
+        - Mismatch (material difference)
+        - Could not complete (blocked on deps, cost, hardware)
+    validations:
+      required: true
+
+  - type: input
+    id: result
+    attributes:
+      label: Your headline result
+      description: e.g. "1970/1982" or "97.4%" or "nDCG@10=0.641"
+      placeholder: "1970/1982"
+    validations:
+      required: true
+
+  - type: input
+    id: frozen
+    attributes:
+      label: Frozen artifact compared against
+      placeholder: benchmarks/results/locomo-chorus-2026-07-08.json
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Commit/tag, OS/arch, Python version, package versions
+      placeholder: |
+        git: v0.5.6 (06f1ac1)
+        OS: Ubuntu 24.04 aarch64
+        Python: 3.11.9
+        fluctlightdb==0.5.6 fluctlightdb-native==0.5.6
+        chromadb==1.5.9
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Commands run
+      placeholder: |
+        make reproduce-locomo
+        # or full command sequence
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output JSON path or gist link
+      description: Attach `benchmarks/results/locomo-reproduce-*.json` or paste a gist URL
+    validations:
+      required: false
+
+  - type: textarea
+    id: diff
+    attributes:
+      label: Diff vs frozen (if mismatch)
+      description: Which fields differ? Any hypothesis (embedding version, native wheel, etc.)?
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: bounty
+    attributes:
+      label: Reproduction bounty (optional)
+      options:
+        - label: I claim the first-external-reproduction bounty for this benchmark (gift card / public credit)
+    validations:
+      required: false
