@@ -80,6 +80,45 @@ pub struct ToolObserveInput {
     pub to_working_memory: bool,
 }
 
+fn wm_lexical_hits(cue: &str, slots: &[WmSlot], k: usize) -> Vec<UnifiedRecallHit> {
+    use std::collections::HashSet;
+
+    let cue_toks: HashSet<String> = crate::tokenize::tokenize(cue).into_iter().collect();
+    if cue_toks.is_empty() {
+        return Vec::new();
+    }
+    let cue_len = cue_toks.len() as f32;
+    let mut scored: Vec<UnifiedRecallHit> = slots
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| {
+            let text = format!("{} {}", s.content, s.context);
+            let toks = crate::tokenize::tokenize(&text);
+            let overlap = toks.iter().filter(|t| cue_toks.contains(*t)).count();
+            if overlap == 0 {
+                return None;
+            }
+            Some(UnifiedRecallHit {
+                memory_id: format!("wm:{i}"),
+                score: overlap as f32 / cue_len,
+                lane: "working_memory".into(),
+                content: s.content.clone(),
+                context: s.context.clone(),
+                verified: false,
+                engram_id: None,
+                snippet: None,
+            })
+        })
+        .collect();
+    scored.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    scored.truncate(k);
+    scored
+}
+
 impl FluctlightBrain {
     pub fn agent_state(&self) -> &AgentState {
         &self.agent
@@ -269,7 +308,7 @@ impl FluctlightBrain {
         Ok(report)
     }
 
-    /// Unified recall — auto-routes episodic / CHORUS / Muon / hybrid.
+    /// Unified recall — auto-routes episodic / CHORUS / Muon / hybrid; falls back to WM lexically.
     pub fn recall_unified(
         &self,
         cue: &str,
@@ -337,6 +376,15 @@ impl FluctlightBrain {
         } else {
             lane_vecs.into_iter().next().unwrap_or_default()
         };
+
+        // Embedded agents often recall before turn_end flush — search WM lexically.
+        if hits.is_empty() && !self.agent.wm.is_empty() {
+            let wm_hits = wm_lexical_hits(cue, &self.agent.wm.slots(), k);
+            if !wm_hits.is_empty() {
+                lanes_used.push("working_memory".into());
+                hits = wm_hits;
+            }
+        }
 
         if let Some(ref filt) = temporal {
             let tick_map: std::collections::HashMap<String, u64> = self
@@ -449,6 +497,24 @@ mod tests {
             .unwrap();
         let out = brain.recall_unified("wallet balance", None, RecallMode::Auto, 4, None);
         assert!(!out.hits.is_empty());
+    }
+
+    #[test]
+    fn recall_unified_searches_wm_before_flush() {
+        let mut brain = FluctlightBrain::new();
+        brain.turn_begin();
+        brain.wm_push("User prefers dark mode", "settings", 0.8, None);
+        let out = brain.recall_unified("dark mode", None, RecallMode::Auto, 4, None);
+        assert!(
+            !out.hits.is_empty(),
+            "expected WM lexical hit before turn_end flush: {:?}",
+            out
+        );
+        assert!(
+            out.lanes_used.iter().any(|l| l == "working_memory"),
+            "expected working_memory lane: {:?}",
+            out.lanes_used
+        );
     }
 
     #[test]

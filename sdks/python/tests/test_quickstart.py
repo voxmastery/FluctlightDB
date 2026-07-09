@@ -86,6 +86,20 @@ class TestReadmeQuickstart(unittest.TestCase):
         result = brain.recall("pytest")
         self.assertTrue(_hits(result), f"docs/ONBOARDING snippet failed: {result!r}")
 
+    def test_wm_recall_before_flush(self) -> None:
+        from fluctlightdb import connect_agent
+
+        tmp = tempfile.mkdtemp(prefix="flct-wm-pre-flush-")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        brain = connect_agent(os.path.join(tmp, "brain"))
+        brain.turn_begin()
+        brain.wm_push("User prefers dark mode", context="settings", salience=0.8)
+        result = brain.recall("dark mode")
+        self.assertTrue(
+            _hits(result),
+            f"WM should be searchable before turn_end flush: {result!r}",
+        )
+
     def test_readme_paraphrase_needs_vector_or_lexical_cue(self) -> None:
         """Paraphrase without semantic_vector needs embedder or overlapping tokens."""
         from fluctlightdb import connect_agent

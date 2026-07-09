@@ -8,7 +8,7 @@ These are the APIs agent developers should pin to. Breaking changes require a **
 
 | Surface | Symbols | Notes |
 |---------|---------|-------|
-| **Python SDK** | `connect`, `connect_agent`, `connect_index`, `connect_chorus`, `connect_project`, `FluctlightBrain` | Primary entry points |
+| **Python SDK** | `connect_embedded`, `connect`, `connect_agent`, `connect_index`, `connect_chorus`, `connect_project`, `FluctlightBrain` | Primary entry points |
 | **Core operations** | `experience()`, `activate()`, `checkpoint()`, `recall()` | Documented in README and paper |
 | **Project brains** | `fluctlight-project` CLI, handoffs, MCP memory tools | Multi-agent monorepo path |
 | **HTTP API** | `/api/v1/experience`, `/api/v1/activate`, `/api/v1/checkpoint` | See `docs/openapi.yaml` |

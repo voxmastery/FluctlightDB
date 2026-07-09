@@ -13,6 +13,19 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ---
 
+## [0.5.9] - 2026-07-09
+
+### Added
+- **`connect_embedded()`** — production embedded entry: clears serve/auth env pollution, optional `0700` brain dir on Unix.
+- **`docs/EMBEDDED.md`** — embedded-first production guide.
+- WM lexical fallback in `recall_unified` when episodic lanes are empty (recall before `turn_end(flush=True)`).
+- `tests/test_embedded.py` guards.
+
+### Fixed
+- Miri CI: split `wal_` and `persistence_roundtrip` test filters (invalid combined filter).
+
+---
+
 ## [0.5.8] - 2026-07-09
 
 ### Fixed

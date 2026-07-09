@@ -73,7 +73,9 @@ jobs:
         run: cargo miri setup
 
       - name: Miri tests (wal + store)
-        run: cargo miri test -p fluctlightdb --lib wal_ persistence_roundtrip
+        run: |
+          cargo miri test -p fluctlightdb --lib wal_
+          cargo miri test -p fluctlightdb --lib persistence_roundtrip
 
   chaos-jepsen:
     name: chaos / crash recovery (Jepsen-style)
@@ -136,6 +138,7 @@ jobs:
         run: |
           python -m unittest tests.test_project.TestProjectInit.test_connect_and_handoff -v
           python -m unittest tests.test_quickstart -v
+          python -m unittest tests.test_embedded -v
 
       - name: Short brain soak (native)
         run: |

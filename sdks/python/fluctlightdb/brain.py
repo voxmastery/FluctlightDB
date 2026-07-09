@@ -7,6 +7,25 @@ import os
 from typing import Any, Optional
 
 
+def _secure_brain_directory(path: str) -> None:
+    """Best-effort 0700 on brain parent/dir (Unix only)."""
+    if os.name == "nt":
+        return
+    abs_path = os.path.abspath(path)
+    parent = os.path.dirname(abs_path)
+    if parent:
+        os.makedirs(parent, mode=0o700, exist_ok=True)
+        try:
+            os.chmod(parent, 0o700)
+        except OSError:
+            pass
+    if os.path.isdir(abs_path):
+        try:
+            os.chmod(abs_path, 0o700)
+        except OSError:
+            pass
+
+
 def _require_native() -> Any:
     """Import the native extension or raise an actionable install hint."""
     try:
@@ -120,6 +139,41 @@ class FluctlightBrain:
             obj.brain_path = path
         else:
             obj = cls(native.Brain.new(), readonly=False, mode=cls.MODE_AGENT_UNIFIED)
+        if retain_days is not None and not readonly:
+            obj.retain_for(days=retain_days)
+            obj.set_auto_consolidate(True)
+        return obj
+
+    @classmethod
+    def connect_embedded(
+        cls,
+        path: str,
+        *,
+        readonly: bool = False,
+        retain_days: Optional[int] = 30,
+        secure_dir: bool = True,
+    ) -> "FluctlightBrain":
+        """Production embedded entry — in-process brain, safe env defaults, no HTTP serve flags.
+
+        Same unified recall / WM-Ring as :meth:`connect_agent`, but clears serve/auth env pollution
+        and optionally chmods the brain directory to ``0700`` on Unix.
+        """
+        for key in (
+            "FLUCTLIGHT_VECTOR_FAST",
+            "FLUCTLIGHT_REQUIRE_AUTH",
+            "FLUCTLIGHT_API_KEYS",
+            "FLUCTLIGHT_SERVE_URL",
+            "FLUCTLIGHT_API_KEY",
+            "FLUCTLIGHT_HTTP_TIMEOUT",
+        ):
+            os.environ.pop(key, None)
+        cls._enable_agent_unified_mode()
+        if secure_dir and not readonly:
+            _secure_brain_directory(path)
+        native = _require_native()
+        brain = native.Brain.open_readonly(path) if readonly else native.Brain.open(path)
+        obj = cls(brain, readonly=readonly, mode=cls.MODE_AGENT_UNIFIED)
+        obj.brain_path = path
         if retain_days is not None and not readonly:
             obj.retain_for(days=retain_days)
             obj.set_auto_consolidate(True)
@@ -688,6 +742,22 @@ def connect_muon(path: Optional[str] = None, *, readonly: bool = False) -> Fluct
 def connect_agent(path: Optional[str] = None, *, readonly: bool = False, retain_days: Optional[int] = 30) -> FluctlightBrain:
     """Recommended unified agent brain — WM-Ring, auto recall routing, auto-consolidate."""
     return FluctlightBrain.connect_agent(path, readonly=readonly, retain_days=retain_days)
+
+
+def connect_embedded(
+    path: str,
+    *,
+    readonly: bool = False,
+    retain_days: Optional[int] = 30,
+    secure_dir: bool = True,
+) -> FluctlightBrain:
+    """Production embedded brain — prefer over ``connect_agent()`` for shipped single-process agents."""
+    return FluctlightBrain.connect_embedded(
+        path,
+        readonly=readonly,
+        retain_days=retain_days,
+        secure_dir=secure_dir,
+    )
 
 
 def connect_chorus(path: Optional[str] = None, *, readonly: bool = False) -> FluctlightBrain:
