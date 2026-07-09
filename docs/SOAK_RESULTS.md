@@ -8,7 +8,7 @@ Sample run on maintainer hardware — not a SLA or capacity guarantee. Re-run lo
 FLUCTLIGHT_SOAK_CYCLES=3000 bash scripts/soak_brain.sh /tmp/soak-sample
 ```
 
-## 2026-07-09 — Linux x86_64, `fluctlightdb-native` 0.5.8 (local build)
+## 2026-07-09 — Linux x86_64, `fluctlightdb-native` 0.5.9 (PyPI)
 
 | Metric | Value |
 |--------|------:|

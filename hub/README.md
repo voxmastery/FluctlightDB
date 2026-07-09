@@ -19,20 +19,22 @@ Become **SQLite for agent memory**: one durable store per agent, cue-driven reca
 ## Install
 
 ```bash
-pip install "fluctlightdb[native]"
+pip install "fluctlightdb[native]==0.5.9"
 ```
 
-## Results (June 2026)
+## Results (July 2026, frozen)
 
 | Benchmark | Result |
 |-----------|--------|
 | LoCoMo evidence recall | **99.0%** (10 conv, k=150) |
+| LongMemEval-S session@8 | **97.6%** (488/500) |
 | BEIR SciFact nDCG@10 | **0.645** (ties Chroma + MiniLM) |
 | FAMB macro | **97–98%** |
 
 ## Links
 
-- [GitHub](https://github.com/voxmastery/FluctlightDB)
+- [Release v0.5.9](https://github.com/voxmastery/FluctlightDB/releases/tag/v0.5.9)
+- [Embedded production guide](https://github.com/voxmastery/FluctlightDB/blob/main/docs/EMBEDDED.md)
 - [PyPI](https://pypi.org/project/fluctlightdb/)
 - [Paper card (HF)](https://huggingface.co/Voxiesz/fluctlightdb-paper)
 - [Benchmarks dataset](https://huggingface.co/datasets/Voxiesz/fluctlightdb-benchmarks)
