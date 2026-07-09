@@ -18,7 +18,7 @@ Our public numbers live here:
 | `benchmarks/results/paper-2026-07-09.json` | Paper freeze bundle |
 | `benchmarks/results/locomo-chorus-2026-07-08.json` | LoCoMo cert (99.0% evidence recall) |
 | `make reproduce-locomo` | Anyone can verify LoCoMo cert locally |
-| `make reproduce-beam-smoke` | BEAM retrieval-layer smoke (in progress) |
+| `make reproduce-beam-smoke` | BEAM retrieval smoke (experimental; not in paper) |
 | GitHub Releases + PyPI | Versioned engine, not a ranking |
 
 ## What we are **not** doing yet (on purpose)
@@ -26,7 +26,7 @@ Our public numbers live here:
 | Action | Status | Why |
 |--------|--------|-----|
 | Mem0/Zep head-to-head blog post | **Blocked** | Credible only after **first external** LoCoMo reproduction ([REPRODUCIBILITY.md](REPRODUCIBILITY.md)) |
-| Vendor roundup outreach (EverMind-style) | **Not started** | Waiting on independent repro + BEAM smoke numbers |
+| Vendor roundup outreach (EverMind-style) | **Not started** | Waiting on independent repro of headline numbers |
 | Claiming “#1 on LoCoMo leaderboard” | **Never** | That leaderboard does not exist as a neutral registry |
 
 ## What we **can** submit (optional, different metrics)
@@ -41,7 +41,7 @@ Our public numbers live here:
 ## When we **will** pursue external visibility
 
 1. **First external LoCoMo match** → link from README + optional comparison post on identical protocol  
-2. **BEAM smoke cert frozen** → add row to paper JSON + REPRODUCIBILITY table  
+2. **Independent LoCoMo/LongMemEval repro** → add to REPRODUCIBILITY table  
 3. **Co-maintainer or named reviewer** → stronger bus-factor story for adoption posts  
 
 ## Summary
