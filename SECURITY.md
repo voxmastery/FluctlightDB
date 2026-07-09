@@ -1,5 +1,17 @@
 # Security Policy
 
+## Audit & CVE history
+
+| Item | Status |
+|------|--------|
+| Third-party security audit | **None to date** (July 2026) |
+| Published CVEs against FluctlightDB | **None** |
+| GitHub Security Advisories | [View advisories](https://github.com/voxmastery/FluctlightDB/security/advisories) — none published yet |
+
+FluctlightDB has **not** undergone a professional penetration test or formal security audit. Production multi-tenant HTTP serve and governance APIs exist but are documented as **not production-hardened** — see [docs/STABILITY.md](docs/STABILITY.md).
+
+**Researchers & auditors:** We welcome coordinated review. Report findings via the process below; for audit sponsorship or extended disclosure windows, contact the maintainer through GitHub.
+
 ## Supported versions
 
 Security fixes are applied to the latest release on the `main` branch. We recommend running the current `main` or the latest tagged release.
