@@ -41,17 +41,19 @@ We present **FluctlightDB**, an embedded brain-native database with write path `
 ## Install
 
 ```bash
-pip install "fluctlightdb[native]"
+pip install "fluctlightdb[native]==0.5.9" "fluctlightdb-native==0.5.9"
 ```
 
 ```python
-from fluctlightdb import connect
+from fluctlightdb import connect_embedded
 
-brain = connect("/tmp/agent-brain")
+brain = connect_embedded("/tmp/agent-brain")
 brain.experience("User prefers dark mode", context="settings", salience=0.8)
-print(brain.activate("dark mode"))  # offline lexical cue (paraphrase needs semantic_vector)
+print(brain.activate("dark mode"))  # paper API; offline lexical cue
 brain.checkpoint()
 ```
+
+Production embedded path: [docs/EMBEDDED.md](https://github.com/voxmastery/FluctlightDB/blob/main/docs/EMBEDDED.md) · Paper metrics frozen in `paper-2026-07-09.json` (unchanged by 0.5.x SDK patches).
 
 ## Links
 
@@ -63,7 +65,10 @@ brain.checkpoint()
 | **Figures 2–3** | Benchmark summary + LongMemEval by type — [`papers/figures/`](https://github.com/voxmastery/FluctlightDB/tree/main/papers/figures) |
 | **Interactive viewer (Space)** | https://huggingface.co/spaces/Voxiesz/fluctlightdb-paper-viewer |
 | **GitHub** | https://github.com/voxmastery/FluctlightDB |
-| **PyPI** | https://pypi.org/project/fluctlightdb/ |
+| **Release v0.5.9** | https://github.com/voxmastery/FluctlightDB/releases/tag/v0.5.9 |
+| **PyPI (SDK)** | https://pypi.org/project/fluctlightdb/0.5.9/ |
+| **PyPI (native)** | https://pypi.org/project/fluctlightdb-native/0.5.9/ |
+| **Embedded guide** | https://github.com/voxmastery/FluctlightDB/blob/main/docs/EMBEDDED.md |
 | **Reproduce benchmarks** | https://github.com/voxmastery/FluctlightDB/tree/main/benchmarks |
 
 ## Citation

@@ -95,7 +95,7 @@ None of them give you a **database engine whose native operations are memory ope
 
 1. **`experience()` / `activate()` / `checkpoint()`** — memory-native contract, not `INSERT` + ANN glue.
 2. **Hybrid recall** — FTS5 + vectors + graph spread in one `activate(cue)`.
-3. **Two production lanes** — `connect_agent()` for agents; `connect_chorus()` + **PRISM** (RaBitQ + QJL + SPECTRUM + float rerank) for IR.
+3. **Two production lanes** — `connect_embedded()` for shipped agents; `connect_chorus()` + **PRISM** (RaBitQ + QJL + SPECTRUM + float rerank) for IR.
 
 ---
 
@@ -145,7 +145,7 @@ Cursor + Claude + Codex share `.fluctlight/project/` brains, handoffs, MCP. See 
 ## Choose your path
 
 ```
-One agent (start here)     → pip install "fluctlightdb[native]" ; connect_agent()
+One agent (start here)     → pip install "fluctlightdb[native]==0.5.9" ; connect_embedded()
 Monorepo multi-tool        → fluctlight-project init ; connect_project()
 HTTP server                → Docker ghcr.io/voxmastery/fluctlightdb
 Engine development         → clone + cargo (CONTRIBUTING.md)
