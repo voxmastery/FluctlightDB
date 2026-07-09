@@ -6,7 +6,10 @@
 use uuid::Uuid;
 
 use crate::brain::FluctlightBrain;
-use crate::chorus::{ChorusHit, ChorusImprintInput, ChorusRecallOpts, ChorusSleepReport, ChorusTrace, parent_memory_id};
+use crate::chorus::{
+    parent_memory_id, ChorusHit, ChorusImprintInput, ChorusRecallOpts, ChorusSleepReport,
+    ChorusTrace,
+};
 use crate::types::{Episode, Provenance, ProvenanceKind, RagRef, RecallResult};
 
 pub fn chorus_enabled() -> bool {
@@ -111,11 +114,8 @@ impl FluctlightBrain {
     }
 
     fn collapse_chorus_trace(&mut self, trace: &ChorusTrace) -> Result<(), crate::error::Error> {
-        let mut episode = Episode::new(
-            trace.content.clone(),
-            trace.context.clone(),
-            trace.salience,
-        );
+        let mut episode =
+            Episode::new(trace.content.clone(), trace.context.clone(), trace.salience);
         episode.semantic_vector = trace.vector.clone();
         episode.rag = Some(RagRef {
             doc_id: Some(trace.memory_id.clone()),
@@ -162,11 +162,8 @@ impl FluctlightBrain {
             let Some(trace) = trace else {
                 continue;
             };
-            let mut episode = Episode::new(
-                trace.content.clone(),
-                trace.context.clone(),
-                trace.salience,
-            );
+            let mut episode =
+                Episode::new(trace.content.clone(), trace.context.clone(), trace.salience);
             episode.semantic_vector = trace.vector.clone();
             episode.rag = Some(RagRef {
                 doc_id: Some(trace.memory_id.clone()),

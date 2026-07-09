@@ -36,7 +36,9 @@ fn provenance_weight(kind: &ProvenanceKind, verified: bool) -> f32 {
 /// Score a recall candidate for conflict resolution.
 pub fn score_candidate(hit: &RecallResult) -> f32 {
     let prov = hit.episode.provenance.as_ref();
-    let kind = prov.map(|p| &p.kind).unwrap_or(&ProvenanceKind::ChatAssertion);
+    let kind = prov
+        .map(|p| &p.kind)
+        .unwrap_or(&ProvenanceKind::ChatAssertion);
     let verified = prov.map(|p| p.verified).unwrap_or(false);
     let conf = prov.map(|p| p.confidence).unwrap_or(0.4);
     let trust = provenance_weight(kind, verified);
@@ -72,7 +74,8 @@ pub fn resolve_from_recalls(cue: &str, recalls: &[RecallResult]) -> ResolvedFact
     } else {
         format!(
             "best match via {:?}",
-            prov.map(|p| &p.kind).unwrap_or(&ProvenanceKind::ChatAssertion)
+            prov.map(|p| &p.kind)
+                .unwrap_or(&ProvenanceKind::ChatAssertion)
         )
     };
 
@@ -112,7 +115,10 @@ pub fn related_engram_ids(hippocampus: &Hippocampus, cue: &str, limit: usize) ->
         .iter()
         .map(|e| {
             let body = format!("{} {}", e.episode.content, e.episode.context).to_lowercase();
-            let hits = key_tokens.iter().filter(|t| body.contains(t.as_str())).count() as f32;
+            let hits = key_tokens
+                .iter()
+                .filter(|t| body.contains(t.as_str()))
+                .count() as f32;
             let score = hits / key_tokens.len() as f32;
             (score, e.id)
         })

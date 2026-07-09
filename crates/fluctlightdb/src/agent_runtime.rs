@@ -9,8 +9,8 @@ use crate::chorus_runtime::{chorus_enabled, chorus_fast_enabled, chorus_float_re
 use crate::conflict_lattice::{resolve_from_recalls, ResolvedFact};
 use crate::error::Result;
 use crate::recall_router::{
-    choose_mode, filter_hits_by_tick, lanes_from_activation, merge_hits, RecallMode,
-    TemporalFilter, UnifiedRecallHit, UnifiedRecallResult, temporal_filter_from_cue,
+    choose_mode, filter_hits_by_tick, lanes_from_activation, merge_hits, temporal_filter_from_cue,
+    RecallMode, TemporalFilter, UnifiedRecallHit, UnifiedRecallResult,
 };
 use crate::retention_policy::{RetentionPolicy, RetentionReport, RetentionState};
 use crate::types::{Episode, Provenance, ProvenanceKind};
@@ -159,10 +159,7 @@ impl FluctlightBrain {
             committed += 1;
         }
         self.touch_activity();
-        Ok(WmFlushReport {
-            committed,
-            turn_id,
-        })
+        Ok(WmFlushReport { committed, turn_id })
     }
 
     /// Observe a tool/MCP result with provenance sheath pre-filled.
@@ -248,15 +245,20 @@ impl FluctlightBrain {
                 .as_ref()
                 .map(|p| p.verified)
                 .unwrap_or(false);
-            !self.agent.retention.should_prune_engram(
-                e.id,
-                now,
-                e.salience,
-                verified,
-            )
+            !self
+                .agent
+                .retention
+                .should_prune_engram(e.id, now, e.salience, verified)
         });
         report.pruned_engrams = before.saturating_sub(self.hippocampus.engrams.len()) as u32;
-        for id in self.agent.retention.engram_ticks.keys().cloned().collect::<Vec<_>>() {
+        for id in self
+            .agent
+            .retention
+            .engram_ticks
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
+        {
             if !self.hippocampus.engrams.iter().any(|e| e.id == id) {
                 self.agent.retention.engram_ticks.remove(&id);
             }
@@ -374,10 +376,8 @@ impl FluctlightBrain {
         if chorus_enabled() {
             report.chorus = Some(self.chorus_sleep()?);
         }
-        report.hippocampal = Some(self.sleep_internal(
-            false,
-            crate::sleep_trigger::SleepTrigger::Manual,
-        )?);
+        report.hippocampal =
+            Some(self.sleep_internal(false, crate::sleep_trigger::SleepTrigger::Manual)?);
         report.retention = self.apply_retention()?;
         self.agent.idle_consolidations += 1;
         self.agent.ticks_since_activity = 0;

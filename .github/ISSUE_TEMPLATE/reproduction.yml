@@ -10,9 +10,8 @@ body:
         Thank you for independently reproducing (or attempting) a frozen benchmark.
         See [docs/REPRODUCIBILITY.md](https://github.com/voxmastery/FluctlightDB/blob/main/docs/REPRODUCIBILITY.md).
 
-        **First verified external reproduction** per benchmark earns public credit in
-        `REPRODUCIBILITY.md` + `MAINTAINER.md` and a **$50 USD gift card** (or equivalent
-        in your region). One bounty per benchmark row (LoCoMo, LongMemEval-S, BEIR SciFact, FAMB).
+        **First verified external reproduction** per benchmark earns permanent public credit in
+        `REPRODUCIBILITY.md` and `MAINTAINER.md` (no cash bounty).
 
   - type: dropdown
     id: benchmark
@@ -98,10 +97,10 @@ body:
       required: false
 
   - type: checkboxes
-    id: bounty
+    id: credit
     attributes:
-      label: Reproduction bounty (optional)
+      label: Public credit (optional)
       options:
-        - label: I claim the first-external-reproduction bounty for this benchmark (gift card / public credit)
+        - label: I am submitting the first external reproduction for this benchmark (public credit in REPRODUCIBILITY.md if verified)
     validations:
       required: false

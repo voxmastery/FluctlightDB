@@ -10,7 +10,9 @@ use fluctlightdb::brain::FluctlightBrain;
 use fluctlightdb::types::Episode;
 
 fn main() {
-    let path = env::args().nth(1).expect("usage: fluctlight-chaos-worker PATH [N]");
+    let path = env::args()
+        .nth(1)
+        .expect("usage: fluctlight-chaos-worker PATH [N]");
     let n: usize = env::args()
         .nth(2)
         .and_then(|s| s.parse().ok())

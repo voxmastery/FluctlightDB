@@ -155,7 +155,8 @@ impl MuonLane {
             let woverlap = weighted_term_overlap(cue, &imp.reel);
             let phase = structural_boost(cue, &imp.user_keys, 256);
             let keys_lex = jaccard(&cue_tokens, &token_bag(&imp.user_keys, ""));
-            let score = 0.15 * photon + 0.25 * lexical + 0.30 * woverlap + 0.15 * phase + 0.15 * keys_lex;
+            let score =
+                0.15 * photon + 0.25 * lexical + 0.30 * woverlap + 0.15 * phase + 0.15 * keys_lex;
             MuonHit {
                 session_id: imp.session_id.clone(),
                 score,

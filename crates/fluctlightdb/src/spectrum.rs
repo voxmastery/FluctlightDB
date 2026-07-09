@@ -121,8 +121,16 @@ mod tests {
         let est_ac = sa.dot_similarity(&sc);
         let true_ab = cosine_f32(&a, &b);
         let true_ac = cosine_f32(&a, &c);
-        assert!((est_ab - true_ab).abs() < 0.002, "ab err {}", (est_ab - true_ab).abs());
-        assert!((est_ac - true_ac).abs() < 0.002, "ac err {}", (est_ac - true_ac).abs());
+        assert!(
+            (est_ab - true_ab).abs() < 0.002,
+            "ab err {}",
+            (est_ab - true_ab).abs()
+        );
+        assert!(
+            (est_ac - true_ac).abs() < 0.002,
+            "ac err {}",
+            (est_ac - true_ac).abs()
+        );
         assert!(est_ab > est_ac + 0.1);
     }
 

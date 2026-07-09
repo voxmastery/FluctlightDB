@@ -342,7 +342,8 @@ mod tests {
             let line = serde_json::to_string(&good).unwrap();
             writeln!(f, "{line}").unwrap();
             // Simulate torn write: partial JSON line at EOF (kill -9 mid-append).
-            f.write_all(b"{\"seq\":2,\"entry\":{\"Experience\":").unwrap();
+            f.write_all(b"{\"seq\":2,\"entry\":{\"Experience\":")
+                .unwrap();
             f.sync_all().unwrap();
         }
         drop(brain);

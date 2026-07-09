@@ -23,9 +23,32 @@ const STOP: &[&str] = &[
 
 /// Common transitive verbs (surface forms) that anchor an SVO relation.
 const VERBS: &[&str] = &[
-    "upgraded", "bought", "purchased", "cancelled", "canceled", "completed", "sent", "created",
-    "deleted", "changed", "moved", "sold", "booked", "paid", "redeemed", "installed", "removed",
-    "added", "started", "finished", "joined", "left", "visited", "ordered", "returned", "signed",
+    "upgraded",
+    "bought",
+    "purchased",
+    "cancelled",
+    "canceled",
+    "completed",
+    "sent",
+    "created",
+    "deleted",
+    "changed",
+    "moved",
+    "sold",
+    "booked",
+    "paid",
+    "redeemed",
+    "installed",
+    "removed",
+    "added",
+    "started",
+    "finished",
+    "joined",
+    "left",
+    "visited",
+    "ordered",
+    "returned",
+    "signed",
 ];
 
 /// A subject–verb–object relation extracted from a clause.
@@ -147,7 +170,10 @@ mod tests {
         for t in ["user", "upgraded", "plan", "agent", "payment"] {
             cb.intern(t, p.dim);
         }
-        assert_eq!(p.readout_role(&structure, "subject", &cb).unwrap().0, "user");
+        assert_eq!(
+            p.readout_role(&structure, "subject", &cb).unwrap().0,
+            "user"
+        );
         assert_eq!(p.readout_role(&structure, "object", &cb).unwrap().0, "plan");
     }
 

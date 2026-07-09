@@ -36,7 +36,7 @@ Our public numbers live here:
 | [BEIR leaderboard](https://github.com/beir-cellar/beir) | IR nDCG@10 | SciFact 0.645 — standard IR, not agent E2E QA |
 | arXiv / Zenodo | Paper + frozen JSON | Already done (DOI on README) |
 | Hugging Face dataset card | Reproduce scripts | Optional future |
-| Independent repro issue | “Verified by X” | **Preferred** — bounty in REPRODUCIBILITY.md |
+| Independent repro issue | “Verified by X” | **Preferred** — public credit in REPRODUCIBILITY.md |
 
 ## When we **will** pursue external visibility
 

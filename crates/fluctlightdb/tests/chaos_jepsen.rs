@@ -80,7 +80,11 @@ fn chaos_property_rounds_checkpoint_wal_tear_and_reopen() {
         drop(brain);
 
         if round % 3 == 0 {
-            wal_append(&path, round as u64 + 100, &format!("round {round} wal-only"));
+            wal_append(
+                &path,
+                round as u64 + 100,
+                &format!("round {round} wal-only"),
+            );
         }
         if round % 4 == 0 {
             tear_wal_tail(&path);

@@ -66,7 +66,11 @@ def _check_native() -> CheckResult:
 
 
 def _check_mcp() -> CheckResult:
-    if importlib.util.find_spec("mcp.server.fastmcp") is None:
+    try:
+        spec = importlib.util.find_spec("mcp.server.fastmcp")
+    except (ImportError, ModuleNotFoundError, ValueError):
+        spec = None
+    if spec is None:
         return CheckResult(
             "mcp",
             False,

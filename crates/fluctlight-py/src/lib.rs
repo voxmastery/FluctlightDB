@@ -4,8 +4,8 @@ use fluctlightdb::api_slim;
 use fluctlightdb::chorus_runtime::{chorus_fast_enabled, chorus_float_rerank_enabled};
 use fluctlightdb::recall_router::RecallMode;
 use fluctlightdb::{
-    ChorusHit, ChorusRecallOpts, Episode, FluctlightBrain, RetentionPolicy, ToolObserveInput,
-    ProvenanceKind,
+    ChorusHit, ChorusRecallOpts, Episode, FluctlightBrain, ProvenanceKind, RetentionPolicy,
+    ToolObserveInput,
 };
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -90,12 +90,9 @@ impl PyBrain {
         limit: Option<usize>,
     ) -> PyResult<Py<PyAny>> {
         let top_k = limit.unwrap_or(crate::api_slim::DEFAULT_API_RECALL_LIMIT);
-        let mut result = self.inner.activate_scoped(
-            cue,
-            semantic_vector.as_deref(),
-            agent_id.as_deref(),
-            top_k,
-        );
+        let mut result =
+            self.inner
+                .activate_scoped(cue, semantic_vector.as_deref(), agent_id.as_deref(), top_k);
         api_slim::slim_activation_for_api(&mut result, limit);
         let dict = PyDict::new(py);
         dict.set_item("recalls", json_val_to_py(py, &result.recalls)?)?;
@@ -281,9 +278,7 @@ impl PyBrain {
 
     #[pyo3(signature = (cue, limit=None))]
     fn cortex_facts(&self, py: Python<'_>, cue: &str, limit: Option<usize>) -> PyResult<Py<PyAny>> {
-        let facts = self
-            .inner
-            .cortex_facts_for_cue(cue, limit.unwrap_or(24));
+        let facts = self.inner.cortex_facts_for_cue(cue, limit.unwrap_or(24));
         json_val_to_py(py, &facts)
     }
 
@@ -326,9 +321,9 @@ impl PyBrain {
         limit: Option<usize>,
         question_type: Option<&str>,
     ) -> PyResult<Py<PyAny>> {
-        let hits = self
-            .inner
-            .tau_recall_typed(cue, limit.unwrap_or(8), question_type.unwrap_or(""));
+        let hits =
+            self.inner
+                .tau_recall_typed(cue, limit.unwrap_or(8), question_type.unwrap_or(""));
         json_val_to_py(py, &hits)
     }
 
@@ -341,11 +336,9 @@ impl PyBrain {
         question_type: Option<&str>,
     ) -> PyResult<Py<PyAny>> {
         let refs: Vec<&str> = cues.iter().map(|s| s.as_str()).collect();
-        let hits = self.inner.tau_recall_rrf_typed(
-            &refs,
-            limit.unwrap_or(8),
-            question_type.unwrap_or(""),
-        );
+        let hits =
+            self.inner
+                .tau_recall_rrf_typed(&refs, limit.unwrap_or(8), question_type.unwrap_or(""));
         json_val_to_py(py, &hits)
     }
 
@@ -376,12 +369,9 @@ impl PyBrain {
             fast,
             float_rerank: chorus_float_rerank_enabled(),
         };
-        let hits = self.inner.chorus_recall_with_opts(
-            cue,
-            k,
-            semantic_vector.as_deref(),
-            opts,
-        );
+        let hits = self
+            .inner
+            .chorus_recall_with_opts(cue, k, semantic_vector.as_deref(), opts);
         if tag.unwrap_or(false) {
             self.inner.chorus_tag_hits(&hits);
         }
@@ -473,8 +463,8 @@ impl PyBrain {
 
     fn observe_tool_json(&mut self, py: Python<'_>, payload_json: &str) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
-        let input: ToolObserveInput =
-            serde_json::from_str(payload_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let input: ToolObserveInput = serde_json::from_str(payload_json)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         let out = self
             .inner
             .observe_tool(&input)
@@ -503,13 +493,9 @@ impl PyBrain {
         } else {
             None
         };
-        let out = self.inner.recall_unified(
-            cue,
-            semantic_vector.as_deref(),
-            mode,
-            k,
-            temporal,
-        );
+        let out = self
+            .inner
+            .recall_unified(cue, semantic_vector.as_deref(), mode, k, temporal);
         json_val_to_py(py, &out)
     }
 
@@ -558,16 +544,16 @@ impl PyBrain {
     }
 
     fn query_json(&self, py: Python<'_>, payload_json: &str) -> PyResult<Py<PyAny>> {
-        let req: fluctlightdb::query::QueryRequest =
-            serde_json::from_str(payload_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let req: fluctlightdb::query::QueryRequest = serde_json::from_str(payload_json)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         let resp = fluctlightdb::query::execute(&self.inner, req);
         json_val_to_py(py, &resp)
     }
 
     fn query_mut_json(&mut self, py: Python<'_>, payload_json: &str) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
-        let req: fluctlightdb::query::QueryRequest =
-            serde_json::from_str(payload_json).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let req: fluctlightdb::query::QueryRequest = serde_json::from_str(payload_json)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         let resp = fluctlightdb::query::execute_mut(&mut self.inner, req);
         json_val_to_py(py, &resp)
     }
@@ -623,11 +609,9 @@ impl PyBrain {
 
     #[staticmethod]
     fn replicate_sync(primary: &str, replica: &str, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let status = fluctlightdb::sync_once(
-            std::path::Path::new(primary),
-            std::path::Path::new(replica),
-        )
-        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let status =
+            fluctlightdb::sync_once(std::path::Path::new(primary), std::path::Path::new(replica))
+                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
         json_val_to_py(py, &status)
     }
 

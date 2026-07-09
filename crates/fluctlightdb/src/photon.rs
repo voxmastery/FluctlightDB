@@ -90,7 +90,10 @@ impl Default for SimHasher {
 
 impl SimHasher {
     pub fn new(bits: usize, seed: u64) -> Self {
-        assert!(bits > 0 && bits.is_multiple_of(64), "bits must be a positive multiple of 64");
+        assert!(
+            bits > 0 && bits.is_multiple_of(64),
+            "bits must be a positive multiple of 64"
+        );
         Self { bits, seed }
     }
 
@@ -364,8 +367,14 @@ mod tests {
 
     #[test]
     fn hamming_is_xor_popcount() {
-        let a = PhotonCode { words: vec![0b1011, 0], bits: 128 };
-        let b = PhotonCode { words: vec![0b1110, 0], bits: 128 };
+        let a = PhotonCode {
+            words: vec![0b1011, 0],
+            bits: 128,
+        };
+        let b = PhotonCode {
+            words: vec![0b1110, 0],
+            bits: 128,
+        };
         assert_eq!(a.hamming(&b), 2); // bits 0 and 2 differ
         assert_eq!(a.hamming(&a), 0);
     }
@@ -375,7 +384,11 @@ mod tests {
         let sh = SimHasher::new(256, 42);
         let v = rand_vec(7, 128);
         // Near-duplicate: v + tiny noise.
-        let near: Vec<f32> = v.iter().enumerate().map(|(i, &x)| x + rand_vec(99, 128)[i] * 0.01).collect();
+        let near: Vec<f32> = v
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| x + rand_vec(99, 128)[i] * 0.01)
+            .collect();
         let far = rand_vec(8888, 128);
 
         let cv = sh.encode(&v);
@@ -412,7 +425,10 @@ mod tests {
         let cos_top: std::collections::HashSet<_> = by_cos[..3].iter().collect();
         let ham_top: std::collections::HashSet<_> = by_ham[..3].iter().collect();
         let overlap = cos_top.intersection(&ham_top).count();
-        assert!(overlap >= 2, "top-3 overlap only {overlap}: cos {by_cos:?} ham {by_ham:?}");
+        assert!(
+            overlap >= 2,
+            "top-3 overlap only {overlap}: cos {by_cos:?} ham {by_ham:?}"
+        );
     }
 
     #[test]
@@ -437,7 +453,11 @@ mod tests {
             store.insert(format!("d{s}"), sh.encode(&rand_vec(s, 128)));
         }
         // Query = target + small noise.
-        let query: Vec<f32> = target.iter().enumerate().map(|(i, &x)| x + rand_vec(7, 128)[i] * 0.02).collect();
+        let query: Vec<f32> = target
+            .iter()
+            .enumerate()
+            .map(|(i, &x)| x + rand_vec(7, 128)[i] * 0.02)
+            .collect();
         let qc = sh.encode(&query);
 
         // LSH prefilter must surface the target as a candidate, and rerank it to top-1.
@@ -447,7 +467,12 @@ mod tests {
         assert_eq!(top[0].0, "target", "top-1 after rerank: {top:?}");
 
         // Prefilter should scan far fewer than the full corpus (sub-linear win).
-        assert!(cands.len() < store.len(), "prefilter scanned everything: {}/{}", cands.len(), store.len());
+        assert!(
+            cands.len() < store.len(),
+            "prefilter scanned everything: {}/{}",
+            cands.len(),
+            store.len()
+        );
     }
 
     #[test]
@@ -468,7 +493,9 @@ mod tests {
         let single = store.multi_probe_candidates(&qc, usize::MAX, 0);
         let multi = store.multi_probe_candidates(&qc, usize::MAX, 4);
         assert!(multi.len() >= single.len());
-        assert!(multi.iter().any(|&i| store.entry_at(i).unwrap().0 == "target"));
+        assert!(multi
+            .iter()
+            .any(|&i| store.entry_at(i).unwrap().0 == "target"));
     }
 
     #[test]

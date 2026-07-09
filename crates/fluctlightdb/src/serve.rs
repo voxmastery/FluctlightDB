@@ -560,7 +560,13 @@ fn serve_one_request(
             "/" | "/brain" | "/viewer" | "/brain/" | "/viewer/"
         )
     {
-        write_text_conn(stream, 200, "text/html; charset=utf-8", VIEWER_HTML, keep_alive)?;
+        write_text_conn(
+            stream,
+            200,
+            "text/html; charset=utf-8",
+            VIEWER_HTML,
+            keep_alive,
+        )?;
         return Ok(keep_alive);
     }
 
@@ -1066,10 +1072,7 @@ fn dispatch(
                 .value
                 .as_deref()
                 .ok_or_else(|| Error::Store("missing value".into()))?;
-            let agent = api_body
-                .agent_id
-                .clone()
-                .unwrap_or_else(|| "api".into());
+            let agent = api_body.agent_id.clone().unwrap_or_else(|| "api".into());
             let conf = api_body.confidence.unwrap_or(0.7);
             server.with_brain_write(tenant_id, |b| {
                 let tick = b.autonomic.total_ticks;

@@ -163,14 +163,23 @@ mod tests {
         assert_eq!(c.before("login", "checkout"), Some(true));
         assert_eq!(c.before("payment_fail", "login"), Some(false));
         let mid = c.in_range(150, 350);
-        assert_eq!(mid.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), vec!["browse", "checkout"]);
+        assert_eq!(
+            mid.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(),
+            vec!["browse", "checkout"]
+        );
     }
 
     #[test]
     fn preceding_events_are_episodic_context() {
         let c = seed();
         let before_fail = c.preceding("payment_fail", 2);
-        assert_eq!(before_fail.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), vec!["browse", "checkout"]);
+        assert_eq!(
+            before_fail
+                .iter()
+                .map(|e| e.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["browse", "checkout"]
+        );
     }
 
     #[test]

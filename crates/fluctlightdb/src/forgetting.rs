@@ -113,7 +113,10 @@ mod tests {
         let r10 = t.retention(10);
         let r100 = t.retention(100);
         let r1000 = t.retention(1000);
-        assert!(r10 > r100 && r100 > r1000, "not monotonic: {r10} {r100} {r1000}");
+        assert!(
+            r10 > r100 && r100 > r1000,
+            "not monotonic: {r10} {r100} {r1000}"
+        );
         assert!(r10 <= 1.0 && r1000 > 0.0);
     }
 
@@ -139,8 +142,14 @@ mod tests {
         let incidental = MemoryTrace::new(0, 0.2);
         let core = MemoryTrace::new(0, 0.95);
         let now = 5000;
-        assert!(incidental.should_forget(now, 0.2), "incidental should be forgettable");
-        assert!(!core.should_forget(now, 0.2), "core memory must never be forgotten");
+        assert!(
+            incidental.should_forget(now, 0.2),
+            "incidental should be forgettable"
+        );
+        assert!(
+            !core.should_forget(now, 0.2),
+            "core memory must never be forgotten"
+        );
     }
 
     #[test]

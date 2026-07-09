@@ -65,7 +65,9 @@ impl Cortex {
             .facts
             .iter()
             .filter_map(|(fact, strength)| {
-                let hit = tokens.iter().any(|t| fact.contains(t.as_str()) || t == fact);
+                let hit = tokens
+                    .iter()
+                    .any(|t| fact.contains(t.as_str()) || t == fact);
                 if hit && *strength > 0.0 {
                     Some((fact.clone(), *strength))
                 } else {

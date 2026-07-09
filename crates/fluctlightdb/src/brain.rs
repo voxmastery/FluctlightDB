@@ -1,13 +1,13 @@
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::agent_runtime::AgentState;
 use crate::activation::{activate_from_hybrid, cap_candidates, complete, default_candidate_cap};
+use crate::agent_runtime::AgentState;
 use crate::amygdala::Amygdala;
 use crate::autonomic::{AutonomicState, TickReport};
 use crate::budget::{self, WiringBudget, PRESSURE_COMPACT_THRESHOLD};
@@ -470,7 +470,12 @@ impl FluctlightBrain {
         cue: &str,
         cue_vector: Option<&[f32]>,
     ) -> ActivationResult {
-        self.activate_scoped(cue, cue_vector, None, crate::api_slim::DEFAULT_API_RECALL_LIMIT)
+        self.activate_scoped(
+            cue,
+            cue_vector,
+            None,
+            crate::api_slim::DEFAULT_API_RECALL_LIMIT,
+        )
     }
 
     pub fn activate_scoped(
@@ -481,7 +486,12 @@ impl FluctlightBrain {
         top_k: usize,
     ) -> ActivationResult {
         let top_k = top_k.max(1).min(crate::index::MAX_CANDIDATE_CAP);
-        if let Some(cached) = self.activation_cache.lock().unwrap().get(cue, agent_id, top_k) {
+        if let Some(cached) = self
+            .activation_cache
+            .lock()
+            .unwrap()
+            .get(cue, agent_id, top_k)
+        {
             return cached;
         }
 
@@ -493,13 +503,8 @@ impl FluctlightBrain {
                 self.recall_index
                     .as_ref()
                     .and_then(|idx| {
-                        idx.hybrid_candidates(
-                            cue,
-                            cue_vector,
-                            &self.semantic,
-                            candidate_cap,
-                        )
-                        .ok()
+                        idx.hybrid_candidates(cue, cue_vector, &self.semantic, candidate_cap)
+                            .ok()
                     })
                     .and_then(|ids| {
                         let capped = cap_candidates(ids, candidate_cap);
@@ -921,7 +926,11 @@ impl FluctlightBrain {
 
     // ---- Chronos (temporal + causal) user API ----
 
-    pub fn chronos_events_in_range(&self, from_tick: u64, to_tick: u64) -> Vec<crate::chronos::Event> {
+    pub fn chronos_events_in_range(
+        &self,
+        from_tick: u64,
+        to_tick: u64,
+    ) -> Vec<crate::chronos::Event> {
         self.chronos.in_range(from_tick, to_tick)
     }
 

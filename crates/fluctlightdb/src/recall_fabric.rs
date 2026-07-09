@@ -173,10 +173,11 @@ impl RecallFabric {
         let m = &self.mems[i];
         let cue_tokens = tokenize(cue);
         let cue_refs: Vec<&str> = cue_tokens.iter().map(|s| s.as_str()).collect();
-        let cue_seq = crate::relation::encode_relations(&self.parser, cue).unwrap_or_else(|| {
-            self.parser.encode_sequence(&cue_refs)
-        });
-        let cue_code = cue_vector.filter(|v| !v.is_empty()).map(|v| self.hasher.encode(v));
+        let cue_seq = crate::relation::encode_relations(&self.parser, cue)
+            .unwrap_or_else(|| self.parser.encode_sequence(&cue_refs));
+        let cue_code = cue_vector
+            .filter(|v| !v.is_empty())
+            .map(|v| self.hasher.encode(v));
         let cue_scalar = cue_vector.filter(|v| !v.is_empty()).map(project_scalar);
         let cue_lattice = cue_scalar.map(|s| {
             self.lattice
@@ -218,11 +219,12 @@ impl RecallFabric {
     pub fn recall(&self, cue: &str, cue_vector: Option<&[f32]>, k: usize) -> Vec<FabricHit> {
         let cue_tokens = tokenize(cue);
         let cue_refs: Vec<&str> = cue_tokens.iter().map(|s| s.as_str()).collect();
-        let cue_seq = crate::relation::encode_relations(&self.parser, cue).unwrap_or_else(|| {
-            self.parser.encode_sequence(&cue_refs)
-        });
+        let cue_seq = crate::relation::encode_relations(&self.parser, cue)
+            .unwrap_or_else(|| self.parser.encode_sequence(&cue_refs));
 
-        let cue_code = cue_vector.filter(|v| !v.is_empty()).map(|v| self.hasher.encode(v));
+        let cue_code = cue_vector
+            .filter(|v| !v.is_empty())
+            .map(|v| self.hasher.encode(v));
         let cue_scalar = cue_vector.filter(|v| !v.is_empty()).map(project_scalar);
 
         // Photon prefilter: shortlist candidate indices, or fall back to the whole store.
@@ -287,7 +289,11 @@ impl RecallFabric {
             })
             .collect();
 
-        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        hits.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         hits.truncate(k);
         hits
     }
@@ -394,8 +400,7 @@ mod tests {
     fn vec_for(seed: u64, dim: usize) -> Vec<f32> {
         (0..dim)
             .map(|i| {
-                let h = splitmix64(seed ^ (i as u64).wrapping_mul(0x9E37))
-                    % 20001;
+                let h = splitmix64(seed ^ (i as u64).wrapping_mul(0x9E37)) % 20001;
                 (h as f32 / 10000.0) - 1.0
             })
             .collect()
@@ -412,11 +417,27 @@ mod tests {
         // Query and target share meaning (near embeddings) but almost no words.
         let mut f = RecallFabric::default();
         let target_vec = vec_for(1, 128);
-        f.insert("target", "the customer boosted their broadband speed", Some(&near(&target_vec, 7)));
-        f.insert("distractor1", "weather forecast rain tomorrow morning", Some(&vec_for(500, 128)));
-        f.insert("distractor2", "recipe for chocolate banana bread", Some(&vec_for(900, 128)));
+        f.insert(
+            "target",
+            "the customer boosted their broadband speed",
+            Some(&near(&target_vec, 7)),
+        );
+        f.insert(
+            "distractor1",
+            "weather forecast rain tomorrow morning",
+            Some(&vec_for(500, 128)),
+        );
+        f.insert(
+            "distractor2",
+            "recipe for chocolate banana bread",
+            Some(&vec_for(900, 128)),
+        );
 
-        let hits = f.recall("did the user upgrade their internet plan", Some(&target_vec), 3);
+        let hits = f.recall(
+            "did the user upgrade their internet plan",
+            Some(&target_vec),
+            3,
+        );
         assert_eq!(hits[0].id, "target", "paraphrase not recalled: {hits:?}");
     }
 
@@ -430,17 +451,31 @@ mod tests {
         f.insert("plan_upgraded_user", "plan upgraded user", Some(&shared));
 
         let hits = f.recall("user upgraded plan", Some(&shared), 2);
-        assert_eq!(hits[0].id, "user_upgraded_plan", "phase failed to disambiguate order: {hits:?}");
-        assert!(hits[0].phase > hits[1].phase, "phase term should favor matching order");
+        assert_eq!(
+            hits[0].id, "user_upgraded_plan",
+            "phase failed to disambiguate order: {hits:?}"
+        );
+        assert!(
+            hits[0].phase > hits[1].phase,
+            "phase term should favor matching order"
+        );
     }
 
     #[test]
     fn photon_prefilter_is_sublinear() {
         let mut f = RecallFabric::default();
         let target_vec = vec_for(3, 128);
-        f.insert("target", "planted near neighbor memory", Some(&near(&target_vec, 11)));
+        f.insert(
+            "target",
+            "planted near neighbor memory",
+            Some(&near(&target_vec, 11)),
+        );
         for s in 0..400 {
-            f.insert(format!("n{s}"), &format!("random distractor number {s}"), Some(&vec_for(s + 1000, 128)));
+            f.insert(
+                format!("n{s}"),
+                &format!("random distractor number {s}"),
+                Some(&vec_for(s + 1000, 128)),
+            );
         }
         // The composed recall still finds the target...
         let hits = f.recall("planted near neighbor memory", Some(&target_vec), 1);
@@ -466,7 +501,10 @@ mod tests {
     fn structural_boost_favors_matching_order() {
         let same = structural_boost("user upgraded plan", "user upgraded plan", 256);
         let swap = structural_boost("user upgraded plan", "plan upgraded user", 256);
-        assert!(same > swap, "boost should reward matching order: same {same} swap {swap}");
+        assert!(
+            same > swap,
+            "boost should reward matching order: same {same} swap {swap}"
+        );
         assert!(same > 0.9, "identical order should score high: {same}");
     }
 }
