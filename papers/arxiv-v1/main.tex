@@ -27,12 +27,13 @@
 For fifty years, data systems have answered two questions. The relational model
 asked \emph{which records match a predicate}; the vector model asked \emph{which
 vectors lie nearest a query}. Neither was built for cue-driven, provenance-weighted
-recall across long sessions. We \emph{argue} that long-term agent memory may
-warrant a \textbf{candidate third data model}---with its own write semantics
-(encoding, separation, consolidation, provenance) and read semantics (cue-driven
-activation across a linked memory graph)---and present \textbf{FluctlightDB}, an
-embedded engine that implements this contract via \texttt{experience()} and
-\texttt{activate()}. On LoCoMo (official \emph{evidence-recall} metric; 10
+recall across long sessions. We propose treating long-term agent memory as a
+\textbf{distinct data model}---with its own write semantics (encoding, separation,
+consolidation, provenance) and read semantics (cue-driven activation across a
+linked memory graph)---and present \textbf{FluctlightDB}, an embedded engine that
+implements this contract via \texttt{experience()} and \texttt{activate()}. We
+make that case carefully, not categorically: we do not claim novelty over Mem0,
+Zep, or HippoRAG-style memory layers, only an embedded engine contract beneath them. On LoCoMo (official \emph{evidence-recall} metric; 10
 conversations, 1{,}982 gold spans), CHORUS recalls \textbf{99.0\%} on an
 internally reproduced July 2026 run. On LongMemEval-S (500 questions, official
 \texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\%}
@@ -61,22 +62,30 @@ consistent. The result is that ``memory'' for agents lives in application code,
 re-implemented badly in every project, with no shared abstraction and no
 benchmark to hold it accountable.
 
-This paper argues---and supports with measurements, not categorical proof---that
-\textbf{agent memory deserves its own database engine, not a wrapper around someone
-else's.} A relational engine is the wrong abstraction because memory is not a set
-of typed rows joined by keys. A vector engine is the wrong abstraction because
-recall is not cosine similarity alone---a human, and an agent, retrieve a fact
-because it was \emph{learned}, \emph{linked} to a context, and \emph{trusted},
-not merely because its embedding is close. What is missing is a model whose unit
-is the \emph{episode}---an experience with content, context, salience, and
-provenance---and whose query is a \emph{cue} that spreads through associations.
+We propose that \textbf{agent memory deserves its own database engine, not a
+wrapper around someone else's.} A relational engine is the wrong abstraction because
+memory is not a set of typed rows joined by keys. A vector engine is the wrong
+abstraction because recall is not cosine similarity alone---a human, and an agent,
+retrieve a fact because it was \emph{learned}, \emph{linked} to a context, and
+\emph{trusted}, not merely because its embedding is close. What is missing is a
+model whose unit is the \emph{episode}---an experience with content, context,
+salience, and provenance---and whose query is a \emph{cue} that spreads through
+associations. We support that proposal with measurements below, not categorical
+proof; where our model overlaps prior memory layers, we say so explicitly
+(Section~\ref{sec:related}).
+
+\textbf{How to read this paper.} Sections~\ref{sec:model}--\ref{sec:design} motivate
+and describe the engine; Section~\ref{sec:eval} reports what was measured---including
+ablations, honest caveats, and runs still incomplete. Optional Recall Fabric
+mechanism detail is deferred to Appendix~\ref{app:fabric} so evaluation honesty
+comes before neuroscience-flavored rerank modules.
 
 \textbf{Contributions.}
 \begin{itemize}
-  \item \textbf{A data-model proposal.} We argue for agent memory as a first-class
-  model of data with explicit write semantics (separation, encoding, consolidation,
-  provenance) and read semantics (cue activation over a memory graph), distinct
-  from the relational and vector models.
+  \item \textbf{A data-model proposal.} Agent memory as a first-class model of data
+  with explicit write semantics (separation, encoding, consolidation, provenance)
+  and read semantics (cue activation over a memory graph), distinct from the
+  relational and vector models.
   \item \textbf{An embedded engine.} FluctlightDB ships as a Rust library (like SQLite:
   no server process) exposing \texttt{experience()} / \texttt{activate()} /
   \texttt{checkpoint()}---one durable brain directory per agent.
@@ -90,7 +99,8 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   number here can be re-run or contested without trusting maintainer scripts alone.
 \end{itemize}
 
-\section{A Candidate Third Data Model}
+\section{A Third Data Model for Agent Memory}
+\label{sec:model}
 \subsection{Why rows are not memory}
 The relational model stores facts whose schema is known in advance and whose
 truth is uniform. Agent memory is the opposite: heterogeneous, arriving out of
@@ -192,8 +202,8 @@ BM25 lexical seeds and HNSW semantic neighbors form a candidate set (default cap
 128--512). The engine spreads activation through the memory graph (up to four hops in
 full mode), fuses lexical, semantic, graph, and provenance scores, and returns ranked
 engrams. Vector-fast mode (\texttt{FLUCTLIGHT\_VECTOR\_FAST=1}) skips graph spread for
-Chroma-class IR latency. Recall Fabric rerank (Section~\ref{sec:fabric}) applies on the
-CHORUS lane after shortlisting when \texttt{FLUCTLIGHT\_FABRIC=1}.
+Chroma-class IR latency. Optional Recall Fabric rerank (Appendix~\ref{app:fabric})
+applies on the CHORUS lane after shortlisting when \texttt{FLUCTLIGHT\_FABRIC=1}.
 
 \begin{lstlisting}[caption={Read path (\texttt{activate}).},label={alg:read}]
 function activate(cue, cue_vector, top_k):
@@ -264,58 +274,30 @@ storage, a co-activation graph, and a hybrid recall sidecar; the logical engram
 bundles episode content, provenance, optional RAG keys, and graph wiring.
 \textbf{(e--f)}~\texttt{experience()} gates near-duplicates, encodes, and indexes;
 \texttt{activate()} seeds, spreads, and ranks. \textbf{(g)}~Compared to
-relational and vector stores, FluctlightDB targets a \emph{candidate} third data
-model with its own write/read contract.}
+relational and vector stores, FluctlightDB targets a third data model with its
+own write/read contract.}
 \label{fig:architecture}
 \end{figure*}
 
-\section{Recall Fabric}
-\label{sec:fabric}
-Hybrid recall (Section~\ref{sec:design}) treats memory as an index. FluctlightDB also
-implements a \emph{Recall Fabric}---Photon prefilter (SimHash/LSH), Manifold Lattice
-addressing~\cite{fiete2008,sreenivasan2011}, theta--gamma phase
-parsing~\cite{lisman1995,lisman2013,plate1995}, consolidation crystallization,
-adaptive forgetting, chronos time buckets, and confidence-weighted
-consensus---each as a deterministic, dependency-free module behind
-\texttt{FLUCTLIGHT\_FABRIC=1}. On ingest, Fabric indexes engrams (and CHORUS traces)
-for lattice/phase scoring; on recall it re-ranks hybrid and CHORUS shortlists before
-returning hits. Synthetic property tests cover CRT round-trip, bind/unbind
-invertibility, Hamming--cosine rank agreement, and decay monotonicity.
-\textbf{LoCoMo, BEIR, and FAMB headline numbers in Section~\ref{sec:eval} were measured with Fabric
-\emph{on}} (\texttt{FLUCTLIGHT\_FABRIC=1} in the CHORUS paper-profile harnesses).
-LongMemEval-S retrieval uses the hybrid \texttt{connect\_index()} path (Colab mpnet;
-Section~\ref{sec:eval}) and does not apply Fabric rerank on that stack.
-Figure~\ref{fig:fabric} sketches the composed pipeline; extended mechanism notes live
-in repository documentation.
-
-\begin{figure}[t]
-\centering
-\fbox{\parbox{0.92\columnwidth}{\centering\ttfamily\small
-cue (text + embedding)\\
-$\downarrow$\\
-Photon prefilter \; (XOR+popcount, LSH) \\
-$\downarrow$ shortlist\\
-Manifold Lattice \; (coarse gist / fine exact) \\
-$\downarrow$ addressed\\
-Phase Parsing \; (order + role disambiguation) \\
-$\downarrow$\\
-\textbf{ranked recall} \; (confidence-weighted)
-}}
-\caption{Recall Fabric pipeline (\texttt{FLUCTLIGHT\_FABRIC=1}). Composes with CHORUS
-recall on LoCoMo, BEIR, and FAMB frozen runs (Section~\ref{sec:eval}).}
-\label{fig:fabric}
-\end{figure}
+\subsection{Optional Recall Fabric rerank}
+\label{sec:fabric-summary}
+CHORUS benchmarks optionally enable Recall Fabric (\texttt{FLUCTLIGHT\_FABRIC=1}): a
+composed reranker on the recall shortlist. LoCoMo, BEIR, and FAMB headline numbers
+in Section~\ref{sec:eval} were measured with Fabric \emph{on}; LongMemEval-S
+hybrid-index retrieval does \emph{not} use Fabric rerank. Fabric modules are
+validated on synthetic property tests in CI---not as standalone peer
+benchmarks---with mechanism detail in Appendix~\ref{app:fabric}.
 
 \section{Evaluation}
 \label{sec:eval}
 Section~\ref{sec:design} defines the engine contract, on-disk format, and durability
-properties; this section validates \emph{recall quality} on public suites. We do not
-re-benchmark crash recovery here---that is covered by the chaos suite
-(Table~\ref{tab:durability}).
+properties; this section validates \emph{recall quality} on public suites---what was
+measured, ablated, honestly caveated, or left incomplete. We do not re-benchmark
+crash recovery here---that is covered by the chaos suite (Table~\ref{tab:durability}).
 
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-09.json}. CHORUS benchmarks (LoCoMo, BEIR,
+\texttt{benchmarks/results/paper-2026-07-10.json}. CHORUS benchmarks (LoCoMo, BEIR,
 FAMB) set \texttt{FLUCTLIGHT\_FABRIC=1} (Recall Fabric on; re-frozen 2026-07-09).
 LongMemEval-S retrieval is the July 2026 Colab v4 freeze (\textbf{97.6\%},
 488/500; hybrid index + mpnet, no Fabric rerank). LongMemEval-S E2E QA is frozen
@@ -600,10 +582,6 @@ on entities and dates; we report measured gaps rather than treating hybrid recal
 as axiomatic.
 
 \textbf{Limitations.}
-\textbf{LoCoMo $k$ and metric choice.} Headline LoCoMo retrieval uses $k{=}150$;
-Table~\ref{tab:locomo-k} reports sensitivity to smaller budgets. We do not claim
-that 99.0\% holds at $k{=}5$ without checking the frozen sweep.
-
 \textbf{Provenance under shared memory.} The graded 50-case suite scores
 \textbf{100\%} when each conflict pair lives in an isolated brain, but only
 \textbf{18\%} (9/50) when all pairs share one brain (Table~\ref{tab:provenance-conditions}).
@@ -611,6 +589,10 @@ We do not treat the isolated figure as evidence of multi-tenant readiness; the
 shared-brain drop reflects cross-case cue contamination, not a broken
 verified-vs-chat ranker within a single scope. Agent/session scoping for
 \texttt{activate()} at scale remains unevaluated beyond this synthetic stress test.
+
+\textbf{LoCoMo $k$ and metric choice.} Headline LoCoMo retrieval uses $k{=}150$;
+Table~\ref{tab:locomo-k} reports sensitivity to smaller budgets. We do not claim
+that 99.0\% holds at $k{=}5$ without checking the frozen sweep.
 
 \textbf{LongMemEval $K$.} We report session recall at $K{=}8$ from a frozen Colab
 run and document a \texttt{--report-ks 5,8,10} harness for $K{=}5$ and $K{=}10$
@@ -636,6 +618,7 @@ LongMemEval-S numbers only where protocols match. ANN beyond $10^5$ memories is
 not yet evaluated.
 
 \section{Related Work}
+\label{sec:related}
 \subsection{Vector databases}
 Systems such as Chroma, Qdrant, and FAISS~\cite{thakur2021beir} optimize approximate
 nearest-neighbor search. They answer \emph{similarity}, not \emph{memory}: there is
@@ -664,20 +647,20 @@ operations are \texttt{experience} and \texttt{activate}, not SQL or
 \texttt{vector\_search}.
 
 \subsection{Positioning}
-We argue that long-term agent memory may warrant a \emph{candidate} engine-level
-data model---episodes, cues, provenance on write; activation on read---distinct
-from SQL rows and vector ANN, but \textbf{not} categorically novel versus entire
-research programs. Mem0~\cite{chhikara2025mem0}, Mem0$^{\text{\tiny g}}$, Zep~\cite{zep2024},
-and HippoRAG~\cite{gutierrez2024hipporag} already treat memory as structured facts,
-graphs, or associative indices with provenance-like trust policies in application
-layers. Our claim is narrower: an \textbf{embedded} store whose native contract is
-\texttt{experience}/\texttt{activate}, with durability, separation, and hybrid
-recall in one binary---a substrate those layers can sit on, not a replacement for
-their extraction and orchestration. Enterprise databases adding agent features
-(e.g.\ Oracle AI Database unified memory) retrofit memory onto existing engines
-rather than defining episodes and cues as first-class types. Table~\ref{tab:landscape}
-summarizes the landscape; direct head-to-head retrieval on LoCoMo evidence recall
-against Mem0/Zep is future work (different published metrics today).
+We propose an engine-level data model for long-term agent memory---episodes, cues,
+provenance on write; activation on read---distinct from SQL rows and vector ANN.
+We make this case carefully, not categorically: Mem0~\cite{chhikara2025mem0},
+Mem0$^{\text{\tiny g}}$, Zep~\cite{zep2024}, and HippoRAG~\cite{gutierrez2024hipporag}
+already treat memory as structured facts, graphs, or associative indices with
+provenance-like trust policies in application layers. Our claim is narrower: an
+\textbf{embedded} store whose native contract is \texttt{experience}/\texttt{activate},
+with durability, separation, and hybrid recall in one binary---a substrate those
+layers can sit on, not a replacement for their extraction and orchestration.
+Enterprise databases adding agent features (e.g.\ Oracle AI Database unified memory)
+retrofit memory onto existing engines rather than defining episodes and cues as
+first-class types. Table~\ref{tab:landscape} summarizes the landscape; direct
+head-to-head retrieval on LoCoMo evidence recall against Mem0/Zep is future work
+(different published metrics today).
 
 \begin{table}[h]
 \centering
@@ -724,6 +707,41 @@ retrieval, 97.6\% session recall on LongMemEval-S (retrieval v4), and 97.4\%
 end-to-end QA on LongMemEval-S---while LoCoMo end-to-end QA remains weak (23.5\%
 F1 on a 50-question pilot). We release everything needed to reproduce and contest
 these claims.
+
+\appendix
+\section{Recall Fabric mechanisms}
+\label{app:fabric}
+Hybrid recall (Section~\ref{sec:design}) treats memory as an index. FluctlightDB also
+implements a \emph{Recall Fabric}---Photon prefilter (SimHash/LSH), Manifold Lattice
+addressing~\cite{fiete2008,sreenivasan2011}, theta--gamma phase
+parsing~\cite{lisman1995,lisman2013,plate1995}, consolidation crystallization,
+adaptive forgetting, chronos time buckets, and confidence-weighted
+consensus---each as a deterministic, dependency-free module behind
+\texttt{FLUCTLIGHT\_FABRIC=1}. On ingest, Fabric indexes engrams (and CHORUS traces)
+for lattice/phase scoring; on recall it re-ranks hybrid and CHORUS shortlists before
+returning hits. Synthetic property tests cover CRT round-trip, bind/unbind
+invertibility, Hamming--cosine rank agreement, and decay monotonicity. Unlike the
+headline results in Section~\ref{sec:eval}, these mechanisms are \emph{not}
+validated as standalone peer benchmarks---only as optional rerank on CHORUS shortlists
+where Fabric was enabled. Extended mechanism notes live in repository documentation.
+
+\begin{figure}[h]
+\centering
+\fbox{\parbox{0.92\columnwidth}{\centering\ttfamily\small
+cue (text + embedding)\\
+$\downarrow$\\
+Photon prefilter \; (XOR+popcount, LSH) \\
+$\downarrow$ shortlist\\
+Manifold Lattice \; (coarse gist / fine exact) \\
+$\downarrow$ addressed\\
+Phase Parsing \; (order + role disambiguation) \\
+$\downarrow$\\
+\textbf{ranked recall} \; (confidence-weighted)
+}}
+\caption{Recall Fabric pipeline (\texttt{FLUCTLIGHT\_FABRIC=1}). Composes with CHORUS
+recall on LoCoMo, BEIR, and FAMB frozen runs (Section~\ref{sec:eval}).}
+\label{fig:fabric}
+\end{figure}
 
 \section*{Artifacts}
 Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
