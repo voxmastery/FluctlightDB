@@ -255,7 +255,7 @@ def fig_benchmark_summary() -> None:
         "LoCoMo\nevidence recall",
         "LongMemEval-S\nsession@8 (retrieval)",
         "LongMemEval-S\nE2E QA (OpenAI)",
-        "BEIR SciFact\nCHORUS nDCG@10",
+        "BEIR SciFact\nCHORUS/Fabric nDCG@10",
     ]
     values = [locomo_pct, retr_pct, e2e_pct, beir_ndcg * 100]
     colors = ["#4C78A8", "#72B7B2", "#59A14F", "#E15759"]
