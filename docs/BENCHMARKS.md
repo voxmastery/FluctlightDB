@@ -57,6 +57,15 @@ See also `benchmarks/locomo_bench.py`, `benchmarks/longmemeval_bench.py`, and `b
 
 **Reference numbers (SciFact, all-MiniLM-L6-v2, shared embeddings):**
 
+**Paper freeze (July 2026, `FLUCTLIGHT_FABRIC=1` on CHORUS lane):**
+
+| System | nDCG@10 | Recall@10 | Query (ms) |
+|---|---:|---:|---:|
+| Chroma + MiniLM | 0.645 | 0.783 | 17 |
+| FluctlightDB (CHORUS/PRISM/Fabric) | **0.646** | **0.792** | 16 |
+
+Legacy index-mode reference (pre-Fabric paper profile):
+
 | System | write/doc | query | nDCG@10 | Recall@10 | Recall@100 |
 |---|---:|---:|---:|---:|---:|
 | Chroma + MiniLM | ~0.65 ms | ~10 ms | 0.645 | 0.783 | 0.925 |
@@ -75,7 +84,7 @@ Index-mode query latency uses slim vector-fast recalls (large doc bodies omitted
 | **Metrics** | QA F1 / accuracy, summarization quality; official RAG **evidence recall** (gold `dia_id` in context) |
 | **Paper** | Maharana et al., *Evaluating Very Long-Term Conversational Memory of LLM Agents*, ACL 2024 |
 | **Site** | https://snap-research.github.io/locomo/ |
-| **Status** | **Full eval complete** — **99.0%** mean evidence recall (10 conv, k=150, CHORUS); frozen in `benchmarks/results/locomo-chorus-2026-07-08.json` |
+| **Status** | **Full eval complete** — **99.0%** mean evidence recall (10 conv, k=150, CHORUS + Fabric); frozen in `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
 | **In-repo** | `benchmarks/locomo_eval.py`, `benchmarks/locomo_metrics.py` |
 
 **One-command reproduce:**

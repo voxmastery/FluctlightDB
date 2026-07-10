@@ -16,7 +16,7 @@ Our public numbers live here:
 | Artifact | Purpose |
 |----------|---------|
 | `benchmarks/results/paper-2026-07-09.json` | Paper freeze bundle |
-| `benchmarks/results/locomo-chorus-2026-07-08.json` | LoCoMo cert (99.0% evidence recall) |
+| `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` | LoCoMo cert (99.0% evidence recall, Fabric on) |
 | `make reproduce-locomo` | Anyone can verify LoCoMo cert locally |
 | GitHub Releases + PyPI | Versioned engine, not a ranking |
 

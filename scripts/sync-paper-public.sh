@@ -35,7 +35,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
   <title>FluctlightDB — Research Paper (Preprint)</title>
   <meta name="description" content="FluctlightDB: a brain-native memory engine for AI agents. 99.0% LoCoMo evidence recall, 97.6% LongMemEval-S session recall@8, 97.4% LongMemEval E2E QA." />
   <meta property="og:title" content="FluctlightDB: A Memory Model of Data for AI Agents" />
-  <meta property="og:description" content="Third data model for agent memory — 99.0% LoCoMo, 97.6% LongMemEval-S retrieval, 97.4% E2E QA, BEIR SciFact parity, FAMB 100%." />
+  <meta property="og:description" content="Candidate third data model for agent memory — 99.0% LoCoMo, 97.6% LongMemEval-S retrieval, 97.4% E2E QA, BEIR 0.646 nDCG@10, FAMB 100%." />
   <meta property="og:type" content="article" />
   <link rel="stylesheet" href="assets/style.css" />
 </head>
@@ -62,7 +62,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
         <li>LongMemEval-S session@8 <span class="metric">97.6%</span></li>
         <li>LongMemEval-S E2E QA <span class="metric">97.4%</span></li>
         <li>LongMemEval preference@8 <span class="metric">96.7%</span></li>
-        <li>BEIR SciFact CHORUS/PRISM nDCG@10 <span class="metric">0.645</span></li>
+        <li>BEIR SciFact CHORUS/PRISM nDCG@10 <span class="metric">0.646</span></li>
         <li>FAMB macro (agent / chorus) <span class="metric">100% / 100%</span></li>
       </ul>
       <h2 style="margin-top:18px">Cite</h2>

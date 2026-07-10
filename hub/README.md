@@ -26,10 +26,11 @@ pip install "fluctlightdb[native]==0.5.9"
 
 | Benchmark | Result |
 |-----------|--------|
-| LoCoMo evidence recall | **99.0%** (10 conv, k=150) |
+| LoCoMo evidence recall @150 | **99.0%** (1970/1982; CHORUS + Fabric) |
 | LongMemEval-S session@8 | **97.6%** (488/500) |
-| BEIR SciFact nDCG@10 | **0.645** (ties Chroma + MiniLM) |
-| FAMB macro | **97–98%** |
+| LongMemEval-S E2E QA | **97.4%** (487/500) |
+| BEIR SciFact nDCG@10 / R@10 | **0.646 / 0.792** (Fabric on) |
+| FAMB macro | **100%** (internal regression) |
 
 ## Links
 

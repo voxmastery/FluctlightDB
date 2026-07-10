@@ -12,7 +12,7 @@ For fifty years, data systems have answered two questions. The relational model 
 
 We argue that long-term agent memory is not an application built on top of a database — it is a **third data model**, with its own write semantics (encoding, separation, consolidation, provenance) and its own read semantics (cue-driven activation across a linked memory graph). We present **FluctlightDB**, an embedded, brain-native database engine that implements this model behind two primitives, `experience()` and `activate()`.
 
-On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's **CHORUS Lane** recalls **99.0%** of gold evidence (July 2026 certified rerun). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. On BEIR SciFact (shared MiniLM embeddings) the **CHORUS/PRISM Lane** scores nDCG@10 **0.645**, matching Chroma on the same embeddings (2.6 ms/doc imprint, 13.5 s full SciFact). On FAMB, `connect_agent()` and CHORUS each score **100%** macro (July 2026 certified rerun). The engine, harnesses, and frozen metrics are released under MIT.
+On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's **CHORUS Lane** recalls **99.0%** of gold evidence (July 2026 certified rerun). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. On BEIR SciFact (shared MiniLM embeddings, Fabric on) the **CHORUS/PRISM** lane scores nDCG@10 **0.646** and Recall@10 **0.792** (vs Chroma 0.645 / 0.783). On FAMB, `connect_agent()` and CHORUS each score **100%** macro (July 2026 rerun; internal regression). The engine, harnesses, and frozen metrics are released under MIT.
 
 ## 1. Introduction
 
@@ -53,7 +53,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 ![Headline benchmark results](../assets/02-benchmark-summary.png)
 
-*Figure 2: LoCoMo 99.0%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR CHORUS/PRISM 0.645 nDCG@10, FAMB 100%.*
+*Figure 2: LoCoMo 99.0%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR CHORUS/PRISM/Fabric 0.646 nDCG@10, FAMB 100%.*
 
 ![LongMemEval-S retrieval by question type](../assets/03-longmemeval-by-type.png)
 
