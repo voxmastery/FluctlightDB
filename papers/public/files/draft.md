@@ -53,7 +53,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 ![Headline benchmark results](../assets/02-benchmark-summary.png)
 
-*Figure 2: LoCoMo 99.0%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR CHORUS/PRISM/Fabric 0.646 nDCG@10, FAMB 100%.*
+*Figure 2: LoCoMo 99.0%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR CHORUS/PRISM/Fabric 0.646 nDCG@10 (FAMB in text only).*
 
 ![LongMemEval-S retrieval by question type](../assets/03-longmemeval-by-type.png)
 
@@ -75,7 +75,7 @@ All experiments use `all-MiniLM-L6-v2` (ONNX CPU) unless noted. Every number is 
 |--------|---------|------|-------|------------|
 | Chroma | 0.645 | 0.783 | 0.927 | 7 |
 | FluctlightDB (index) | 0.630 | 0.764 | 0.906 | 68 |
-| **FluctlightDB (CHORUS/PRISM)** | **0.645** | **0.783** | 0.925 | 11 |
+| **FluctlightDB (CHORUS/PRISM/Fabric)** | **0.646** | **0.792** | 0.925 | 16 |
 
 CHORUS uses `connect_chorus()` + `chorus_imprint_batch` (GRG resonance recall): **11.6 s** to imprint 5,183 docs vs hours for legacy per-doc `experience()`. Reproduce: `PYTHONPATH=sdks/python python benchmarks/beir_bench.py`.
 
