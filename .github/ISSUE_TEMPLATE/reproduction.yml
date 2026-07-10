@@ -52,7 +52,7 @@ body:
     id: frozen
     attributes:
       label: Frozen artifact compared against
-      placeholder: benchmarks/results/locomo-chorus-2026-07-08.json
+      placeholder: benchmarks/results/locomo-chorus-fabric-2026-07-09.json
     validations:
       required: true
 

@@ -10,15 +10,16 @@ cd "$ROOT"
 
 LOCOMO_DIR="${LOCOMO_DATA_DIR:-/tmp/locomo}"
 LOCOMO_JSON="${LOCOMO_DATA:-$LOCOMO_DIR/locomo10.json}"
-FROZEN="${FROZEN:-benchmarks/results/locomo-chorus-2026-07-08.json}"
+FROZEN="${FROZEN:-benchmarks/results/locomo-chorus-fabric-2026-07-09.json}"
 OUT="${OUT:-benchmarks/results/locomo-reproduce-$(date +%Y-%m-%d).json}"
 VENV="${VENV:-$ROOT/.reproduce-venv}"
 TOP_K="${TOP_K:-150}"
 
-echo "==> LoCoMo reproduce (CHORUS, k=$TOP_K)"
+echo "==> LoCoMo reproduce (CHORUS + Fabric, k=$TOP_K)"
 echo "    dataset:  $LOCOMO_JSON"
 echo "    frozen:   $FROZEN"
 echo "    output:   $OUT"
+echo "    profile:  FLUCTLIGHT_FABRIC=1 (paper freeze)"
 
 mkdir -p "$LOCOMO_DIR"
 if [[ ! -f "$LOCOMO_JSON" ]]; then
@@ -57,6 +58,7 @@ python -c "import fluctlightdb_native; import fluctlightdb; print('native import
 
 export LOCOMO_DATA="$LOCOMO_JSON"
 export PYTHONPATH="$ROOT/sdks/python${PYTHONPATH:+:$PYTHONPATH}"
+export FLUCTLIGHT_FABRIC=1
 
 echo "==> Running locomo_eval.py ..."
 python benchmarks/locomo_eval.py \

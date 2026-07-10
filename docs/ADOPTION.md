@@ -6,7 +6,7 @@ This document tracks the **adoption layer** (integrations, DX, proof) on top of 
 
 | Benchmark | Metric | Result | Artifact |
 |-----------|--------|--------|----------|
-| LoCoMo | Evidence recall | **99.0%** | `benchmarks/results/locomo-chorus-2026-07-08.json` |
+| LoCoMo | Evidence recall | **99.0%** | `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
 | LongMemEval-S | Session@8 retrieval | **97.6%** | `benchmarks/results/longmemeval-muon-final-2026-07-06.json` |
 | BEIR SciFact | nDCG@10 | **0.645** (CHORUS/PRISM parity) | `benchmarks/results/beir-prism-prod-2026-07-08.json` |
 | FAMB | Macro accuracy | **97–98%** | `benchmarks/results/famb-*-2026-07-06.json` |

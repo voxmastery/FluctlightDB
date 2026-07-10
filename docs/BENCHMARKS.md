@@ -221,8 +221,8 @@ Headline numbers in `benchmarks/results/paper-2026-07-09.json` were frozen as fo
 
 | Benchmark | Config frozen | Final cert JSON | Notes |
 |---|---|---|---|
-| LoCoMo CHORUS | 2026-07-08 | `locomo-chorus-2026-07-08.json` | No dev-slice tuning on test convs |
-| BEIR SciFact PRISM | 2026-07-08 | `beir-prism-prod-2026-07-08.json` | Shared MiniLM; Chroma baseline in same harness |
+| LoCoMo CHORUS + Fabric | 2026-07-09 | `locomo-chorus-fabric-2026-07-09.json` | Paper headline; `make reproduce-locomo` |
+| BEIR SciFact PRISM + Fabric | 2026-07-09 | `beir-prism-fabric-2026-07-09.json` | Shared MiniLM; Chroma baseline in same harness |
 | FAMB agent/chorus | 2026-07-09 | `famb-*-2026-07-09.json` | Replaced hardcoded CHORUS sub-scores with measured suites |
 | LongMemEval-S v4 | 2026-07-04 | `longmemeval-colab-v2-full-2026-07-04.json` | Unified 500; pref-facts ablation on preference slice only during dev |
 | LongMemEval E2E | 2026-07-07 | `e2e-cert-paper-v2-2026-07-07.json` | Reader/judge profile frozen before cert |

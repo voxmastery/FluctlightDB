@@ -32,6 +32,8 @@ That is the same headline **99.0%** (1970/1982), not a rounded approximation.
 | **`fluctlightdb[native]==<tag version>`** | Script pins from `crates/fluctlight-py/pyproject.toml` |
 | **`benchmarks/requirements-reproduce.txt`** | Pins Chroma / eval deps (embeddings) |
 | **`--mode chorus --top-k 150`** | Default in `reproduce-locomo.sh` |
+| **`FLUCTLIGHT_FABRIC=1`** | Paper-profile Recall Fabric on (set by `reproduce-locomo.sh`; also via `configure_ir_env()` in `locomo_eval.py`) |
+| **Frozen cert** | `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
 | **Official `locomo10.json`** | Auto-downloaded from snap-research/locomo |
 
 **What can still differ (without changing the pass/fail check):** `wall_s`, embed cache hit counts, absolute paths in JSON metadata.
@@ -110,7 +112,7 @@ git checkout v0.5.6   # or tag matching the frozen cert you compare against
 make reproduce-locomo
 ```
 
-This downloads LoCoMo data, runs CHORUS eval, and compares against the frozen cert (`locomo-chorus-2026-07-08.json`). Expected: **1970/1982** evidence hits at k=150.
+This downloads LoCoMo data, runs CHORUS + Fabric eval (`FLUCTLIGHT_FABRIC=1`), and compares against the frozen cert (`locomo-chorus-fabric-2026-07-09.json`). Expected: **1970/1982** evidence hits at k=150.
 
 Options:
 
