@@ -434,6 +434,31 @@ refund, license, temperature). This is still synthetic author-designed stress
 testing, not a peer benchmark, but it is stronger than $n{=}1$ for the provenance
 story.
 
+\textbf{Shared-brain stress (multi-tenant analogue).} The same 50 cases ingested
+into a \emph{single} \texttt{connect\_agent()} brain---100 conflicting engrams,
+semantically similar cues---collapse to \textbf{18\%} top-1 (9/50;
+\texttt{--shared-brain} in the harness). We attribute this to \emph{cross-case
+cue contamination}: unrelated domains share lexical overlap (``balance,''
+``quota,'' ``version''), so activation returns another case's ledger or chat
+engram, not a failure of per-pair provenance ranking in isolation
+(Table~\ref{tab:provenance-conditions}). This is the main open gap for
+production multi-tenant memory: scoped activation (agent/session namespaces,
+stricter candidate filtering) is on the roadmap and not yet benchmarked at scale.
+
+\begin{table}[h]
+\centering
+\caption{Provenance-conflict suite ($n{=}50$): isolated vs.\ shared brain.}
+\label{tab:provenance-conditions}
+\begin{tabular}{lrr}
+\toprule
+Condition & Top-1 accuracy & Notes \\
+\midrule
+Isolated (one brain per case) & \textbf{100\%} & 50/50; FAMB protocol \\
+Shared (one brain, all cases) & \textbf{18\%} & 9/50; cross-case contamination \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \texttt{connect\_agent()} FAMB macro is \textbf{100\%};
 CHORUS macro is \textbf{100\%} (July 2026 internally reproduced rerun; CHORUS
 provenance and persistence suites call \texttt{chorus\_sleep()} before
@@ -579,12 +604,17 @@ as axiomatic.
 Table~\ref{tab:locomo-k} reports sensitivity to smaller budgets. We do not claim
 that 99.0\% holds at $k{=}5$ without checking the frozen sweep.
 
-\textbf{Provenance evaluation scale.} FAMB provenance remains $n{=}1$; the graded
-50-case conflict suite (Section~5) is author-designed and isolated per case---not
-peer-reviewed external validation and not multi-tenant contention.
+\textbf{Provenance under shared memory.} The graded 50-case suite scores
+\textbf{100\%} when each conflict pair lives in an isolated brain, but only
+\textbf{18\%} (9/50) when all pairs share one brain (Table~\ref{tab:provenance-conditions}).
+We do not treat the isolated figure as evidence of multi-tenant readiness; the
+shared-brain drop reflects cross-case cue contamination, not a broken
+verified-vs-chat ranker within a single scope. Agent/session scoping for
+\texttt{activate()} at scale remains unevaluated beyond this synthetic stress test.
 
-\textbf{LongMemEval $K$.} We now report session recall at $K \in \{5,8,10\}$ on the
-same v4 harness; leaderboard rows still mix embedders and protocols.
+\textbf{LongMemEval $K$.} We report session recall at $K{=}8$ from a frozen Colab
+run and document a \texttt{--report-ks 5,8,10} harness for $K{=}5$ and $K{=}10$
+from one recall pass; leaderboard rows still mix embedders and protocols.
 
 \textbf{LoCoMo end-to-end gap.} Full LoCoMo retrieval reaches \textbf{99.0\%} evidence
 recall, but a 50-question end-to-end pilot with a hosted reader LLM yields only
@@ -602,8 +632,8 @@ full) is not yet in the default ingest path. End-to-end QA on LongMemEval-S
 (Table~\ref{tab:longmemeval-e2e}, Figure~\ref{fig:longmemeval-e2e-types}) uses
 OpenAI reader/judge APIs and remains weakest on multi-session aggregation (92.5\%).
 Mem0/Zep end-to-end figures use different reader setups; we cite published
-LongMemEval-S numbers only where protocols match. Multi-tenant isolation
-at scale and ANN beyond $10^5$ memories are not yet evaluated.
+LongMemEval-S numbers only where protocols match. ANN beyond $10^5$ memories is
+not yet evaluated.
 
 \section{Related Work}
 \subsection{Vector databases}

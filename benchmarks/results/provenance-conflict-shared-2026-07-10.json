@@ -1,0 +1,373 @@
+{
+  "benchmark": "provenance_conflict",
+  "lane": "agent",
+  "condition": "shared_brain",
+  "n_cases": 50,
+  "top1_accuracy": 0.18,
+  "hits": "9/50",
+  "by_domain_macro": {
+    "wallet": 0.0,
+    "shipping": 0.2,
+    "subscription": 0.2,
+    "api_quota": 0.2,
+    "inventory": 0.2,
+    "meeting": 0.2,
+    "deployment": 0.2,
+    "refund": 0.2,
+    "license": 0.2,
+    "temperature": 0.2
+  },
+  "cases": [
+    {
+      "id": "wallet_0",
+      "hit": false,
+      "top_engram_id": "cc40ae50-004b-4e14-a8d5-cd3c32a59f68",
+      "ledger_engram_id": "16f31bcd-32e7-4282-9bdc-c49e78e65946",
+      "top_content_preview": "ledger verified: refund amount 1500 USD"
+    },
+    {
+      "id": "wallet_1",
+      "hit": false,
+      "top_engram_id": "cc40ae50-004b-4e14-a8d5-cd3c32a59f68",
+      "ledger_engram_id": "cf0889cb-fd35-403b-8446-313895e0af7b",
+      "top_content_preview": "ledger verified: refund amount 1500 USD"
+    },
+    {
+      "id": "wallet_2",
+      "hit": false,
+      "top_engram_id": "cc40ae50-004b-4e14-a8d5-cd3c32a59f68",
+      "ledger_engram_id": "488d59ad-72fa-488b-8f4b-7b9ede75fcf2",
+      "top_content_preview": "ledger verified: refund amount 1500 USD"
+    },
+    {
+      "id": "wallet_3",
+      "hit": false,
+      "top_engram_id": "cc40ae50-004b-4e14-a8d5-cd3c32a59f68",
+      "ledger_engram_id": "5307597e-45c7-4a43-b5bd-c1f1782f7d32",
+      "top_content_preview": "ledger verified: refund amount 1500 USD"
+    },
+    {
+      "id": "wallet_4",
+      "hit": false,
+      "top_engram_id": "cc40ae50-004b-4e14-a8d5-cd3c32a59f68",
+      "ledger_engram_id": "df7b4780-6a6a-4e77-af21-754acdd8fc01",
+      "top_content_preview": "ledger verified: refund amount 1500 USD"
+    },
+    {
+      "id": "shipping_0",
+      "hit": true,
+      "top_engram_id": "d6030c27-8637-46d8-839b-cc89078d96f4",
+      "ledger_engram_id": "d6030c27-8637-46d8-839b-cc89078d96f4",
+      "top_content_preview": "tool output verified: order ships on 10"
+    },
+    {
+      "id": "shipping_1",
+      "hit": false,
+      "top_engram_id": "d6030c27-8637-46d8-839b-cc89078d96f4",
+      "ledger_engram_id": "b79292de-5978-4424-8baf-8645bd96681b",
+      "top_content_preview": "tool output verified: order ships on 10"
+    },
+    {
+      "id": "shipping_2",
+      "hit": false,
+      "top_engram_id": "d6030c27-8637-46d8-839b-cc89078d96f4",
+      "ledger_engram_id": "0b78dffa-4e02-4a4c-992b-682361aed170",
+      "top_content_preview": "tool output verified: order ships on 10"
+    },
+    {
+      "id": "shipping_3",
+      "hit": false,
+      "top_engram_id": "d6030c27-8637-46d8-839b-cc89078d96f4",
+      "ledger_engram_id": "9ef512d5-e1a3-4f70-8ade-89c90209acb4",
+      "top_content_preview": "tool output verified: order ships on 10"
+    },
+    {
+      "id": "shipping_4",
+      "hit": false,
+      "top_engram_id": "d6030c27-8637-46d8-839b-cc89078d96f4",
+      "ledger_engram_id": "4427d9e8-0cf7-4fe5-85e5-17b549b66686",
+      "top_content_preview": "tool output verified: order ships on 10"
+    },
+    {
+      "id": "subscription_0",
+      "hit": false,
+      "top_engram_id": "766cd5e7-e864-4ba8-b8c6-79c6e5848f73",
+      "ledger_engram_id": "a6b978a3-fe73-4300-842a-ceee8f08267d",
+      "top_content_preview": "ledger verified: plan tier is 42"
+    },
+    {
+      "id": "subscription_1",
+      "hit": false,
+      "top_engram_id": "766cd5e7-e864-4ba8-b8c6-79c6e5848f73",
+      "ledger_engram_id": "225b1a42-7de0-4188-9d64-03f1098ef09f",
+      "top_content_preview": "ledger verified: plan tier is 42"
+    },
+    {
+      "id": "subscription_2",
+      "hit": false,
+      "top_engram_id": "766cd5e7-e864-4ba8-b8c6-79c6e5848f73",
+      "ledger_engram_id": "dada0aff-a261-41b3-8ec7-94bf2c3eaed6",
+      "top_content_preview": "ledger verified: plan tier is 42"
+    },
+    {
+      "id": "subscription_3",
+      "hit": true,
+      "top_engram_id": "766cd5e7-e864-4ba8-b8c6-79c6e5848f73",
+      "ledger_engram_id": "766cd5e7-e864-4ba8-b8c6-79c6e5848f73",
+      "top_content_preview": "ledger verified: plan tier is 42"
+    },
+    {
+      "id": "subscription_4",
+      "hit": false,
+      "top_engram_id": "766cd5e7-e864-4ba8-b8c6-79c6e5848f73",
+      "ledger_engram_id": "f9f38e87-023f-4b5a-ae0c-b62dd14eda48",
+      "top_content_preview": "ledger verified: plan tier is 42"
+    },
+    {
+      "id": "api_quota_0",
+      "hit": false,
+      "top_engram_id": "7f4f97e5-4e27-44c1-91df-381679507d7c",
+      "ledger_engram_id": "b57d76d6-e34b-40ea-9815-c4d7ca2f217c",
+      "top_content_preview": "tool grounded: api quota remaining 0 calls"
+    },
+    {
+      "id": "api_quota_1",
+      "hit": true,
+      "top_engram_id": "7f4f97e5-4e27-44c1-91df-381679507d7c",
+      "ledger_engram_id": "7f4f97e5-4e27-44c1-91df-381679507d7c",
+      "top_content_preview": "tool grounded: api quota remaining 0 calls"
+    },
+    {
+      "id": "api_quota_2",
+      "hit": false,
+      "top_engram_id": "7f4f97e5-4e27-44c1-91df-381679507d7c",
+      "ledger_engram_id": "1b48c16d-2f54-4147-935e-bea35d8a80d6",
+      "top_content_preview": "tool grounded: api quota remaining 0 calls"
+    },
+    {
+      "id": "api_quota_3",
+      "hit": false,
+      "top_engram_id": "7f4f97e5-4e27-44c1-91df-381679507d7c",
+      "ledger_engram_id": "1f1d69b0-1b60-426e-bfc6-c1d73b06b386",
+      "top_content_preview": "tool grounded: api quota remaining 0 calls"
+    },
+    {
+      "id": "api_quota_4",
+      "hit": false,
+      "top_engram_id": "7f4f97e5-4e27-44c1-91df-381679507d7c",
+      "ledger_engram_id": "654f09d2-baa4-4755-88f1-e5298e6e4a8c",
+      "top_content_preview": "tool grounded: api quota remaining 0 calls"
+    },
+    {
+      "id": "inventory_0",
+      "hit": true,
+      "top_engram_id": "9df91013-3260-44a2-a21c-94f5b8ab68f5",
+      "ledger_engram_id": "9df91013-3260-44a2-a21c-94f5b8ab68f5",
+      "top_content_preview": "file observation verified: sku-42 stock count 10"
+    },
+    {
+      "id": "inventory_1",
+      "hit": false,
+      "top_engram_id": "9df91013-3260-44a2-a21c-94f5b8ab68f5",
+      "ledger_engram_id": "a8964077-5651-41fb-b5e4-c8e0eb7883eb",
+      "top_content_preview": "file observation verified: sku-42 stock count 10"
+    },
+    {
+      "id": "inventory_2",
+      "hit": false,
+      "top_engram_id": "9df91013-3260-44a2-a21c-94f5b8ab68f5",
+      "ledger_engram_id": "50ac021a-1815-4193-a6cd-efc7aa1c83ae",
+      "top_content_preview": "file observation verified: sku-42 stock count 10"
+    },
+    {
+      "id": "inventory_3",
+      "hit": false,
+      "top_engram_id": "9df91013-3260-44a2-a21c-94f5b8ab68f5",
+      "ledger_engram_id": "82290a6a-702c-4dcd-97a9-94c3c81868dd",
+      "top_content_preview": "file observation verified: sku-42 stock count 10"
+    },
+    {
+      "id": "inventory_4",
+      "hit": false,
+      "top_engram_id": "9df91013-3260-44a2-a21c-94f5b8ab68f5",
+      "ledger_engram_id": "02c2efa8-5d10-47d5-a019-367f57eda8f1",
+      "top_content_preview": "file observation verified: sku-42 stock count 10"
+    },
+    {
+      "id": "meeting_0",
+      "hit": false,
+      "top_engram_id": "c2251587-a795-4a9a-a79e-dc94eba8e8f2",
+      "ledger_engram_id": "c7fc3bd9-a86b-4794-9d9c-b58ecd0d2446",
+      "top_content_preview": "calendar verified: standup scheduled 250"
+    },
+    {
+      "id": "meeting_1",
+      "hit": false,
+      "top_engram_id": "c2251587-a795-4a9a-a79e-dc94eba8e8f2",
+      "ledger_engram_id": "3687bb81-8cfc-4900-a591-79900bd12df1",
+      "top_content_preview": "calendar verified: standup scheduled 250"
+    },
+    {
+      "id": "meeting_2",
+      "hit": true,
+      "top_engram_id": "c2251587-a795-4a9a-a79e-dc94eba8e8f2",
+      "ledger_engram_id": "c2251587-a795-4a9a-a79e-dc94eba8e8f2",
+      "top_content_preview": "calendar verified: standup scheduled 250"
+    },
+    {
+      "id": "meeting_3",
+      "hit": false,
+      "top_engram_id": "c2251587-a795-4a9a-a79e-dc94eba8e8f2",
+      "ledger_engram_id": "61d5c5fc-274e-412e-a3fa-6fcf446049a6",
+      "top_content_preview": "calendar verified: standup scheduled 250"
+    },
+    {
+      "id": "meeting_4",
+      "hit": false,
+      "top_engram_id": "c2251587-a795-4a9a-a79e-dc94eba8e8f2",
+      "ledger_engram_id": "16bbe48d-c6c8-4e8b-a777-47ad3671ebce",
+      "top_content_preview": "calendar verified: standup scheduled 250"
+    },
+    {
+      "id": "deployment_0",
+      "hit": false,
+      "top_engram_id": "12c62916-d517-4949-8a00-f77f6cc2b77e",
+      "ledger_engram_id": "3d18d56c-8d42-4d78-859c-322fa515eb03",
+      "top_content_preview": "ci verified: production version 42"
+    },
+    {
+      "id": "deployment_1",
+      "hit": false,
+      "top_engram_id": "12c62916-d517-4949-8a00-f77f6cc2b77e",
+      "ledger_engram_id": "3c9c12b0-1817-42a2-a696-bd75b7994daf",
+      "top_content_preview": "ci verified: production version 42"
+    },
+    {
+      "id": "deployment_2",
+      "hit": false,
+      "top_engram_id": "12c62916-d517-4949-8a00-f77f6cc2b77e",
+      "ledger_engram_id": "53930a40-189a-4d63-bb7b-e317b3d8b178",
+      "top_content_preview": "ci verified: production version 42"
+    },
+    {
+      "id": "deployment_3",
+      "hit": true,
+      "top_engram_id": "12c62916-d517-4949-8a00-f77f6cc2b77e",
+      "ledger_engram_id": "12c62916-d517-4949-8a00-f77f6cc2b77e",
+      "top_content_preview": "ci verified: production version 42"
+    },
+    {
+      "id": "deployment_4",
+      "hit": false,
+      "top_engram_id": "12c62916-d517-4949-8a00-f77f6cc2b77e",
+      "ledger_engram_id": "1580c517-4fb8-4ff9-b94d-786d02195f34",
+      "top_content_preview": "ci verified: production version 42"
+    },
+    {
+      "id": "refund_0",
+      "hit": true,
+      "top_engram_id": "88326d79-90aa-4e4f-b88d-c9a294909f55",
+      "ledger_engram_id": "88326d79-90aa-4e4f-b88d-c9a294909f55",
+      "top_content_preview": "ledger verified: refund amount 10 USD"
+    },
+    {
+      "id": "refund_1",
+      "hit": false,
+      "top_engram_id": "88326d79-90aa-4e4f-b88d-c9a294909f55",
+      "ledger_engram_id": "09c62765-8408-4892-bad8-e55e155aa62f",
+      "top_content_preview": "ledger verified: refund amount 10 USD"
+    },
+    {
+      "id": "refund_2",
+      "hit": false,
+      "top_engram_id": "88326d79-90aa-4e4f-b88d-c9a294909f55",
+      "ledger_engram_id": "4cc4b4f5-8bf9-45f2-9b76-124cbdcf045c",
+      "top_content_preview": "ledger verified: refund amount 10 USD"
+    },
+    {
+      "id": "refund_3",
+      "hit": false,
+      "top_engram_id": "88326d79-90aa-4e4f-b88d-c9a294909f55",
+      "ledger_engram_id": "6bf8c2d5-6877-4835-961a-edc154995f81",
+      "top_content_preview": "ledger verified: refund amount 10 USD"
+    },
+    {
+      "id": "refund_4",
+      "hit": false,
+      "top_engram_id": "88326d79-90aa-4e4f-b88d-c9a294909f55",
+      "ledger_engram_id": "cc40ae50-004b-4e14-a8d5-cd3c32a59f68",
+      "top_content_preview": "ledger verified: refund amount 10 USD"
+    },
+    {
+      "id": "license_0",
+      "hit": true,
+      "top_engram_id": "903d4aa3-0322-43c4-a7da-6b019be21e23",
+      "ledger_engram_id": "903d4aa3-0322-43c4-a7da-6b019be21e23",
+      "top_content_preview": "license server verified: seats in use 10"
+    },
+    {
+      "id": "license_1",
+      "hit": false,
+      "top_engram_id": "903d4aa3-0322-43c4-a7da-6b019be21e23",
+      "ledger_engram_id": "5785b2dd-aad1-4989-bc13-17113acbe693",
+      "top_content_preview": "license server verified: seats in use 10"
+    },
+    {
+      "id": "license_2",
+      "hit": false,
+      "top_engram_id": "903d4aa3-0322-43c4-a7da-6b019be21e23",
+      "ledger_engram_id": "4e6e6910-3a4e-46a1-b683-dbb029354ceb",
+      "top_content_preview": "license server verified: seats in use 10"
+    },
+    {
+      "id": "license_3",
+      "hit": false,
+      "top_engram_id": "903d4aa3-0322-43c4-a7da-6b019be21e23",
+      "ledger_engram_id": "6dfe60c3-ff03-49db-b6fc-583b8bde044c",
+      "top_content_preview": "license server verified: seats in use 10"
+    },
+    {
+      "id": "license_4",
+      "hit": false,
+      "top_engram_id": "903d4aa3-0322-43c4-a7da-6b019be21e23",
+      "ledger_engram_id": "3fb1711c-9128-4e63-af0c-d75a73c06b6c",
+      "top_content_preview": "license server verified: seats in use 10"
+    },
+    {
+      "id": "temperature_0",
+      "hit": true,
+      "top_engram_id": "583c6fa9-0322-49fd-8699-165acac84b86",
+      "ledger_engram_id": "583c6fa9-0322-49fd-8699-165acac84b86",
+      "top_content_preview": "sensor verified: server room temp 10C"
+    },
+    {
+      "id": "temperature_1",
+      "hit": false,
+      "top_engram_id": "583c6fa9-0322-49fd-8699-165acac84b86",
+      "ledger_engram_id": "7b871106-fd84-4da9-9f77-da199cd090a7",
+      "top_content_preview": "sensor verified: server room temp 10C"
+    },
+    {
+      "id": "temperature_2",
+      "hit": false,
+      "top_engram_id": "583c6fa9-0322-49fd-8699-165acac84b86",
+      "ledger_engram_id": "354e6912-6a4c-4153-bde7-26a4ead30856",
+      "top_content_preview": "sensor verified: server room temp 10C"
+    },
+    {
+      "id": "temperature_3",
+      "hit": false,
+      "top_engram_id": "583c6fa9-0322-49fd-8699-165acac84b86",
+      "ledger_engram_id": "d82dff71-6f35-4ba0-97d2-1670a09cea38",
+      "top_content_preview": "sensor verified: server room temp 10C"
+    },
+    {
+      "id": "temperature_4",
+      "hit": false,
+      "top_engram_id": "583c6fa9-0322-49fd-8699-165acac84b86",
+      "ledger_engram_id": "61280d1c-6fd2-4745-8a92-b778aefece87",
+      "top_content_preview": "sensor verified: server room temp 10C"
+    }
+  ],
+  "wall_s": 0.56
+}
