@@ -206,6 +206,12 @@ PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode chorus --j
 
 FAMB is an **internal regression suite** (not LoCoMo-scale external validation): paraphrase $n=10$; provenance, persistence, confusion, and determinism are each one pass/fail scenario ($n=1$). CHORUS provenance/persistence suites call `chorus_sleep()` then `activate()` so durable hippocampal engrams participate (in-memory CHORUS traces alone are not checkpointed).
 
+**Graded provenance conflicts ($n=50$):** `benchmarks/provenance_conflict_bench.py` — isolated agent brain per case; verified ledger/tool vs conflicting chat; top-1 must prefer verified. Reproduce: `scripts/reproduce-provenance.sh`.
+
+**LoCoMo ablations:** `benchmarks/locomo_ablation.py --sweep-k` (recall@$k$ sensitivity on CHORUS+Fabric); `--hybrid-vs-vector` (index lane hybrid vs vector-fast at fixed $k$).
+
+**LongMemEval multi-$K$:** `longmemeval_bench.py --report-ks 5,8,10` scores session recall at $K=5,8,10$ from one recall pass at $\max K$. Merge sharded runs: `benchmarks/merge_longmemeval_shards.py`.
+
 **Latest runs (2026-07-09, noise=200, measured suites):**
 
 | Mode | paraphrase@1 | provenance | persistence | confusion | determinism | **MACRO** |
@@ -217,11 +223,13 @@ FAMB is an **internal regression suite** (not LoCoMo-scale external validation):
 
 ## Development protocol (freeze dates)
 
-Headline numbers in `benchmarks/results/paper-2026-07-09.json` were frozen as follows:
+Headline numbers in `benchmarks/results/paper-2026-07-10.json` (reviewer remediation freeze):
 
 | Benchmark | Config frozen | Final cert JSON | Notes |
 |---|---|---|---|
-| LoCoMo CHORUS + Fabric | 2026-07-09 | `locomo-chorus-fabric-2026-07-09.json` | Paper headline; `make reproduce-locomo` |
+| LoCoMo CHORUS + Fabric | 2026-07-09 | `locomo-chorus-fabric-2026-07-09.json` | 99.0% @ $k{=}150$; k-sweep: `locomo-k-sweep-fabric-2026-07-10.json` |
+| LoCoMo hybrid vs vector (index) | 2026-07-10 | `locomo-hybrid-index-2026-07-10.json` | @ $k{=}50$; hybrid $\approx$ vector |
+| Provenance conflict (50 cases) | 2026-07-10 | `provenance-conflict-2026-07-10.json` | Agent lane; 100% top-1 |
 | BEIR SciFact PRISM + Fabric | 2026-07-09 | `beir-prism-fabric-2026-07-09.json` | Shared MiniLM; Chroma baseline in same harness |
 | FAMB agent/chorus | 2026-07-09 | `famb-*-2026-07-09.json` | Replaced hardcoded CHORUS sub-scores with measured suites |
 | LongMemEval-S v4 | 2026-07-04 | `longmemeval-colab-v2-full-2026-07-04.json` | Unified 500; pref-facts ablation on preference slice only during dev |

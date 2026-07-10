@@ -658,6 +658,7 @@ def eval_one(
     pref_facts_key: bool,
     brain_sleep: int = 2,
     use_muon: bool = False,
+    report_ks: Optional[list[int]] = None,
 ) -> dict[str, Any]:
     t0 = time.perf_counter()
     recalls, hit, ingested, _brain = retrieve_item(
@@ -676,7 +677,7 @@ def eval_one(
     if metric != "session":
         hit = answer_in_recalls(recalls, item.get("answer") or "", top_k=top_k)
     elapsed = time.perf_counter() - t0
-    return {
+    row: dict[str, Any] = {
         "question_id": item.get("question_id"),
         "question_type": item.get("question_type"),
         "hit": hit,
@@ -684,6 +685,11 @@ def eval_one(
         "recalls": len(recalls),
         "sec": round(elapsed, 3),
     }
+    if metric == "session" and report_ks:
+        gold = item.get("answer_session_ids") or []
+        for k in report_ks:
+            row[f"hit_at_{k}"] = session_in_recalls(recalls, gold, top_k=k)
+    return row
 
 
 def _ingest_sessions(
@@ -794,6 +800,11 @@ def main() -> int:
         help="brain=full agent path (default); index=IR-only vector-fast; conv=hybrid RAG",
     )
     ap.add_argument("--top-k", type=int, default=8)
+    ap.add_argument(
+        "--report-ks",
+        default="",
+        help="comma-separated K values to score from one recall at max(K) (e.g. 5,8,10)",
+    )
     ap.add_argument("--limit", type=int, default=0, help="0 = full dataset")
     ap.add_argument("--offset", type=int, default=0)
     ap.add_argument("--fast", action="store_true", help="skip embeddings (lexical only)")
@@ -849,6 +860,9 @@ def main() -> int:
     if not args.data.is_file():
         raise SystemExit(f"dataset not found: {args.data}")
 
+    report_ks = [int(x) for x in args.report_ks.split(",") if x.strip()]
+    effective_top_k = max([args.top_k, *report_ks]) if report_ks else args.top_k
+
     items = load_dataset(args.data)
     if args.type_filter.strip():
         allowed = {t.strip() for t in args.type_filter.split(",") if t.strip()}
@@ -889,7 +903,7 @@ def main() -> int:
             row = eval_one(
                 item,
                 mode=args.mode,
-                top_k=args.top_k,
+                top_k=effective_top_k,
                 embedder=embedder,
                 fast=args.fast,
                 granularity=args.granularity,
@@ -899,6 +913,7 @@ def main() -> int:
                 pref_facts_key=args.pref_facts_key,
                 brain_sleep=args.brain_sleep,
                 use_muon=args.muon,
+                report_ks=report_ks or None,
             )
         except Exception as e:
             row = {
@@ -941,7 +956,8 @@ def main() -> int:
         "brain_sleep": args.brain_sleep if args.mode == "brain" else 0,
         "muon_lane": args.muon,
         "tau_lane": args.muon,
-        "top_k": args.top_k,
+        "top_k": effective_top_k,
+        "report_ks": report_ks,
         "questions": len(results),
         metric_key: round(hits / len(results), 4) if results else 0.0,
         "hits": f"{hits}/{len(results)}",
@@ -953,6 +969,11 @@ def main() -> int:
             k: round(sum(v) / len(v), 4) for k, v in sorted(by_type.items())
         },
     }
+    if report_ks and args.metric == "session":
+        for k in report_ks:
+            khits = sum(1 for r in results if r.get(f"hit_at_{k}"))
+            report[f"session_recall_at_{k}"] = round(khits / len(results), 4) if results else 0.0
+            report[f"hits_at_{k}"] = f"{khits}/{len(results)}"
     print(json.dumps(report, indent=2))
 
     out = args.json_out or REPO / "benchmarks" / "results" / f"longmemeval-{time.strftime('%Y-%m-%d')}.json"
