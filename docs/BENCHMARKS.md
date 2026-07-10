@@ -168,7 +168,6 @@ Leaderboard context: gbrain 97.6% R@5 (hybrid + text-embedding-3-large); YourMem
 
 | Benchmark | Focus | Notes |
 |---|---|---|
-| **BEAM (ICLR 2026)** | 128K–10M token chats; LLM-rubric E2E | Experimental harness: `benchmarks/beam_eval.py`, `make reproduce-beam-smoke` — **not in paper freeze** (smoke scores too low to cite pre-arXiv) |
 | **Evo-Memory / EvoMemBench** | Evolving memory under distribution shift | Good for consolidation / forgetting claims |
 | **MemoryArena (2026)** | Head-to-head memory modules | Useful for related-work positioning |
 | **FindingDory** | Embodied episodic memory | If claiming spatial / embodied recall |
