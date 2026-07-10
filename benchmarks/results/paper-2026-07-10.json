@@ -1,0 +1,106 @@
+{
+  "date": "2026-07-10",
+  "harness": "FluctlightDB benchmark suite (paper v2 + reviewer remediation)",
+  "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
+  "doi": "10.5281/zenodo.20949890",
+  "arxiv": "preprint (cs.DB; arXiv submission pending)",
+  "reproduce": "benchmarks/README.md, docs/BENCHMARKS.md, benchmarks/longmemeval_colab_v2.ipynb",
+  "fabric_on": true,
+  "fabric_note": "Paper-profile Fabric-on (FLUCTLIGHT_FABRIC=1) via configure_paper_fabric() in CHORUS benchmarks (LoCoMo, BEIR, FAMB). LongMemEval connect_index uses hybrid sidecar ranking; Fabric rerank applies on CHORUS/PRISM lane only.",
+  "beir_scifact": {
+    "embedder": "all-MiniLM-L6-v2 ONNX CPU",
+    "systems": {
+      "chroma": {
+        "ndcg_at_10": 0.645,
+        "recall_at_10": 0.783,
+        "recall_at_100": 0.927,
+        "query_ms": "17"
+      },
+      "fluctlightdb_chorus": {
+        "ndcg_at_10": 0.646,
+        "recall_at_10": 0.792,
+        "recall_at_100": 0.925,
+        "query_ms": "16",
+        "imprint_ms_per_doc": 2.96,
+        "lane": "chorus_grg_prism",
+        "frozen_source": "beir-prism-fabric-2026-07-09.json"
+      }
+    },
+    "frozen_source": "beir-prism-fabric-2026-07-09.json"
+  },
+  "locomo": {
+    "conversations": 10,
+    "gold_evidence_spans": 1982,
+    "top_k": 150,
+    "mode": "chorus",
+    "lane": "chorus_grg_fabric",
+    "rag_mode": "all",
+    "embedder": "all-MiniLM-L6-v2 ONNX CPU",
+    "mean_evidence_recall": 0.99,
+    "evidence_all_in_context": 0.983,
+    "evidence_hits": "1970/1982",
+    "memories_ingested": 8422,
+    "frozen_source": "locomo-chorus-fabric-2026-07-09.json",
+    "recall_at_k": {
+      "5": 0.6928,
+      "10": 0.7757,
+      "25": 0.8734,
+      "50": 0.9346,
+      "150": 0.9902
+    },
+    "recall_at_k_frozen_source": "locomo-k-sweep-fabric-2026-07-10.json",
+    "hybrid_vs_vector_index_k50": {
+      "hybrid_bm25_vector_mean": 0.9016,
+      "vector_only_fast_mean": 0.9031,
+      "frozen_source": "locomo-hybrid-index-2026-07-10.json"
+    }
+  },
+  "provenance_conflict": {
+    "n_cases": 50,
+    "lane": "agent",
+    "top1_accuracy": 1.0,
+    "hits": "50/50",
+    "domains": 10,
+    "frozen_source": "provenance-conflict-2026-07-10.json",
+    "note": "Isolated brain per case; verified ledger vs chat conflict (author-designed)."
+  },
+  "famb": {
+    "agent_macro": 1.0,
+    "chorus_macro": 1.0,
+    "suite_sizes": {
+      "paraphrase_recall_at_1": 10,
+      "provenance_top1": 1,
+      "persistence_recall": 1,
+      "confusion_ingest": 1,
+      "determinism": 1
+    },
+    "frozen_source_agent": "famb-agent-fabric-2026-07-09.json",
+    "frozen_source_chorus": "famb-chorus-fabric-2026-07-09.json"
+  },
+  "longmemeval_s": {
+    "dataset": "longmemeval_s_cleaned.json (Wu et al., ICLR 2025)",
+    "metric": "session_recall multi-K",
+    "questions": 500,
+    "session_recall_at_8": 0.976,
+    "hits_at_8": "488/500",
+    "session_recall_at_5": null,
+    "session_recall_at_10": null,
+    "multi_k_note": "Certify K=5,8,10 in one pass via longmemeval_bench.py --report-ks 5,8,10; frozen_source pending longmemeval-session-multi-k-2026-07-10.json",
+    "unified_v4_full_500": true,
+    "platform_colab": "google_colab_gpu",
+    "embed_model": "sentence-transformers/multi-qa-mpnet-base-dot-v1",
+    "mode": "index",
+    "granularity": "session",
+    "dual_key": true,
+    "pref_facts_key": true,
+    "query_expand": true,
+    "harness": "v4",
+    "frozen_source_colab_k8": "longmemeval-colab-v2-full-2026-07-04.json",
+    "reproduce_local": "scripts/start-embed-mpnet.sh && python3 benchmarks/longmemeval_bench.py --mode index --granularity session --metric session --dual-key --pref-facts-key --query-expand --report-ks 5,8,10",
+    "e2e": {
+      "overall_accuracy": 0.974,
+      "frozen_source": "e2e-cert-paper-v2-2026-07-07.json",
+      "note": "Frozen July 2026; not re-run (OpenAI credits)."
+    }
+  }
+}

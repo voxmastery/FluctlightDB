@@ -1,0 +1,45 @@
+{
+  "benchmark": "locomo",
+  "ablation": "recall_at_k",
+  "fabric_on": true,
+  "ks": [
+    5,
+    10,
+    25,
+    50,
+    150
+  ],
+  "by_k": {
+    "5": {
+      "mean_evidence_recall": 0.6927814686017771,
+      "evidence_all_in_context": 0.6503531786074672,
+      "evidence_hits": "1473/1982",
+      "questions": 1982
+    },
+    "10": {
+      "mean_evidence_recall": 0.775744079499551,
+      "evidence_all_in_context": 0.7290615539858728,
+      "evidence_hits": "1634/1982",
+      "questions": 1982
+    },
+    "25": {
+      "mean_evidence_recall": 0.8733605523347883,
+      "evidence_all_in_context": 0.8340060544904138,
+      "evidence_hits": "1796/1982",
+      "questions": 1982
+    },
+    "50": {
+      "mean_evidence_recall": 0.9345722582522905,
+      "evidence_all_in_context": 0.9076690211907165,
+      "evidence_hits": "1889/1982",
+      "questions": 1982
+    },
+    "150": {
+      "mean_evidence_recall": 0.990201277587756,
+      "evidence_all_in_context": 0.9833501513622603,
+      "evidence_hits": "1970/1982",
+      "questions": 1982
+    }
+  },
+  "wall_s": 625.6
+}

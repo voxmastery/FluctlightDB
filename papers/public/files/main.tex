@@ -382,9 +382,38 @@ Memories ingested & 8422 \\
 
 We deliberately separate \emph{retrieval} from \emph{generation} on LoCoMo
 (Section~\ref{sec:eval}, Limitations). The engine's job is to put evidence in
-context; on full LoCoMo retrieval it scores \textbf{99.0\%}.
+context; on full LoCoMo retrieval it scores \textbf{99.0\%} at $k{=}150$.
 
-\subsection{FAMB: internal agent-memory regression suite}
+\subsubsection{Recall sensitivity to $k$}
+LoCoMo uses a generous $k{=}150$ (SPECTRUM readout when $k{>}100$). To test
+whether the headline number depends on that budget, we re-score the same July 2026
+CHORUS+Fabric imprint with a single batched recall per question and truncate to
+$k \in \{5,10,25,50,150\}$ (Table~\ref{tab:locomo-k}). Mean evidence recall stays
+high at moderate $k$; the full-set 99.0\% figure is at $k{=}150$.
+
+\begin{table}[h]
+\centering
+\caption{LoCoMo evidence recall vs.\ retrieval budget $k$ (CHORUS+Fabric, July 2026).}
+\label{tab:locomo-k}
+\begin{tabular}{lrrrrr}
+\toprule
+$k$ & 5 & 10 & 25 & 50 & 150 \\
+\midrule
+Mean evidence recall & 69.3\% & 77.6\% & 87.3\% & 93.5\% & \textbf{99.0\%} \\
+All evidence in context & 65.0\% & 72.9\% & 83.4\% & 90.8\% & 98.3\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Hybrid vs.\ vector-only (index lane)}
+On the full LoCoMo set with \texttt{connect\_index()} at $k{=}50$, hybrid
+BM25+dense and vector-fast-only are statistically tied ($\sim$90.2\% vs.\
+$\sim$90.3\% mean evidence recall; frozen
+\texttt{locomo-hybrid-index-2026-07-10.json}). The headline 99.0\% figure uses
+CHORUS+Fabric at $k{=}150$, not the index lane. Lexical seeds help on some
+dialogue slices but are not a large uniform gain on this benchmark at moderate~$k$.
+
+\subsection{FAMB and provenance-conflict suite}
 Generic IR does not test what agents need. FAMB measures paraphrase recall@1
 (real cues never match stored wording), provenance top-1 (verified ledger beats
 chat claim), persistence (recall survives checkpoint + reopen), confusion ingest
@@ -392,12 +421,24 @@ chat claim), persistence (recall survives checkpoint + reopen), confusion ingest
 or LongMemEval, FAMB is a small suite we authored: paraphrase $n{=}10$ hand-written
 pairs; provenance, persistence, confusion, and determinism are each a single
 pass/fail scenario ($n{=}1$). We report it as a regression check on agent semantics,
-not as external validation. \texttt{connect\_agent()} macro is \textbf{100\%};
+not as external validation.
+
+\textbf{Graded provenance conflicts ($n{=}50$).} Because FAMB provenance is a
+single wallet scenario, we add a separate benchmark:
+\texttt{benchmarks/provenance\_conflict\_bench.py}. Each of 50 isolated cases
+ingests a verified ledger/tool fact and a conflicting unverified chat claim in
+\texttt{connect\_agent()}; the cue asks for the grounded value. Top-1 must be the
+verified engram. The July 2026 run scores \textbf{100\%} (50/50) across ten
+domains (wallet, shipping, subscription, API quota, inventory, meeting, deployment,
+refund, license, temperature). This is still synthetic author-designed stress
+testing, not a peer benchmark, but it is stronger than $n{=}1$ for the provenance
+story.
+
+\texttt{connect\_agent()} FAMB macro is \textbf{100\%};
 CHORUS macro is \textbf{100\%} (July 2026 internally reproduced rerun; CHORUS
 provenance and persistence suites call \texttt{chorus\_sleep()} before
 \texttt{activate()} so durable engrams participate in ranking). We do not place
-FAMB alongside LoCoMo/BEIR in headline figures---it is author-designed regression,
-not external validation.
+FAMB or the provenance-conflict suite alongside LoCoMo/BEIR in headline figures.
 
 \subsection{LongMemEval-S: 97.6\% session recall@8 (v4 unified 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
@@ -411,25 +452,29 @@ hybrid BM25 + dense recall, dual-key user indexing (CP2), heuristic query
 expansion (CP3), and a third \emph{pref-facts} engram per session (v4). This
 hybrid-index stack does not use Recall Fabric rerank (unlike the CHORUS benchmarks
 above). Embeddings use \texttt{multi-qa-mpnet-base-dot-v1} on GPU; the unified 500-question v4 run
-scores \textbf{97.6\%} (488/500) and completes in $\sim$73 minutes on Colab T4
-($8.8$\,s/question). Reproduce: \texttt{benchmarks/longmemeval\_colab\_v2.ipynb}
+scores \textbf{97.6\%} session recall@8 (488/500) and completes in $\sim$73 minutes on Colab T4
+($8.8$\,s/question). The harness also supports \texttt{--report-ks 5,8,10} to
+score $K{=}5$, $8$, and $10$ from a single recall pass at $\max(K){=}10$; frozen
+multi-$K$ JSON: \texttt{longmemeval-session-multi-k-2026-07-10.json}. Reproduce:
+\texttt{benchmarks/longmemeval\_colab\_v2.ipynb}
 (\texttt{BENCH\_PROFILE=full}) or \texttt{longmemeval\_bench.py} with
-\texttt{--dual-key --pref-facts-key --query-expand}.
+\texttt{--dual-key --pref-facts-key --query-expand --report-ks 5,8,10}.
 
 \begin{table}[h]
 \centering
-\caption{LongMemEval-S retrieval: session recall@8 (full 500 questions).}
+\caption{LongMemEval-S retrieval: session recall at multiple $K$ (full 500 questions, v4 harness).}
 \begin{tabular}{lrr}
 \toprule
-\textbf{FluctlightDB (this work)} & \textbf{session@8} & \textbf{Notes} \\
+\textbf{FluctlightDB (this work)} & \textbf{session recall} & \textbf{Notes} \\
 \midrule
-v4 unified & \textbf{97.6\%} & 488/500; pref-facts + RRF \\
-\quad knowledge-update & 100\% & \\
-\quad multi-session & 98.5\% & \\
-\quad single-session-user & 97.1\% & \\
-\quad single-session-assistant & 98.2\% & \\
-\quad temporal-reasoning & 95.5\% & \\
-\quad single-session-preference & 96.7\% & 29/30 \\
+v4 @ $K{=}5$, $K{=}10$ & \multicolumn{2}{l}{\texttt{--report-ks 5,8,10} (same v4 harness; Colab $\sim$75\,min)} \\
+v4 @ $K{=}8$ & \textbf{97.6\%} & 488/500; Colab mpnet \\
+\quad knowledge-update & 100\% @8 & \\
+\quad multi-session & 98.5\% @8 & \\
+\quad single-session-user & 97.1\% @8 & \\
+\quad single-session-assistant & 98.2\% @8 & \\
+\quad temporal-reasoning & 95.5\% @8 & \\
+\quad single-session-preference & 96.7\% @8 & 29/30 \\
 \midrule
 \multicolumn{3}{l}{\textit{Cited leaderboard figures (different $K$ / embedders; not head-to-head)}} \\
 \midrule
@@ -522,12 +567,25 @@ workflows (not a third-party production case study). The durability and crash-re
 properties in Section~\ref{sec:design} are what those workflows rely on, alongside
 the chaos suite above---not properties asserted only from benchmark scripts.
 
-\textbf{Hybrid retrieval matters.} Lexical seeds materially raised LoCoMo recall
-over vector-only retrieval at moderate $k$; dialogue evidence frequently hinges on
-named entities and dates that cosine similarity alone misses. This is direct
-evidence that the memory model benefits from machinery a pure vector DB lacks.
+\textbf{Hybrid retrieval on measured ablations.} On LoCoMo with
+\texttt{connect\_index()} at $k{=}50$, hybrid BM25+dense and vector-fast-only
+tie within 0.1 percentage points mean evidence recall (full-set ablation JSON).
+The 99.0\% headline uses CHORUS+Fabric at $k{=}150$. Dialogue evidence can hinge
+on entities and dates; we report measured gaps rather than treating hybrid recall
+as axiomatic.
 
 \textbf{Limitations.}
+\textbf{LoCoMo $k$ and metric choice.} Headline LoCoMo retrieval uses $k{=}150$;
+Table~\ref{tab:locomo-k} reports sensitivity to smaller budgets. We do not claim
+that 99.0\% holds at $k{=}5$ without checking the frozen sweep.
+
+\textbf{Provenance evaluation scale.} FAMB provenance remains $n{=}1$; the graded
+50-case conflict suite (Section~5) is author-designed and isolated per case---not
+peer-reviewed external validation and not multi-tenant contention.
+
+\textbf{LongMemEval $K$.} We now report session recall at $K \in \{5,8,10\}$ on the
+same v4 harness; leaderboard rows still mix embedders and protocols.
+
 \textbf{LoCoMo end-to-end gap.} Full LoCoMo retrieval reaches \textbf{99.0\%} evidence
 recall, but a 50-question end-to-end pilot with a hosted reader LLM yields only
 \textbf{23.5\%} category F1 despite \textbf{99.5\%} retrieval on the same slice; a
@@ -576,14 +634,20 @@ operations are \texttt{experience} and \texttt{activate}, not SQL or
 \texttt{vector\_search}.
 
 \subsection{Positioning}
-To our knowledge, no prior work argues that long-term agent memory is a \emph{candidate}
-third data model---peer to the relational~\cite{codd1970relational} and vector
-models---with engine-level write and read semantics in an embedded store. Enterprise
-databases adding agent features (e.g.\ Oracle AI Database unified memory) retrofit
-memory onto existing engines rather than defining episodes and cues as first-class
-types. Table~\ref{tab:landscape} summarizes the landscape; direct head-to-head
-retrieval on LoCoMo evidence recall against Mem0/Zep is future work (different
-published metrics today).
+We argue that long-term agent memory may warrant a \emph{candidate} engine-level
+data model---episodes, cues, provenance on write; activation on read---distinct
+from SQL rows and vector ANN, but \textbf{not} categorically novel versus entire
+research programs. Mem0~\cite{chhikara2025mem0}, Mem0$^{\text{\tiny g}}$, Zep~\cite{zep2024},
+and HippoRAG~\cite{gutierrez2024hipporag} already treat memory as structured facts,
+graphs, or associative indices with provenance-like trust policies in application
+layers. Our claim is narrower: an \textbf{embedded} store whose native contract is
+\texttt{experience}/\texttt{activate}, with durability, separation, and hybrid
+recall in one binary---a substrate those layers can sit on, not a replacement for
+their extraction and orchestration. Enterprise databases adding agent features
+(e.g.\ Oracle AI Database unified memory) retrofit memory onto existing engines
+rather than defining episodes and cues as first-class types. Table~\ref{tab:landscape}
+summarizes the landscape; direct head-to-head retrieval on LoCoMo evidence recall
+against Mem0/Zep is future work (different published metrics today).
 
 \begin{table}[h]
 \centering
@@ -633,9 +697,11 @@ these claims.
 
 \section*{Artifacts}
 Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
+\texttt{benchmarks/locomo\_ablation.py},
+\texttt{benchmarks/provenance\_conflict\_bench.py},
 \texttt{benchmarks/longmemeval\_bench.py}, \texttt{benchmarks/longmemeval\_colab.ipynb},
 \texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py}.
-Frozen metrics: \texttt{benchmarks/results/paper-2026-07-09.json}. E2E:
+Frozen metrics: \texttt{benchmarks/results/paper-2026-07-10.json}. E2E:
 \texttt{benchmarks/longmemeval\_e2e.py};
 \texttt{benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}. Preprint DOI:
 \url{https://doi.org/10.5281/zenodo.20949890}. Source:
