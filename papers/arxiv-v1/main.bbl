@@ -23,6 +23,12 @@ Bernardo Guti{\'e}rrez, Yiheng Shu, Yu~Gu, Peter Pasupat, Barret Liu, Rishabh
   language models.
 \newblock {\em arXiv preprint arXiv:2405.14831}, 2024.
 
+\bibitem{sqlite2024}
+Richard~D. Hipp.
+\newblock {SQLite}.
+\newblock \url{https://www.sqlite.org/}, 2024.
+\newblock Embedded relational database engine.
+
 \bibitem{lisman1995}
 John~E. Lisman and Marco A.~P. Idiart.
 \newblock Storage of $7 \pm 2$ short-term memories in oscillatory subcycles.

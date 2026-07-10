@@ -2,14 +2,14 @@
 
 FluctlightDB **does not** publish headline benchmark numbers to a third-party agent-memory leaderboard today. This page explains why, what we do instead, and what would change that.
 
-## Agent-memory “leaderboards” (LoCoMo, LongMemEval, BEAM)
+## Agent-memory “leaderboards” (LoCoMo, LongMemEval)
 
 | Fact | Detail |
 |------|--------|
-| **Canonical live leaderboard?** | **No** — LoCoMo, LongMemEval, and BEAM have official datasets/papers, but no neutral site where vendors submit scores and get ranked like BEIR or MTEB |
+| **Canonical live leaderboard?** | **No** — LoCoMo and LongMemEval have official datasets/papers, but no neutral site where vendors submit scores and get ranked like BEIR or MTEB |
 | **What Mem0/Zep/etc. publish** | Mostly **self-reported** blog posts, PDF tables, or GitHub README percentages |
 | **What we publish** | Frozen JSON in-repo + open reproduce scripts + honest [REPRODUCIBILITY.md](REPRODUCIBILITY.md) |
-| **Third-party submission status** | **Not submitted** anywhere external for LoCoMo / LongMemEval / BEAM |
+| **Third-party submission status** | **Not submitted** anywhere external for LoCoMo / LongMemEval |
 
 Our public numbers live here:
 
@@ -18,7 +18,6 @@ Our public numbers live here:
 | `benchmarks/results/paper-2026-07-09.json` | Paper freeze bundle |
 | `benchmarks/results/locomo-chorus-2026-07-08.json` | LoCoMo cert (99.0% evidence recall) |
 | `make reproduce-locomo` | Anyone can verify LoCoMo cert locally |
-| `make reproduce-beam-smoke` | BEAM retrieval smoke (experimental; not in paper) |
 | GitHub Releases + PyPI | Versioned engine, not a ranking |
 
 ## What we are **not** doing yet (on purpose)

@@ -55,7 +55,6 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 - Jepsen-style chaos harness: `tests/chaos_jepsen.rs`, `scripts/jepsen-chaos.sh`, CI `chaos-jepsen`
 - [docs/LEADERBOARD.md](docs/LEADERBOARD.md) — public results policy (no neutral agent-memory registry)
 
-- BEAM retrieval smoke harness: `benchmarks/beam_eval.py`, `make reproduce-beam-smoke`
 - Crash recovery integration tests (`tests/crash_recovery.rs`) — WAL corrupt/truncate/kill simulation
 - GitHub label sync workflow (`.github/workflows/sync-labels.yml`)
 

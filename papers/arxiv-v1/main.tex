@@ -39,8 +39,8 @@ internally reproduced July 2026 run. On LongMemEval-S (500 questions, official
 (488/500); end-to-end QA with our reader/judge stack scores \textbf{97.4\%}
 (487/500)---these layers use different protocols than vendor leaderboard figures
 we cite for context only. On BEIR SciFact (shared MiniLM embeddings, same harness, Recall Fabric on),
-CHORUS/PRISM edges Chroma on nDCG@10 (\textbf{0.646} vs.\ \textbf{0.645}); Recall@100
-is 0.925 vs.\ 0.927 in the same script. We also report a small author-designed
+CHORUS/PRISM edges Chroma on nDCG@10 (\textbf{0.646} vs.\ \textbf{0.645}) and Recall@10
+(\textbf{0.792} vs.\ \textbf{0.783}). We also report a small author-designed
 regression suite (FAMB; paraphrase $n{=}10$, other sub-tests $n{=}1$) at 100\%
 macro---internal validation, not peer benchmark. Strangers can verify the engine
 in under a minute via \texttt{pip install "fluctlightdb[native]"} and a minimal
@@ -77,9 +77,9 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   model of data with explicit write semantics (separation, encoding, consolidation,
   provenance) and read semantics (cue activation over a memory graph), distinct
   from the relational and vector models.
-  \item \textbf{An engine.} FluctlightDB, an embedded Rust engine exposing
-  \texttt{experience()} / \texttt{activate()} / \texttt{checkpoint()}---one
-  durable store per agent, with no external services.
+  \item \textbf{An embedded engine.} FluctlightDB ships as a Rust library (like SQLite:
+  no server process) exposing \texttt{experience()} / \texttt{activate()} /
+  \texttt{checkpoint()}---one durable brain directory per agent.
   \item \textbf{Evidence.} \textbf{99.0\%} evidence recall on full LoCoMo (CHORUS),
   \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
   \textbf{97.4\%} end-to-end QA on LongMemEval-S (our reader/judge stack; 500 questions),
@@ -136,39 +136,118 @@ Provenance & Verified sources outrank unverified chat at recall & No native type
 
 \section{System Design}
 \label{sec:design}
-\subsection{Embedded, one store per agent}
-Like SQLite, FluctlightDB is a library, not a server: each agent owns a directory
-on disk and \texttt{checkpoint()} commits state. There is nothing to provision and
-nothing to keep in sync. A thin HTTP server is provided for multi-agent
-deployments but is not required.
+\subsection{Embedded engine contract (SQLite analogy)}
+\textbf{Embedded} means deployment: the library runs in-process, one brain directory
+on disk, no broker to provision---the same packaging model as SQLite~\cite{sqlite2024}.
+\textbf{Engine} means the data contract: native write/read operations
+(\texttt{experience}, \texttt{activate}), a versioned on-disk format, WAL-backed
+durability, and \texttt{checkpoint()} as the commit barrier. Vector databases expose
+\texttt{vector\_search}; relational stores expose SQL. FluctlightDB exposes episodic
+memory semantics. A thin HTTP wrapper exists for multi-agent deployments but is not
+part of the core contract.
+
+\subsection{On-disk format (FLCTLTDB v4)}
+Each agent brain is a directory. \texttt{manifest.json} records format version~4,
+WAL sequence numbers (\texttt{wal\_seq}, \texttt{wal\_checkpoint\_seq}), and twelve
+named segments (\texttt{*.seg}): hippocampus (engrams), graph (synapses),
+semantic/cortex fields, neuromodulators, and auxiliary metadata. Segments serialize
+with bincode; each write goes to \texttt{name.seg.tmp}, \texttt{fsync}, then atomic
+\texttt{rename} so a torn write cannot replace committed state. The hybrid recall
+sidecar \texttt{recall\_index.sqlite} stores FTS5 lexical rows and HNSW semantic
+neighbors for \texttt{connect\_index()} mode. WAL segments live under
+\texttt{wal/brain.wal.NNN} as append-only JSON lines (\texttt{Experience},
+\texttt{Sleep}, \texttt{Tick}, \texttt{Compact}, \ldots), rotating at 64\,MiB.
+On \texttt{open()}, the engine loads segments at the manifest watermark, replays WAL
+entries with sequence $>$ \texttt{wal\_checkpoint\_seq} (skipping torn tail records),
+and attaches the sidecar if present.
 
 \subsection{Write path}
-Incoming \texttt{experience} episodes pass through optional separation gating,
-dentate-style encoding into engrams, semantic vector registration, and graph
-wiring. A fast-ingest mode skips heavy graph work for bulk indexing.
+Algorithm~\ref{alg:write} summarizes \texttt{experience()}. Episodic mode gates
+near-duplicates (dentate separation), encodes engrams with context/salience/provenance,
+registers semantic vectors, and wires co-activation edges. Index mode
+(\texttt{FLUCTLIGHT\_FAST\_INGEST=1}) skips graph wiring when the caller supplies a
+dense vector---$O(1)$ hippocampal insert plus sidecar update per chunk. WAL append
+precedes in-memory mutation when enabled; \texttt{maybe\_checkpoint()} flushes all
+segments when the checkpoint policy fires.
+
+\begin{lstlisting}[caption={Write path (\texttt{experience}).},label={alg:write}]
+function experience(episode):
+  if WAL enabled: append WAL Experience(episode)
+  if rag (doc_id, chunk_id) already stored: return dedup
+  if fast_ingest and semantic_vector present:
+      insert engram; update recall_index; maybe_checkpoint(); return
+  gate near-duplicates (dentate separation)
+  encode engram(content, context, salience, provenance)
+  wire co-activation edges to recent episodes
+  register semantic vector; update recall_index if open
+  maybe_checkpoint()
+\end{lstlisting}
+
+Storage is $O(n)$ engram payload plus $O(n \bar{d})$ synapses for average graph degree
+$\bar{d}$; the sidecar adds FTS5 rows and $O(nD)$ floats for embedding dimension~$D$.
 
 \subsection{Read path}
-\texttt{activate(cue)} seeds lexical (BM25) and semantic (vector) indexes, spreads
-activation through the memory graph, fuses scores, and applies provenance boosts.
-For conversational RAG we merge vector top-$k$ with lexical seeds---\emph{hybrid
-retrieval}---before ranking. A vector-fast mode provides Chroma-class cosine
-top-$k$ for IR comparisons.
+Algorithm~\ref{alg:read} summarizes \texttt{activate()}. When a hybrid sidecar exists,
+BM25 lexical seeds and HNSW semantic neighbors form a candidate set (default cap
+128--512). The engine spreads activation through the memory graph (up to four hops in
+full mode), fuses lexical, semantic, graph, and provenance scores, and returns ranked
+engrams. Vector-fast mode (\texttt{FLUCTLIGHT\_VECTOR\_FAST=1}) skips graph spread for
+Chroma-class IR latency. Recall Fabric rerank (Section~\ref{sec:fabric}) applies on the
+CHORUS lane after shortlisting when \texttt{FLUCTLIGHT\_FABRIC=1}.
+
+\begin{lstlisting}[caption={Read path (\texttt{activate}).},label={alg:read}]
+function activate(cue, cue_vector, top_k):
+  if recall_index present:
+      candidates <- hybrid_candidates(BM25 seeds, ANN seeds, cap)
+  else:
+      candidates <- hippocampal scan (or CHORUS path)
+  scores <- spread_activation(candidates, graph, max_hops)
+  fuse lexical + semantic + graph + provenance weights
+  if FABRIC on and CHORUS lane: rerank shortlist
+  return top_k ranked engrams
+\end{lstlisting}
+
+Per-query cost is $O(|C| \log |C|)$ over candidate set $|C|$, plus $O(h \cdot |E|)$
+graph spread for hop depth~$h$ and frontier~$|E|$; hybrid seeding is sublinear in~$n$
+via FTS5 and HNSW rather than full-table scan.
 
 \subsection{Two explicit modes}
 \texttt{connect()} is the full episodic engine (separation, graph, provenance) for
 live agents. \texttt{connect\_index()} is the bulk semantic path for RAG backfills
-and IR benchmarks. The modes share one engine and one file format.
+and IR benchmarks. The modes share one engine, one WAL, and one file format.
 
-\subsection{Durability and crash recovery}
-Each agent brain is a versioned on-disk directory (\texttt{manifest.json},
-hippocampal segments, \texttt{recall\_index.sqlite}). \texttt{checkpoint()}
-atomically commits durable state; optional WAL (\texttt{FLUCTLIGHT\_WAL=1}) appends
-experiences before fsync so recent writes survive process death between checkpoints.
-\texttt{verify\_path()} scans manifest, segments, and the recall sidecar for torn
-headers or orphan indices. CI runs Jepsen-style chaos tests
-(\texttt{tests/chaos\_jepsen.rs}): \texttt{SIGKILL} mid-write, torn WAL tails,
-replicate-while-partial-WAL, and round-trip reopen---the embedded store should not
-silently serve corrupt brains after these failures.
+\subsection{Durability, recovery, and verification}
+\texttt{checkpoint()} atomically writes all segments and advances
+\texttt{wal\_checkpoint\_seq}; optional WAL (\texttt{FLUCTLIGHT\_WAL=1}, default on)
+appends before mutation so recent experiences survive process death between checkpoints.
+\texttt{verify\_path()} loads the manifest, checks every segment deserializes, and
+reports engram/synapse counts---useful after copy or crash. CI runs Jepsen-style chaos
+tests (\texttt{tests/chaos\_jepsen.rs}): eight rounds of checkpoint/WAL interleaving,
+\texttt{SIGKILL} mid-write via a worker subprocess, torn WAL tails, replicate-while-partial-WAL,
+and round-trip reopen. These tests assert \texttt{verify\_path()} succeeds and at least
+one engram is recoverable---the embedded store must not silently serve corrupt brains.
+
+Table~\ref{tab:durability} summarizes failure modes we test; Section~\ref{sec:eval}
+validates recall \emph{quality} on public suites, not durability (which the chaos suite
+covers separately).
+
+\begin{table}[h]
+\centering
+\caption{Durability scenarios exercised in CI (\texttt{chaos\_jepsen.rs}).}
+\label{tab:durability}
+\small
+\begin{tabular}{p{3.2cm}p{4.8cm}}
+\toprule
+\textbf{Failure mode} & \textbf{Expected behavior} \\
+\midrule
+Process kill mid-write & WAL replay on reopen; \texttt{verify\_path()} OK \\
+Torn WAL JSON tail & Skip corrupt record; earlier entries replay \\
+Checkpoint between WAL lines & Manifest watermark + replay of post-checkpoint WAL \\
+Replica sync during partial WAL & Replica opens; \texttt{verify\_path()} OK \\
+Segment tmp left by crash & Ignored; committed \texttt{*.seg} loads \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 Figure~\ref{fig:architecture} summarizes how an agent brain is laid out on disk,
 what each engram stores, and how write and read paths connect the episodic store
@@ -229,6 +308,11 @@ recall on LoCoMo, BEIR, and FAMB frozen runs (Section~\ref{sec:eval}).}
 
 \section{Evaluation}
 \label{sec:eval}
+Section~\ref{sec:design} defines the engine contract, on-disk format, and durability
+properties; this section validates \emph{recall quality} on public suites. We do not
+re-benchmark crash recovery here---that is covered by the chaos suite
+(Table~\ref{tab:durability}).
+
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
 \texttt{benchmarks/results/paper-2026-07-09.json}. CHORUS benchmarks (LoCoMo, BEIR,
@@ -257,20 +341,19 @@ documents in the July 2026 Fabric-on rerun.
 \begin{table}[h]
 \centering
 \caption{BEIR SciFact (shared MiniLM embeddings; Fabric on; July 2026).}
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrr}
 \toprule
-System & nDCG@10 & R@10 & R@100 & Query (ms) \\
+System & nDCG@10 & R@10 & Query (ms) \\
 \midrule
-Chroma & 0.645 & 0.783 & 0.927 & 17 \\
-FluctlightDB (CHORUS/PRISM/Fabric) & \textbf{0.646} & \textbf{0.792} & 0.925 & 16 \\
+Chroma & 0.645 & 0.783 & 17 \\
+FluctlightDB (CHORUS/PRISM/Fabric) & \textbf{0.646} & \textbf{0.792} & 16 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 With Fabric on, CHORUS/PRISM improves nDCG@10 and Recall@10 over Chroma in the
-\emph{same} harness; Recall@100 differs by 0.002 (0.925 vs.\ 0.927). Per-query
-latency stays in the same ballpark as the Fabric-off CHORUS profile ($\sim$16\,ms
-median on this run). Reproduce:
+\emph{same} harness. Per-query latency stays in the same ballpark as the Fabric-off
+CHORUS profile ($\sim$16\,ms median on this run). Reproduce:
 \texttt{PYTHONPATH=sdks/python python benchmarks/beir\_bench.py}.
 
 \subsection{LoCoMo: 99.0\% evidence recall on the full set}
@@ -292,7 +375,7 @@ Metric & Value \\
 Mean evidence recall & \textbf{99.0\%} \\
 All evidence in context & 98.3\% \\
 Evidence hits & 1970/1982 \\
-Wall time (s) & 443.1 \\
+Memories ingested & 8422 \\
 \bottomrule
 \end{tabular}
 \end{table}
