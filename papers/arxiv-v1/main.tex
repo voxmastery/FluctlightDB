@@ -423,9 +423,10 @@ semantically similar cues---collapse to \textbf{18\%} top-1 (9/50;
 cue contamination}: unrelated domains share lexical overlap (``balance,''
 ``quota,'' ``version''), so activation returns another case's ledger or chat
 engram, not a failure of per-pair provenance ranking in isolation
-(Table~\ref{tab:provenance-conditions}). This is the main open gap for
-production multi-tenant memory: scoped activation (agent/session namespaces,
-stricter candidate filtering) is on the roadmap and not yet benchmarked at scale.
+(Table~\ref{tab:provenance-conditions}). \textbf{Status:} no implementation mitigates
+this failure mode as of this preprint---\texttt{activate\_scoped} can post-filter by
+\texttt{agent\_id}, but ingest and benchmarks do not enforce per-tenant namespaces,
+and we have not re-run the suite under scoped activation (Section~\ref{sec:future}).
 
 \begin{table}[h]
 \centering
@@ -587,8 +588,8 @@ as axiomatic.
 \textbf{18\%} (9/50) when all pairs share one brain (Table~\ref{tab:provenance-conditions}).
 We do not treat the isolated figure as evidence of multi-tenant readiness; the
 shared-brain drop reflects cross-case cue contamination, not a broken
-verified-vs-chat ranker within a single scope. Agent/session scoping for
-\texttt{activate()} at scale remains unevaluated beyond this synthetic stress test.
+verified-vs-chat ranker within a single scope. \textbf{Status:} unaddressed in code
+and unevaluated beyond this synthetic stress test (Section~\ref{sec:future}).
 
 \textbf{LoCoMo $k$ and metric choice.} Headline LoCoMo retrieval uses $k{=}150$;
 Table~\ref{tab:locomo-k} reports sensitivity to smaller budgets. We do not claim
@@ -616,6 +617,19 @@ OpenAI reader/judge APIs and remains weakest on multi-session aggregation (92.5\
 Mem0/Zep end-to-end figures use different reader setups; we cite published
 LongMemEval-S numbers only where protocols match. ANN beyond $10^5$ memories is
 not yet evaluated.
+
+\section{Future Work}
+\label{sec:future}
+The shared-brain provenance result (18\% top-1 vs.\ 100\% isolated) is the highest-priority
+gap for a revised preprint: session- or agent-scoped \texttt{experience}/\texttt{activate},
+stricter hybrid candidate filtering, and a re-benchmark of
+\texttt{provenance\_conflict\_bench.py} under realistic multi-tenant load. That work
+is \textbf{not implemented} in the repository accompanying this submission; a future
+version should report before/after top-1 accuracy in Table~\ref{tab:provenance-conditions}.
+Secondary targets include full LongMemEval session recall at $K{=}5$ and $K{=}10$ from
+the \texttt{--report-ks} harness, head-to-head LoCoMo evidence recall against published
+Mem0/Zep figures where protocols align, and replacing the hybrid SQLite sidecar with a
+native in-engine recall index.
 
 \section{Related Work}
 \label{sec:related}
