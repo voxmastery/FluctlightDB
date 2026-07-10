@@ -43,6 +43,11 @@ papers/arxiv-v1/*.aux
 papers/arxiv-v1/*.log
 papers/arxiv-v1/*.out
 papers/arxiv-v1/*.blg
+# Copied from papers/figures/ by papers/arxiv-v1/build.sh (arXiv flat layout)
+papers/arxiv-v1/figures/01-brain-architecture.pdf
+papers/arxiv-v1/figures/02-benchmark-summary.pdf
+papers/arxiv-v1/figures/03-longmemeval-by-type.pdf
+papers/arxiv-v1/figures/04-longmemeval-e2e-by-type.pdf
 
 # Benchmark run scratch (canonical freezes stay tracked; see benchmarks/results/.gitignore)
 **/benchmarks/results/*.checkpoint.jsonl

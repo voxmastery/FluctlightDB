@@ -41,9 +41,10 @@ Register: https://arxiv.org/user/register
 | Source zip (recommended) | `main.tex`, `references.bib`, `main.bbl`, `../figures/*.pdf` |
 
 ```bash
-cd papers/arxiv-v1
-zip -r fluctlightdb-arxiv-source.zip main.tex references.bib main.bbl ../figures/*.pdf
+cd papers/arxiv-v1 && bash build.sh
 ```
+
+Produces `main.pdf` and `fluctlightdb-arxiv-source.zip` (`main.tex`, `references.bib`, `main.bbl`, `figures/*.pdf` with paths matching `main.tex`).
 
 ## 4. Headline numbers (July 2026 freeze)
 
