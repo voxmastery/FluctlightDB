@@ -58,11 +58,19 @@
   "provenance_conflict": {
     "n_cases": 50,
     "lane": "agent",
-    "top1_accuracy": 1.0,
-    "hits": "50/50",
+    "isolated_brain": {
+      "top1_accuracy": 1.0,
+      "hits": "50/50",
+      "frozen_source": "provenance-conflict-2026-07-10.json"
+    },
+    "shared_brain": {
+      "top1_accuracy": 0.18,
+      "hits": "9/50",
+      "frozen_source": "provenance-conflict-shared-2026-07-10.json",
+      "note": "Cross-case cue contamination; not a per-pair ranking defect."
+    },
     "domains": 10,
-    "frozen_source": "provenance-conflict-2026-07-10.json",
-    "note": "Isolated brain per case; verified ledger vs chat conflict (author-designed)."
+    "note": "Isolated brain per case vs single shared brain (--shared-brain)."
   },
   "famb": {
     "agent_macro": 1.0,

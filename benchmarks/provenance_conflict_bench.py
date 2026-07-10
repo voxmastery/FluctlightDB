@@ -86,35 +86,66 @@ def run_case(brain: Any, case: dict[str, Any], *, ledger_id: str) -> dict[str, A
     }
 
 
-def run_suite(cases: list[dict[str, Any]]) -> dict[str, Any]:
-    rows: list[dict] = []
-    for case in cases:
+def run_suite(cases: list[dict[str, Any]], *, shared_brain: bool = False) -> dict[str, Any]:
+    ledger_ids: dict[str, str] = {}
+    if shared_brain:
         brain = open_lane("agent")
-        rep = brain.experience(
-            case["ledger_content"],
-            context=f"ledger:{case['domain']}",
-            salience=0.95,
-            verified=True,
-            provenance_kind="ledger_verified",
-            source_uri=f"file://{case['domain']}.json",
-            confidence=0.99,
-        )
-        eid = str(rep.get("engram_id") or "")
-        brain.verify_fact(
-            eid,
-            provenance_kind="ledger_verified",
-            source_uri=f"file://{case['domain']}.json",
-            confidence=0.99,
-        )
-        brain.experience(
-            case["chat_content"],
-            context=f"chat:{case['domain']}",
-            salience=0.35,
-            verified=False,
-            provenance_kind="chat_assertion",
-            confidence=0.25,
-        )
-        rows.append(run_case(brain, case, ledger_id=eid))
+        for case in cases:
+            rep = brain.experience(
+                case["ledger_content"],
+                context=f"ledger:{case['domain']}",
+                salience=0.95,
+                verified=True,
+                provenance_kind="ledger_verified",
+                source_uri=f"file://{case['domain']}.json",
+                confidence=0.99,
+            )
+            eid = str(rep.get("engram_id") or "")
+            brain.verify_fact(
+                eid,
+                provenance_kind="ledger_verified",
+                source_uri=f"file://{case['domain']}.json",
+                confidence=0.99,
+            )
+            ledger_ids[case["id"]] = eid
+            brain.experience(
+                case["chat_content"],
+                context=f"chat:{case['domain']}",
+                salience=0.35,
+                verified=False,
+                provenance_kind="chat_assertion",
+                confidence=0.25,
+            )
+        rows = [run_case(brain, c, ledger_id=ledger_ids[c["id"]]) for c in cases]
+    else:
+        rows = []
+        for case in cases:
+            brain = open_lane("agent")
+            rep = brain.experience(
+                case["ledger_content"],
+                context=f"ledger:{case['domain']}",
+                salience=0.95,
+                verified=True,
+                provenance_kind="ledger_verified",
+                source_uri=f"file://{case['domain']}.json",
+                confidence=0.99,
+            )
+            eid = str(rep.get("engram_id") or "")
+            brain.verify_fact(
+                eid,
+                provenance_kind="ledger_verified",
+                source_uri=f"file://{case['domain']}.json",
+                confidence=0.99,
+            )
+            brain.experience(
+                case["chat_content"],
+                context=f"chat:{case['domain']}",
+                salience=0.35,
+                verified=False,
+                provenance_kind="chat_assertion",
+                confidence=0.25,
+            )
+            rows.append(run_case(brain, case, ledger_id=eid))
     hits = sum(1 for r in rows if r["hit"])
     by_domain: dict[str, list[bool]] = {}
     for case, row in zip(cases, rows):
@@ -123,6 +154,7 @@ def run_suite(cases: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "benchmark": "provenance_conflict",
         "lane": "agent",
+        "condition": "shared_brain" if shared_brain else "isolated_brain",
         "n_cases": len(cases),
         "top1_accuracy": hits / len(cases) if cases else 0.0,
         "hits": f"{hits}/{len(cases)}",
@@ -133,16 +165,23 @@ def run_suite(cases: list[dict[str, Any]]) -> dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Provenance conflict benchmark (agent)")
+    ap.add_argument(
+        "--shared-brain",
+        action="store_true",
+        help="ingest all 50 conflict pairs into one brain (multi-tenant stress)",
+    )
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
     cases = build_cases()
     t0 = time.perf_counter()
-    out = run_suite(cases)
+    out = run_suite(cases, shared_brain=args.shared_brain)
     out["wall_s"] = round(time.perf_counter() - t0, 2)
     print(json.dumps({k: v for k, v in out.items() if k != "cases"}, indent=2))
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
         args.json_out.write_text(json.dumps(out, indent=2) + "\n")
+    if args.shared_brain:
+        return 0
     return 0 if out["top1_accuracy"] >= 0.9 else 1
 
 

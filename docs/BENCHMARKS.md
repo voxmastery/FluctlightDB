@@ -206,7 +206,7 @@ PYTHONPATH=sdks/python python benchmarks/agent_memory_bench.py --mode chorus --j
 
 FAMB is an **internal regression suite** (not LoCoMo-scale external validation): paraphrase $n=10$; provenance, persistence, confusion, and determinism are each one pass/fail scenario ($n=1$). CHORUS provenance/persistence suites call `chorus_sleep()` then `activate()` so durable hippocampal engrams participate (in-memory CHORUS traces alone are not checkpointed).
 
-**Graded provenance conflicts ($n=50$):** `benchmarks/provenance_conflict_bench.py` — isolated agent brain per case; verified ledger/tool vs conflicting chat; top-1 must prefer verified. Reproduce: `scripts/reproduce-provenance.sh`.
+**Graded provenance conflicts ($n=50$):** `benchmarks/provenance_conflict_bench.py` — isolated agent brain per case scores **100%** (50/50); **shared-brain** (`--shared-brain`, all cases in one brain) scores **18%** (9/50) from cross-case cue contamination. Reproduce: `scripts/reproduce-provenance.sh`.
 
 **LoCoMo ablations:** `benchmarks/locomo_ablation.py --sweep-k` (recall@$k$ sensitivity on CHORUS+Fabric); `--hybrid-vs-vector` (index lane hybrid vs vector-fast at fixed $k$).
 
@@ -229,7 +229,8 @@ Headline numbers in `benchmarks/results/paper-2026-07-10.json` (reviewer remedia
 |---|---|---|---|
 | LoCoMo CHORUS + Fabric | 2026-07-09 | `locomo-chorus-fabric-2026-07-09.json` | 99.0% @ $k{=}150$; k-sweep: `locomo-k-sweep-fabric-2026-07-10.json` |
 | LoCoMo hybrid vs vector (index) | 2026-07-10 | `locomo-hybrid-index-2026-07-10.json` | @ $k{=}50$; hybrid $\approx$ vector |
-| Provenance conflict (50 cases) | 2026-07-10 | `provenance-conflict-2026-07-10.json` | Agent lane; 100% top-1 |
+| Provenance conflict (50 cases, isolated) | 2026-07-10 | `provenance-conflict-2026-07-10.json` | Agent lane; 100% top-1 |
+| Provenance conflict (50 cases, shared brain) | 2026-07-10 | `provenance-conflict-shared-2026-07-10.json` | 18% top-1; cross-case contamination |
 | BEIR SciFact PRISM + Fabric | 2026-07-09 | `beir-prism-fabric-2026-07-09.json` | Shared MiniLM; Chroma baseline in same harness |
 | FAMB agent/chorus | 2026-07-09 | `famb-*-2026-07-09.json` | Replaced hardcoded CHORUS sub-scores with measured suites |
 | LongMemEval-S v4 | 2026-07-04 | `longmemeval-colab-v2-full-2026-07-04.json` | Unified 500; pref-facts ablation on preference slice only during dev |
