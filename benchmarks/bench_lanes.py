@@ -64,8 +64,14 @@ def chorus_hits_to_ids(hits: list[Any], limit: int) -> list[str]:
     return ids
 
 
+def configure_paper_fabric() -> None:
+    """Paper-profile benchmarks: Recall Fabric on for all frozen headline numbers."""
+    os.environ["FLUCTLIGHT_FABRIC"] = "1"
+
+
 def configure_ir_env() -> None:
     """Tune env for bulk IR benchmarks (BEIR / LoCoMo CHORUS)."""
+    configure_paper_fabric()
     os.environ.setdefault("FLUCTLIGHT_CHECKPOINT_EVERY_N", "100000")
     os.environ.setdefault("FLUCTLIGHT_WAL", "0")
     os.environ.setdefault("FLUCTLIGHT_SEPARATION_GATE", "0")

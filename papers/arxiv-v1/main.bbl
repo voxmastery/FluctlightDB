@@ -1,10 +1,5 @@
 \begin{thebibliography}{10}
 
-\bibitem{charikar2002}
-Moses~S. Charikar.
-\newblock Similarity estimation techniques from rounding algorithms.
-\newblock In {\em STOC}, 2002.
-
 \bibitem{chhikara2025mem0}
 Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet Singh, and Deshraj Yadav.
 \newblock Mem0: Building production-ready ai agents with scalable long-term
@@ -15,11 +10,6 @@ Prateek Chhikara, Dev Khant, Saket Aryan, Taranjeet Singh, and Deshraj Yadav.
 Edgar~F Codd.
 \newblock A relational model of data for large shared data banks.
 \newblock {\em Communications of the ACM}, 13(6):377--387, 1970.
-
-\bibitem{eichenbaum2014}
-Howard Eichenbaum.
-\newblock Time cells in the hippocampus: a new dimension for mapping memories.
-\newblock {\em Nature Reviews Neuroscience}, 15(11):732--744, 2014.
 
 \bibitem{fiete2008}
 Ila~R. Fiete, Yoram Burak, and Ted Brookings.
@@ -48,13 +38,6 @@ Adyasha Maharana, Dong-Ho Lee, Sergey Tulyakov, Mohit Bansal, Francesco
   Barbieri, and Yuwei Fang.
 \newblock Evaluating very long-term conversational memory of llm agents.
 \newblock In {\em ACL}, 2024.
-
-\bibitem{mcclelland1995}
-James~L. McClelland, Bruce~L. McNaughton, and Randall~C. O'Reilly.
-\newblock Why there are complementary learning systems in the hippocampus and
-  neocortex: insights from the successes and failures of connectionist models
-  of learning and memory.
-\newblock {\em Psychological Review}, 102(3):419--457, 1995.
 
 \bibitem{packer2023memgpt}
 Charles Packer, Sarah Wooders, Kevin Lin, Vivian Fang, Shishir~G Patil, Ion

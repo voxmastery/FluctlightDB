@@ -10,6 +10,7 @@ use crate::chorus::{
     parent_memory_id, ChorusHit, ChorusImprintInput, ChorusRecallOpts, ChorusSleepReport,
     ChorusTrace,
 };
+use crate::fabric_runtime::fabric_enabled;
 use crate::types::{Episode, Provenance, ProvenanceKind, RagRef, RecallResult};
 
 pub fn chorus_enabled() -> bool {
@@ -47,14 +48,25 @@ impl FluctlightBrain {
         if !chorus_enabled() {
             return false;
         }
-        self.chorus.imprint(input)
+        let ok = self.chorus.imprint(input);
+        if ok {
+            self.fabric_on_chorus_imprint(input);
+        }
+        ok
     }
 
     pub fn chorus_imprint_batch(&mut self, batch: &[ChorusImprintInput]) -> usize {
         if !chorus_enabled() {
             return 0;
         }
-        self.chorus.imprint_batch(batch)
+        let mut n = 0usize;
+        for input in batch {
+            if self.chorus.imprint(input) {
+                self.fabric_on_chorus_imprint(input);
+                n += 1;
+            }
+        }
+        n
     }
 
     pub fn chorus_recall(&self, cue: &str, k: usize, cue_vector: Option<&[f32]>) -> Vec<ChorusHit> {
@@ -65,7 +77,11 @@ impl FluctlightBrain {
             fast: chorus_fast_enabled(),
             float_rerank: chorus_float_rerank_enabled(),
         };
-        self.chorus.recall_with_opts(cue, k, cue_vector, opts)
+        let mut hits = self.chorus.recall_with_opts(cue, k, cue_vector, opts);
+        if fabric_enabled() && !hits.is_empty() {
+            self.fabric_rerank_chorus_hits(cue, cue_vector, &mut hits);
+        }
+        hits
     }
 
     pub fn chorus_recall_with_opts(
@@ -78,7 +94,11 @@ impl FluctlightBrain {
         if !chorus_enabled() {
             return Vec::new();
         }
-        self.chorus.recall_with_opts(cue, k, cue_vector, opts)
+        let mut hits = self.chorus.recall_with_opts(cue, k, cue_vector, opts);
+        if fabric_enabled() && !hits.is_empty() {
+            self.fabric_rerank_chorus_hits(cue, cue_vector, &mut hits);
+        }
+        hits
     }
 
     pub fn chorus_recall_batch(
@@ -90,7 +110,11 @@ impl FluctlightBrain {
         if !chorus_enabled() {
             return vec![Vec::new(); queries.len()];
         }
-        self.chorus.recall_batch(queries, k, opts)
+        let mut batches = self.chorus.recall_batch(queries, k, opts);
+        for (hits, (cue, cue_vector)) in batches.iter_mut().zip(queries.iter()) {
+            self.fabric_rerank_chorus_hits(cue, *cue_vector, hits);
+        }
+        batches
     }
 
     /// Tag last recall hits (SWR-TAG) for sleep triage.

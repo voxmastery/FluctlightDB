@@ -26,7 +26,7 @@ SDK = REPO / "sdks/python"
 if str(SDK) not in sys.path:
     sys.path.insert(0, str(SDK))
 
-from bench_lanes import chorus_hits_to_ids, embed_minilm, open_lane  # noqa: E402
+from bench_lanes import chorus_hits_to_ids, configure_paper_fabric, embed_minilm, open_lane  # noqa: E402
 
 PARAPHRASE_PAIRS: list[tuple[str, str, list[float]]] = [
     ("database connection pool exhausted", "db pool timeout", [0.9, 0.1, 0.0]),
@@ -419,6 +419,7 @@ def main() -> int:
     ap.add_argument("--noise", type=int, default=int(os.environ.get("FAMB_NOISE", "200")))
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
+    configure_paper_fabric()
     out = run_famb(args.mode, noise=args.noise)
     print(json.dumps(out, indent=2))
     if args.json_out:

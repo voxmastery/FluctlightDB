@@ -21,7 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::lattice::{Axis, Lattice};
+use crate::lattice::{Axis, GridCode, Lattice};
 use crate::phase_parse::{PhaseParser, PhaseVector};
 use crate::photon::{PhotonCode, PhotonStore, SimHasher};
 
@@ -63,6 +63,24 @@ struct FabricMemory {
     seq: PhaseVector,
     code: Option<PhotonCode>,
     sem_scalar: Option<f64>,
+    /// Precomputed semantic grid gist (avoids per-query lattice encode on shortlist rerank).
+    #[serde(default)]
+    sem_gist: Option<GridCode>,
+}
+
+/// Per-query cue features computed once, then reused across shortlist scoring.
+struct FabricCueCtx {
+    cue_tokens: Vec<String>,
+    cue_seq: PhaseVector,
+    cue_code: Option<PhotonCode>,
+    cue_gist: Option<GridCode>,
+    has_vec: bool,
+}
+
+/// Lightweight per-query ctx for shortlist rerank (CHORUS / activate hot path).
+struct FabricCueLite {
+    cue_tokens: Vec<String>,
+    cue_code: Option<PhotonCode>,
 }
 
 /// Scored recall result from the composed fabric.
@@ -85,6 +103,8 @@ pub struct RecallFabric {
     parser: PhaseParser,
     prefilter: PhotonStore,
     mems: Vec<FabricMemory>,
+    #[serde(skip, default)]
+    id_index: std::collections::HashMap<String, usize>,
 }
 
 impl Default for RecallFabric {
@@ -102,7 +122,131 @@ impl RecallFabric {
             prefilter: PhotonStore::new(cfg.photon_bits, cfg.lsh_bands, cfg.lsh_rows),
             mems: Vec::new(),
             cfg,
+            id_index: std::collections::HashMap::new(),
         }
+    }
+
+    /// Rebuild id→index map and backfill cached lattice gists (after load or serde).
+    pub fn rebuild_indexes(&mut self) {
+        self.id_index.clear();
+        for (i, m) in self.mems.iter_mut().enumerate() {
+            self.id_index.insert(m.id.clone(), i);
+            if m.sem_gist.is_none() {
+                if let Some(s) = m.sem_scalar {
+                    m.sem_gist = self
+                        .lattice
+                        .encode_with_semantic_position(s, &[])
+                        .axes
+                        .remove(&Axis::Semantic);
+                }
+            }
+        }
+    }
+
+    fn prepare_cue_ctx(&self, cue: &str, cue_vector: Option<&[f32]>) -> FabricCueCtx {
+        let cue_tokens = tokenize(cue);
+        let cue_refs: Vec<&str> = cue_tokens.iter().map(|s| s.as_str()).collect();
+        let cue_seq = crate::relation::encode_relations(&self.parser, cue)
+            .unwrap_or_else(|| self.parser.encode_sequence(&cue_refs));
+        let cue_code = cue_vector
+            .filter(|v| !v.is_empty())
+            .map(|v| self.hasher.encode(v));
+        let cue_gist = cue_vector
+            .filter(|v| !v.is_empty())
+            .map(project_scalar)
+            .and_then(|s| {
+                self.lattice
+                    .encode_with_semantic_position(s, &[])
+                    .axes
+                    .remove(&Axis::Semantic)
+            });
+        FabricCueCtx {
+            has_vec: cue_code.is_some(),
+            cue_tokens,
+            cue_seq,
+            cue_code,
+            cue_gist,
+        }
+    }
+
+    fn score_mem_at(&self, i: usize, ctx: &FabricCueCtx) -> f32 {
+        let m = &self.mems[i];
+        let lexical = jaccard(&ctx.cue_tokens, &m.tokens);
+        let photon = match (&ctx.cue_code, &m.code) {
+            (Some(a), Some(b)) => ((a.estimated_cosine(b)) + 1.0) / 2.0,
+            _ => 0.0,
+        };
+        let phase = (ctx.cue_seq.similarity(&m.seq) + 1.0) / 2.0;
+        let lattice = match (&ctx.cue_gist, &m.sem_gist) {
+            (Some(cg), Some(mg)) => cg.coarse_similarity(mg, &self.lattice.scales),
+            _ => 0.0,
+        };
+        let has_vec = m.code.is_some() && ctx.has_vec;
+        self.blend(lexical, photon, phase, lattice, has_vec)
+    }
+
+    fn prepare_cue_ctx_lite(&self, cue: &str, cue_vector: Option<&[f32]>) -> FabricCueLite {
+        FabricCueLite {
+            cue_tokens: tokenize(cue),
+            cue_code: cue_vector
+                .filter(|v| !v.is_empty())
+                .map(|v| self.hasher.encode(v)),
+        }
+    }
+
+    fn score_mem_at_lite(&self, i: usize, ctx: &FabricCueLite) -> f32 {
+        let m = &self.mems[i];
+        let lexical = jaccard(&ctx.cue_tokens, &m.tokens);
+        let photon = match (&ctx.cue_code, &m.code) {
+            (Some(a), Some(b)) => ((a.estimated_cosine(b)) + 1.0) / 2.0,
+            _ => 0.0,
+        };
+        if ctx.cue_code.is_some() && m.code.is_some() {
+            0.35 * lexical + 0.65 * photon
+        } else {
+            lexical
+        }
+    }
+
+    /// Fast shortlist rerank: one cue encode + O(k) photon/lexical (no phase/lattice).
+    pub(crate) fn score_shortlist_lite(
+        &self,
+        ids: &[&str],
+        cue: &str,
+        cue_vector: Option<&[f32]>,
+    ) -> std::collections::HashMap<String, f32> {
+        if ids.is_empty() {
+            return std::collections::HashMap::new();
+        }
+        let ctx = self.prepare_cue_ctx_lite(cue, cue_vector);
+        let mut out = std::collections::HashMap::with_capacity(ids.len());
+        for id in ids {
+            if let Some(&i) = self.id_index.get(*id) {
+                out.insert((*id).to_string(), self.score_mem_at_lite(i, &ctx));
+            }
+        }
+        debug_assert!(out.len() <= ids.len());
+        out
+    }
+
+    /// Score a pre-filtered id list with one cue encode (full fabric signals).
+    pub(crate) fn score_shortlist(
+        &self,
+        ids: &[&str],
+        cue: &str,
+        cue_vector: Option<&[f32]>,
+    ) -> std::collections::HashMap<String, f32> {
+        if ids.is_empty() {
+            return std::collections::HashMap::new();
+        }
+        let ctx = self.prepare_cue_ctx(cue, cue_vector);
+        let mut out = std::collections::HashMap::with_capacity(ids.len());
+        for id in ids {
+            if let Some(&i) = self.id_index.get(*id) {
+                out.insert((*id).to_string(), self.score_mem_at(i, &ctx));
+            }
+        }
+        out
     }
 
     pub fn len(&self) -> usize {
@@ -123,9 +267,38 @@ impl RecallFabric {
         self.mems.is_empty()
     }
 
-    /// Ingest one memory. `vector` (embedding) is optional; without it, only lexical + phase
-    /// signals contribute. Uses relational role binding when SVO relations are extractable.
+    /// Ingest one memory (lite: lexical + photon index; for CHORUS bulk imprint).
     pub fn insert(&mut self, id: impl Into<String>, text: &str, vector: Option<&[f32]>) {
+        let id = id.into();
+        let tokens = tokenize(text);
+        let (code, sem_scalar) = match vector {
+            Some(v) if !v.is_empty() => {
+                let c = self.hasher.encode(v);
+                self.prefilter.insert(id.clone(), c.clone());
+                (Some(c), Some(project_scalar(v)))
+            }
+            _ => (None, None),
+        };
+        let sem_gist = sem_scalar.and_then(|s| {
+            self.lattice
+                .encode_with_semantic_position(s, &[])
+                .axes
+                .remove(&Axis::Semantic)
+        });
+        let idx = self.mems.len();
+        self.mems.push(FabricMemory {
+            id: id.clone(),
+            tokens,
+            seq: PhaseVector { phases: vec![] },
+            code,
+            sem_scalar,
+            sem_gist,
+        });
+        self.id_index.insert(id, idx);
+    }
+
+    /// Full fabric ingest (phase + relation encoding) for episodic activate path.
+    pub fn insert_rich(&mut self, id: impl Into<String>, text: &str, vector: Option<&[f32]>) {
         let id = id.into();
         let tokens = tokenize(text);
         let seq = crate::relation::encode_relations(&self.parser, text).unwrap_or_else(|| {
@@ -140,13 +313,22 @@ impl RecallFabric {
             }
             _ => (None, None),
         };
+        let sem_gist = sem_scalar.and_then(|s| {
+            self.lattice
+                .encode_with_semantic_position(s, &[])
+                .axes
+                .remove(&Axis::Semantic)
+        });
+        let idx = self.mems.len();
         self.mems.push(FabricMemory {
-            id,
+            id: id.clone(),
             tokens,
             seq,
             code,
             sem_scalar,
+            sem_gist,
         });
+        self.id_index.insert(id, idx);
     }
 
     /// Photon LSH shortlist only — sub-linear, no phase/lattice rerank. Use as recall prefilter.
@@ -169,41 +351,20 @@ impl RecallFabric {
         cue: &str,
         cue_vector: Option<&[f32]>,
     ) -> Option<FabricHit> {
-        let i = self.mems.iter().position(|m| m.id == id)?;
+        let i = *self.id_index.get(id)?;
         let m = &self.mems[i];
-        let cue_tokens = tokenize(cue);
-        let cue_refs: Vec<&str> = cue_tokens.iter().map(|s| s.as_str()).collect();
-        let cue_seq = crate::relation::encode_relations(&self.parser, cue)
-            .unwrap_or_else(|| self.parser.encode_sequence(&cue_refs));
-        let cue_code = cue_vector
-            .filter(|v| !v.is_empty())
-            .map(|v| self.hasher.encode(v));
-        let cue_scalar = cue_vector.filter(|v| !v.is_empty()).map(project_scalar);
-        let cue_lattice = cue_scalar.map(|s| {
-            self.lattice
-                .encode_with_semantic_position(s, &[])
-                .axes
-                .remove(&Axis::Semantic)
-        });
-        let lexical = jaccard(&cue_tokens, &m.tokens);
-        let photon = match (&cue_code, &m.code) {
+        let ctx = self.prepare_cue_ctx(cue, cue_vector);
+        let lexical = jaccard(&ctx.cue_tokens, &m.tokens);
+        let photon = match (&ctx.cue_code, &m.code) {
             (Some(a), Some(b)) => ((a.estimated_cosine(b)) + 1.0) / 2.0,
             _ => 0.0,
         };
-        let phase = (cue_seq.similarity(&m.seq) + 1.0) / 2.0;
-        let lattice = match (&cue_lattice, m.sem_scalar) {
-            (Some(Some(cg)), Some(ms)) => {
-                let mg = self
-                    .lattice
-                    .encode_with_semantic_position(ms, &[])
-                    .axes
-                    .remove(&Axis::Semantic)
-                    .unwrap();
-                cg.coarse_similarity(&mg, &self.lattice.scales)
-            }
+        let phase = (ctx.cue_seq.similarity(&m.seq) + 1.0) / 2.0;
+        let lattice = match (&ctx.cue_gist, &m.sem_gist) {
+            (Some(cg), Some(mg)) => cg.coarse_similarity(mg, &self.lattice.scales),
             _ => 0.0,
         };
-        let has_vec = m.code.is_some() && cue_code.is_some();
+        let has_vec = m.code.is_some() && ctx.has_vec;
         let score = self.blend(lexical, photon, phase, lattice, has_vec);
         Some(FabricHit {
             id: m.id.clone(),
@@ -247,36 +408,36 @@ impl RecallFabric {
             None => (0..self.mems.len()).collect(),
         };
 
-        let cue_lattice = cue_scalar.map(|s| {
+        let cue_gist = cue_scalar.and_then(|s| {
             self.lattice
                 .encode_with_semantic_position(s, &[])
                 .axes
                 .remove(&Axis::Semantic)
         });
 
+        let ctx = FabricCueCtx {
+            cue_tokens: cue_tokens.clone(),
+            cue_seq: cue_seq.clone(),
+            cue_code: cue_code.clone(),
+            cue_gist,
+            has_vec: cue_code.is_some(),
+        };
+
         let mut hits: Vec<FabricHit> = candidate_idx
             .into_iter()
             .map(|i| {
                 let m = &self.mems[i];
-                let lexical = jaccard(&cue_tokens, &m.tokens);
-                let photon = match (&cue_code, &m.code) {
+                let lexical = jaccard(&ctx.cue_tokens, &m.tokens);
+                let photon = match (&ctx.cue_code, &m.code) {
                     (Some(a), Some(b)) => ((a.estimated_cosine(b)) + 1.0) / 2.0,
                     _ => 0.0,
                 };
-                let phase = (cue_seq.similarity(&m.seq) + 1.0) / 2.0;
-                let lattice = match (&cue_lattice, m.sem_scalar) {
-                    (Some(Some(cg)), Some(ms)) => {
-                        let mg = self
-                            .lattice
-                            .encode_with_semantic_position(ms, &[])
-                            .axes
-                            .remove(&Axis::Semantic)
-                            .unwrap();
-                        cg.coarse_similarity(&mg, &self.lattice.scales)
-                    }
+                let phase = (ctx.cue_seq.similarity(&m.seq) + 1.0) / 2.0;
+                let lattice = match (&ctx.cue_gist, &m.sem_gist) {
+                    (Some(cg), Some(mg)) => cg.coarse_similarity(mg, &self.lattice.scales),
                     _ => 0.0,
                 };
-                let has_vec = m.code.is_some() && cue_code.is_some();
+                let has_vec = m.code.is_some() && ctx.has_vec;
                 let score = self.blend(lexical, photon, phase, lattice, has_vec);
                 FabricHit {
                     id: m.id.clone(),
@@ -413,6 +574,37 @@ mod tests {
     }
 
     #[test]
+    fn bench_score_shortlist_5k_docs() {
+        let mut f = RecallFabric::default();
+        let dim = 384;
+        for i in 0..5183 {
+            let v = vec_for(i as u64, dim);
+            f.insert(
+                format!("d{i}"),
+                &format!("document title and body text number {i} about science"),
+                Some(&v),
+            );
+        }
+        let ids: Vec<String> = (0..100).map(|i| format!("d{i}")).collect();
+        let id_refs: Vec<&str> = ids.iter().map(|s| s.as_str()).collect();
+        let qv = vec_for(99, dim);
+        let start = std::time::Instant::now();
+        for _ in 0..300 {
+            let _ = f.score_shortlist(&id_refs, "query about broadband speed science", Some(&qv));
+        }
+        let elapsed = start.elapsed();
+        eprintln!(
+            "score_shortlist x300: {:?} ({:.2} ms/query)",
+            elapsed,
+            elapsed.as_secs_f64() * 1000.0 / 300.0
+        );
+        assert!(
+            elapsed.as_secs_f64() / 300.0 < 0.05,
+            "shortlist rerank too slow"
+        );
+    }
+
+    #[test]
     fn paraphrase_recalled_despite_low_lexical_overlap() {
         // Query and target share meaning (near embeddings) but almost no words.
         let mut f = RecallFabric::default();
@@ -447,8 +639,8 @@ mod tests {
         // them apart. Only the phase (order) term breaks the tie toward the matching order.
         let mut f = RecallFabric::default();
         let shared = vec_for(42, 128);
-        f.insert("user_upgraded_plan", "user upgraded plan", Some(&shared));
-        f.insert("plan_upgraded_user", "plan upgraded user", Some(&shared));
+        f.insert_rich("user_upgraded_plan", "user upgraded plan", Some(&shared));
+        f.insert_rich("plan_upgraded_user", "plan upgraded user", Some(&shared));
 
         let hits = f.recall("user upgraded plan", Some(&shared), 2);
         assert_eq!(

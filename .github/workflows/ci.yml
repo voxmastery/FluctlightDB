@@ -179,6 +179,9 @@ jobs:
             rustup target add aarch64-apple-darwin x86_64-apple-darwin
             maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml --target universal2-apple-darwin
           else
+            if [[ "${{ runner.arch }}" == "ARM64" ]]; then
+              rustup target add aarch64-pc-windows-msvc
+            fi
             maturin build --release -o dist-native --manifest-path crates/fluctlight-py/Cargo.toml
           fi
           mkdir -p dist-native dist-sdk
