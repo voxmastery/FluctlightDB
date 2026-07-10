@@ -94,10 +94,10 @@ LongMemEval E2E is **excluded** (locked maintainer run; OpenAI cost).
 
 | Benchmark | Frozen artifact | Open harness | Maintainer self-reported | Independent third-party reproduction |
 |-----------|-----------------|--------------|--------------------------|-------------------------------------|
-| LoCoMo evidence recall @150 | `locomo-chorus-2026-07-08.json` | `make reproduce-locomo` | Yes — **99.0%** | **None published** |
+| LoCoMo evidence recall @150 | `locomo-chorus-fabric-2026-07-09.json` | `make reproduce-locomo` | Yes — **99.0%** | **None published** |
 | LongMemEval-S session@8 | `paper-2026-07-09.json` | Colab + local scripts | Yes — **97.6%** | **None published** |
 | LongMemEval E2E QA | `e2e-cert-paper-v2-2026-07-07.json` | `benchmarks/e2e_certify.sh` (OpenAI) | Yes — **97.4%** | **None** — run locked |
-| BEIR SciFact nDCG@10 | `paper-2026-07-09.json` | `benchmarks/beir_bench.py` | Yes — **0.645** | **None published** |
+| BEIR SciFact nDCG@10 / R@10 | `paper-2026-07-09.json` | `benchmarks/beir_bench.py` | Yes — **0.646 / 0.792** (Fabric on) | **None published** |
 | FAMB macro | `paper-2026-07-09.json` | `benchmarks/famb_bench.py` | Yes — **100%** | **None published** |
 
 **Bottom line:** Harnesses are open and numbers are frozen, but **all headline metrics are maintainer-reported until an external group publishes a reproduction** (issue, blog, paper, or fork).

@@ -45,13 +45,13 @@ Source: [`benchmarks/results/paper-2026-07-09.json`](benchmarks/results/paper-20
 
 | Benchmark | Metric | Result | Lane |
 |-----------|--------|--------|------|
-| **LoCoMo** (1,982 gold spans) | Evidence recall @150 | **99.0%** (1970/1982) | CHORUS + SPECTRUM (k>100) |
-| **LongMemEval-S** | session_recall@8 | **97.6%** (488/500) | v4 unified mpnet |
+| **LoCoMo** (1,982 gold spans) | Evidence recall @150 | **99.0%** (1970/1982) | CHORUS + Fabric (paper profile) |
+| **LongMemEval-S** | session_recall@8 | **97.6%** (488/500) | hybrid index + mpnet (no Fabric) |
 | **LongMemEval E2E** (locked) | Overall QA | **97.4%** | Muon + paper profile |
-| **BEIR SciFact** | nDCG@10 | **0.645** (Chroma tie) | PRISM + float rerank |
-| **FAMB** | Macro | **100%** | agent + CHORUS |
+| **BEIR SciFact** | nDCG@10 / R@10 | **0.646 / 0.792** vs Chroma 0.645 / 0.783 | CHORUS/PRISM + Fabric |
+| **FAMB** | Macro | **100%** | agent + CHORUS (internal regression) |
 
-> LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics. See [BENCHMARKS.md](docs/BENCHMARKS.md).
+> Paper-profile CHORUS benchmarks (LoCoMo, BEIR, FAMB) use `FLUCTLIGHT_FABRIC=1`. LongMemEval retrieval uses `connect_index()` hybrid sidecar only. LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics. See [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ### Reproduce LoCoMo (one command)
 
@@ -101,7 +101,7 @@ None of them give you a **database engine whose native operations are memory ope
 
 ## Recall Fabric (opt-in)
 
-Foundational memory mechanisms behind `FLUCTLIGHT_FABRIC=1` (off by default). Photon prefilter, lattice, phase binding, forgetting, chronos, confidence — each tested in Rust, composed at runtime only.
+Foundational memory mechanisms behind `FLUCTLIGHT_FABRIC=1`. Paper-profile CHORUS benchmarks (LoCoMo, BEIR, FAMB) run with Fabric on; default agent paths may leave it off.
 
 ```bash
 export FLUCTLIGHT_FABRIC=1
