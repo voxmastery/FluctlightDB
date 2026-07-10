@@ -57,7 +57,7 @@ Source: [`benchmarks/results/paper-2026-07-09.json`](benchmarks/results/paper-20
 
 ```bash
 git clone https://github.com/voxmastery/FluctlightDB.git && cd FluctlightDB
-make reproduce-locomo          # downloads data, runs CHORUS eval, checks frozen cert
+make reproduce-locomo          # CHORUS + FLUCTLIGHT_FABRIC=1; checks locomo-chorus-fabric-2026-07-09.json
 # from source (pre-PyPI): REPRODUCE_FROM_SOURCE=1 make reproduce-locomo
 ```
 

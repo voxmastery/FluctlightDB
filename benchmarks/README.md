@@ -6,8 +6,9 @@ Run from repo root unless noted. Install deps:
 pip install chromadb pytrec-eval-terrier "fluctlightdb[native]>=0.5.2"
 # or dev: pip install -e sdks/python && ./scripts/install-native.sh
 
-# LoCoMo one-command reproduce (downloads data, checks frozen cert)
+# LoCoMo one-command reproduce (downloads data, Fabric on, checks frozen cert)
 make reproduce-locomo
+# Frozen baseline: benchmarks/results/locomo-chorus-fabric-2026-07-09.json
 ```
 
 | Script | Purpose | Data |
