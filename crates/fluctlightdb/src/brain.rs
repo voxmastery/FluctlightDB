@@ -280,6 +280,13 @@ impl FluctlightBrain {
             self.activation_cache.lock().unwrap().invalidate();
             self.development.on_experience(salience);
             self.prefrontal.unlocked = self.development.pfc_unlocked();
+            self.fabric_on_experience(
+                engram_id,
+                &episode.content,
+                salience,
+                tick,
+                vector_for_index.as_deref(),
+            );
             if checkpoint {
                 self.maybe_checkpoint()?;
             }
@@ -496,25 +503,24 @@ impl FluctlightBrain {
         }
 
         let candidate_cap = top_k.max(default_candidate_cap());
-        let candidate_set: Option<HashSet<uuid::Uuid>> =
-            if let Some(photon) = self.fabric_photon_candidates(cue_vector) {
-                Some(cap_candidates(photon.into_iter().collect(), candidate_cap))
-            } else {
-                self.recall_index
-                    .as_ref()
-                    .and_then(|idx| {
-                        idx.hybrid_candidates(cue, cue_vector, &self.semantic, candidate_cap)
-                            .ok()
-                    })
-                    .and_then(|ids| {
-                        let capped = cap_candidates(ids, candidate_cap);
-                        if capped.is_empty() {
-                            None
-                        } else {
-                            Some(capped)
-                        }
-                    })
-            };
+        // Hybrid BM25+dense sidecar when present (LongMemEval / connect_index).
+        // When absent, scan all hippocampal engrams — do not substitute Fabric Photon
+        // prefilter (that path is for CHORUS rerank, not hybrid activate).
+        let candidate_set: Option<HashSet<uuid::Uuid>> = self
+            .recall_index
+            .as_ref()
+            .and_then(|idx| {
+                idx.hybrid_candidates(cue, cue_vector, &self.semantic, candidate_cap)
+                    .ok()
+            })
+            .and_then(|ids| {
+                let capped = cap_candidates(ids, candidate_cap);
+                if capped.is_empty() {
+                    None
+                } else {
+                    Some(capped)
+                }
+            });
 
         let mut result = activate_from_hybrid(
             cue,
@@ -542,8 +548,7 @@ impl FluctlightBrain {
                 recall.activation += 0.15;
             }
         }
-        // Recall Fabric (opt-in): full Photon → Lattice → Phase composed recall merged into
-        // hybrid activation, then forgetting retention + confidence weighting. Off by default.
+        // Recall Fabric (opt-in): blend composed scores into hybrid activation. Off by default.
         self.fabric_on_activate(cue, cue_vector, &mut result.recalls);
         self.merge_chorus_recalls(cue, cue_vector, &mut result.recalls, top_k);
         result
@@ -1038,6 +1043,10 @@ impl FluctlightBrain {
             .as_ref()
             .map(|i| i.uses_sidecar())
             .unwrap_or(false)
+    }
+
+    pub(crate) fn has_recall_index(&self) -> bool {
+        self.recall_index.is_some()
     }
 
     pub fn invalidate_activation_cache(&mut self) {

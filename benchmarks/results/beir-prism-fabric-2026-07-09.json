@@ -1,0 +1,32 @@
+{
+  "benchmark": "beir",
+  "dataset": "scifact",
+  "docs": 5183,
+  "queries": 300,
+  "embed_doc_ms": 88.74,
+  "embed_query_ms": 70.31,
+  "chroma": {
+    "ndcg_at_10": 0.6450816521455776,
+    "recall_at_10": 0.7833333333333333,
+    "recall_at_100": 0.9266666666666666,
+    "write_ms_per_doc": 1.52,
+    "query_ms": 6.83
+  },
+  "fluctlightdb_chorus": {
+    "ndcg_at_10": 0.6459920533371171,
+    "recall_at_10": 0.7916666666666666,
+    "recall_at_100": 0.925,
+    "imprint_ms_per_doc": 2.958,
+    "query_ms": 15.82,
+    "query_ms_mean": 18.35,
+    "imprint_wall_s": 15.33,
+    "query_batch_wall_s": 5.5,
+    "lane": "chorus_grg_prism",
+    "sleep": {
+      "collapsed": 25,
+      "pruned": 0,
+      "splits": 4,
+      "theta_sweeps": 8
+    }
+  }
+}

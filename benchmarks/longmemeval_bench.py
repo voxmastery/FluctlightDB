@@ -843,6 +843,8 @@ def main() -> int:
         help="comma-separated question_type filter (e.g. single-session-preference)",
     )
     args = ap.parse_args()
+    # LongMemEval uses connect_index hybrid BM25+dense — not CHORUS Fabric rerank.
+    # Paper-profile Fabric-on applies to CHORUS lanes (LoCoMo, BEIR, FAMB); see bench_lanes.py.
 
     if not args.data.is_file():
         raise SystemExit(f"dataset not found: {args.data}")

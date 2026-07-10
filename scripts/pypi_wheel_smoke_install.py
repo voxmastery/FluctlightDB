@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import glob
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -16,7 +17,38 @@ def _pick_wheel(pattern: str) -> Path:
     matches = sorted(Path(p) for p in glob.glob(pattern))
     if not matches:
         raise FileNotFoundError(f"No wheel matched {pattern!r}")
+
+    # SDK is pure Python; native wheel must match host OS/arch.
+    if "dist-native" in pattern.replace("\\", "/"):
+        return _pick_native_wheel(matches)
+    # dist-sdk: prefer platform-independent wheel
+    for m in reversed(matches):
+        if "py3-none-any" in m.name or "any" in m.name.split("-")[-1]:
+            return m
     return matches[-1]
+
+
+def _pick_native_wheel(matches: list[Path]) -> Path:
+    """Select abi3 native wheel for the current host (avoid manylinux on Windows)."""
+    abi = [m for m in matches if "abi3" in m.name]
+    pool = abi or matches
+
+    if sys.platform == "win32":
+        machine = platform.machine().lower()
+        if machine in ("arm64", "aarch64"):
+            tags = ("win_arm64", "win_amd64", "win32")
+        else:
+            tags = ("win_amd64", "win32", "win_arm64")
+    elif sys.platform == "darwin":
+        tags = ("macosx_11_0_universal2", "macosx_10_9_universal2", "macosx", "darwin")
+    else:
+        tags = ("manylinux", "linux")
+
+    for tag in tags:
+        for m in reversed(pool):
+            if tag in m.name:
+                return m
+    return pool[-1]
 
 
 def main() -> int:
@@ -34,7 +66,9 @@ def main() -> int:
     pip = vdir / ("Scripts/pip.exe" if os.name == "nt" else "bin/pip")
 
     subprocess.check_call([str(pip), "install", "--upgrade", "pip"])
-    subprocess.check_call([str(pip), "install", str(native), str(sdk)])
+    subprocess.check_call(
+        [str(pip), "install", "--force-reinstall", str(native), str(sdk)]
+    )
     subprocess.check_call(
         [
             str(py),

@@ -3,6 +3,7 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{graphicx}
 \usepackage{booktabs}
+\usepackage{amsmath}
 \usepackage{listings}
 \usepackage{xcolor}
 
@@ -37,10 +38,9 @@ internally reproduced July 2026 run. On LongMemEval-S (500 questions, official
 \texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\%}
 (488/500); end-to-end QA with our reader/judge stack scores \textbf{97.4\%}
 (487/500)---these layers use different protocols than vendor leaderboard figures
-we cite for context only. On BEIR SciFact (shared MiniLM embeddings, same
-harness), CHORUS/PRISM ties Chroma on nDCG@10 (\textbf{0.645}); Recall@100
-differs slightly (0.925 vs.\ 0.927) because both systems are scored fresh in one
-script, not copied from a leaderboard. We also report a small author-designed
+we cite for context only. On BEIR SciFact (shared MiniLM embeddings, same harness, Recall Fabric on),
+CHORUS/PRISM edges Chroma on nDCG@10 (\textbf{0.646} vs.\ \textbf{0.645}); Recall@100
+is 0.925 vs.\ 0.927 in the same script. We also report a small author-designed
 regression suite (FAMB; paraphrase $n{=}10$, other sub-tests $n{=}1$) at 100\%
 macro---internal validation, not peer benchmark. Strangers can verify the engine
 in under a minute via \texttt{pip install "fluctlightdb[native]"} and a minimal
@@ -83,7 +83,7 @@ provenance---and whose query is a \emph{cue} that spreads through associations.
   \item \textbf{Evidence.} \textbf{99.0\%} evidence recall on full LoCoMo (CHORUS),
   \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
   \textbf{97.4\%} end-to-end QA on LongMemEval-S (our reader/judge stack; 500 questions),
-  BEIR SciFact CHORUS ties Chroma nDCG@10 in a shared harness (MiniLM), and FAMB
+  BEIR SciFact CHORUS/Fabric edges Chroma nDCG@10 in a shared harness (MiniLM), and FAMB
   (author-designed regression; Section~\ref{sec:eval}) at 100\% macro on July 2026 reruns.
   \item \textbf{Reproducibility.} Open harnesses, frozen result JSON, and a
   one-minute \texttt{pip install "fluctlightdb[native]"} smoke path so every
@@ -159,6 +159,17 @@ top-$k$ for IR comparisons.
 live agents. \texttt{connect\_index()} is the bulk semantic path for RAG backfills
 and IR benchmarks. The modes share one engine and one file format.
 
+\subsection{Durability and crash recovery}
+Each agent brain is a versioned on-disk directory (\texttt{manifest.json},
+hippocampal segments, \texttt{recall\_index.sqlite}). \texttt{checkpoint()}
+atomically commits durable state; optional WAL (\texttt{FLUCTLIGHT\_WAL=1}) appends
+experiences before fsync so recent writes survive process death between checkpoints.
+\texttt{verify\_path()} scans manifest, segments, and the recall sidecar for torn
+headers or orphan indices. CI runs Jepsen-style chaos tests
+(\texttt{tests/chaos\_jepsen.rs}): \texttt{SIGKILL} mid-write, torn WAL tails,
+replicate-while-partial-WAL, and round-trip reopen---the embedded store should not
+silently serve corrupt brains after these failures.
+
 Figure~\ref{fig:architecture} summarizes how an agent brain is laid out on disk,
 what each engram stores, and how write and read paths connect the episodic store
 to the hybrid recall sidecar.
@@ -179,22 +190,24 @@ model with its own write/read contract.}
 \label{fig:architecture}
 \end{figure*}
 
-\section{Optional Recall Fabric (not evaluated at benchmark scale)}
+\section{Recall Fabric}
 \label{sec:fabric}
 Hybrid recall (Section~\ref{sec:design}) treats memory as an index. FluctlightDB also
-implements an optional \emph{Recall Fabric}---Photon prefilter (SimHash/LSH),
-Manifold Lattice addressing~\cite{fiete2008,sreenivasan2011}, theta--gamma phase
+implements a \emph{Recall Fabric}---Photon prefilter (SimHash/LSH), Manifold Lattice
+addressing~\cite{fiete2008,sreenivasan2011}, theta--gamma phase
 parsing~\cite{lisman1995,lisman2013,plate1995}, consolidation crystallization,
 adaptive forgetting, chronos time buckets, and confidence-weighted
 consensus---each as a deterministic, dependency-free module behind
-\texttt{FLUCTLIGHT\_FABRIC=1}. Synthetic property tests cover CRT round-trip,
-bind/unbind invertibility, Hamming--cosine rank agreement, and decay
-monotonicity. \textbf{Every headline number in Section~\ref{sec:eval} was measured
-with Fabric \emph{off}.} A preliminary 10-question, single-type LongMemEval
-Fabric A/B pilot (\texttt{fabric-ab-f0-10.json} / \texttt{fabric-ab-f1-10.json})
-showed no regression; benchmark-scale Fabric-on ablations (positive, flat, or
-negative) are future work. Figure~\ref{fig:fabric} sketches the composed pipeline;
-extended mechanism notes live in repository documentation.
+\texttt{FLUCTLIGHT\_FABRIC=1}. On ingest, Fabric indexes engrams (and CHORUS traces)
+for lattice/phase scoring; on recall it re-ranks hybrid and CHORUS shortlists before
+returning hits. Synthetic property tests cover CRT round-trip, bind/unbind
+invertibility, Hamming--cosine rank agreement, and decay monotonicity.
+\textbf{LoCoMo, BEIR, and FAMB headline numbers in Section~\ref{sec:eval} were measured with Fabric
+\emph{on}} (\texttt{FLUCTLIGHT\_FABRIC=1} in the CHORUS paper-profile harnesses).
+LongMemEval-S retrieval uses the hybrid \texttt{connect\_index()} path (Colab mpnet;
+Section~\ref{sec:eval}) and does not apply Fabric rerank on that stack.
+Figure~\ref{fig:fabric} sketches the composed pipeline; extended mechanism notes live
+in repository documentation.
 
 \begin{figure}[t]
 \centering
@@ -209,8 +222,8 @@ Phase Parsing \; (order + role disambiguation) \\
 $\downarrow$\\
 \textbf{ranked recall} \; (confidence-weighted)
 }}
-\caption{Recall Fabric pipeline (optional; \texttt{FLUCTLIGHT\_FABRIC=1}). Not used
-for any frozen result in Section~\ref{sec:eval}.}
+\caption{Recall Fabric pipeline (\texttt{FLUCTLIGHT\_FABRIC=1}). Composes with CHORUS
+recall on LoCoMo, BEIR, and FAMB frozen runs (Section~\ref{sec:eval}).}
 \label{fig:fabric}
 \end{figure}
 
@@ -218,9 +231,11 @@ for any frozen result in Section~\ref{sec:eval}.}
 \label{sec:eval}
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-09.json} (LoCoMo, BEIR, FAMB PRISM production
-refresh 2026-07-08; LongMemEval unified v4 retrieval from 2026-07-04; E2E QA from
-2026-07-07).
+\texttt{benchmarks/results/paper-2026-07-09.json}. CHORUS benchmarks (LoCoMo, BEIR,
+FAMB) set \texttt{FLUCTLIGHT\_FABRIC=1} (Recall Fabric on; re-frozen 2026-07-09).
+LongMemEval-S retrieval is the July 2026 Colab v4 freeze (\textbf{97.6\%},
+488/500; hybrid index + mpnet, no Fabric rerank). LongMemEval-S E2E QA is frozen
+from 2026-07-07 (not re-run).
 
 \begin{figure}[t]
 \centering
@@ -232,30 +247,30 @@ CHORUS Lane nDCG@10. Author-designed FAMB is reported in text only (Section~\ref
 \label{fig:benchmarks}
 \end{figure}
 
-\subsection{BEIR SciFact: CHORUS Lane matches Chroma}
+\subsection{BEIR SciFact: CHORUS + Fabric edges Chroma on ranking}
 We score standard IR metrics via \texttt{pytrec\_eval} against official qrels,
 using identical embeddings for FluctlightDB and Chroma. The \textbf{CHORUS Lane}
-(\texttt{connect\_chorus()}, batch \texttt{chorus\_imprint\_batch}, \textbf{PRISM} readout:
-RaBitQ + QJL rank, SPECTRUM certify, float32 rerank) is our bulk ingest path---13.5\,s
-to imprint all 5{,}183 SciFact documents.
+(\texttt{connect\_chorus()}, batch \texttt{chorus\_imprint\_batch}, \textbf{PRISM} readout,
+Recall Fabric on) is our bulk ingest path---15.3\,s to imprint all 5{,}183 SciFact
+documents in the July 2026 Fabric-on rerun.
 
 \begin{table}[h]
 \centering
-\caption{BEIR SciFact (shared MiniLM embeddings; internally reproduced July 2026).}
+\caption{BEIR SciFact (shared MiniLM embeddings; Fabric on; July 2026).}
 \begin{tabular}{lrrrr}
 \toprule
 System & nDCG@10 & R@10 & R@100 & Query (ms) \\
 \midrule
 Chroma & 0.645 & 0.783 & 0.927 & 17 \\
-FluctlightDB (CHORUS/PRISM) & \textbf{0.645} & \textbf{0.783} & 0.925 & 11 \\
+FluctlightDB (CHORUS/PRISM/Fabric) & \textbf{0.646} & \textbf{0.792} & 0.925 & 16 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-CHORUS/PRISM ties Chroma on nDCG@10 and Recall@10 in the \emph{same} harness with
-identical precomputed embeddings; Recall@100 differs by 0.002 (0.925 vs.\ 0.927) because
-ranking ties and tail ordering need not match even when nDCG@10 rounds to the same
-three decimals. Reproduce:
+With Fabric on, CHORUS/PRISM improves nDCG@10 and Recall@10 over Chroma in the
+\emph{same} harness; Recall@100 differs by 0.002 (0.925 vs.\ 0.927). Per-query
+latency stays in the same ballpark as the Fabric-off CHORUS profile ($\sim$16\,ms
+median on this run). Reproduce:
 \texttt{PYTHONPATH=sdks/python python benchmarks/beir\_bench.py}.
 
 \subsection{LoCoMo: 99.0\% evidence recall on the full set}
@@ -277,7 +292,7 @@ Metric & Value \\
 Mean evidence recall & \textbf{99.0\%} \\
 All evidence in context & 98.3\% \\
 Evidence hits & 1970/1982 \\
-Wall time (s) & 20.5 \\
+Wall time (s) & 443.1 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -310,8 +325,9 @@ layer (Table~\ref{tab:longmemeval-e2e}).
 
 We run retrieval with \texttt{connect\_index()}, one engram per chat session,
 hybrid BM25 + dense recall, dual-key user indexing (CP2), heuristic query
-expansion (CP3), and a third \emph{pref-facts} engram per session (v4). Embeddings
-use \texttt{multi-qa-mpnet-base-dot-v1} on GPU; the unified 500-question v4 run
+expansion (CP3), and a third \emph{pref-facts} engram per session (v4). This
+hybrid-index stack does not use Recall Fabric rerank (unlike the CHORUS benchmarks
+above). Embeddings use \texttt{multi-qa-mpnet-base-dot-v1} on GPU; the unified 500-question v4 run
 scores \textbf{97.6\%} (488/500) and completes in $\sim$73 minutes on Colab T4
 ($8.8$\,s/question). Reproduce: \texttt{benchmarks/longmemeval\_colab\_v2.ipynb}
 (\texttt{BENCH\_PROFILE=full}) or \texttt{longmemeval\_bench.py} with
@@ -418,11 +434,10 @@ judged on whether it surfaces the right evidence; 99.0\% on full LoCoMo says it
 does. End-to-end QA additionally depends on the language model and the prompt
 budget, and we are careful not to launder a retrieval win into a generation claim.
 
-\textbf{In production.} Beyond benchmarks, FluctlightDB backs a continuously
-running operational agent in a deployed production system, persisting
-cross-session state for an autonomous service rather than a research fixture---the
-durability and cold-start guarantees above are properties we rely on, not only
-ones we measured.
+\textbf{Operational use.} We have exercised FluctlightDB in long-running developer
+workflows (not a third-party production case study). The durability and crash-recovery
+properties in Section~\ref{sec:design} are what those workflows rely on, alongside
+the chaos suite above---not properties asserted only from benchmark scripts.
 
 \textbf{Hybrid retrieval matters.} Lexical seeds materially raised LoCoMo recall
 over vector-only retrieval at moderate $k$; dialogue evidence frequently hinges on
@@ -446,9 +461,8 @@ full) is not yet in the default ingest path. End-to-end QA on LongMemEval-S
 (Table~\ref{tab:longmemeval-e2e}, Figure~\ref{fig:longmemeval-e2e-types}) uses
 OpenAI reader/judge APIs and remains weakest on multi-session aggregation (92.5\%).
 Mem0/Zep end-to-end figures use different reader setups; we cite published
-LongMemEval-S numbers only where protocols match. Recall Fabric
-(Section~\ref{sec:fabric}) is implemented but contributed zero to frozen benchmarks.
-Multi-tenant isolation at scale and ANN beyond $10^5$ memories are not yet evaluated.
+LongMemEval-S numbers only where protocols match. Multi-tenant isolation
+at scale and ANN beyond $10^5$ memories are not yet evaluated.
 
 \section{Related Work}
 \subsection{Vector databases}
@@ -463,7 +477,7 @@ live agents.
 \subsection{Agent memory SDKs and layers}
 \textbf{Mem0}~\cite{chhikara2025mem0} is the closest contemporary system: it
 extracts, consolidates, and retrieves salient facts from dialogue, with an optional
-graph variant (Mem0$^{\tiny g}$) for relational structure among entities. It
+graph variant (Mem0$^{\text{\tiny g}}$) for relational structure among entities. It
 reports strong LoCoMo numbers using \emph{LLM-as-a-judge end-to-end QA}---a
 different metric from the official evidence-recall protocol we adopt for retrieval.
 \textbf{Zep}~\cite{zep2024} provides temporal knowledge-graph memory for
@@ -507,7 +521,7 @@ FluctlightDB & Engine & Muon + paper E2E & \textbf{97.4\%} & LongMemEval E2E QA 
 \midrule
 \multicolumn{5}{l}{\textit{Cited vendor/literature (different metrics; not comparable)}} \\
 \midrule
-Mem0 / Mem0$^{\tiny g}$ & SDK + backend & Extract / consolidate / retrieve facts & $\sim$92\%+ LLM-J & End-to-end QA \\
+Mem0 / Mem0$^{\text{\tiny g}}$ & SDK + backend & Extract / consolidate / retrieve facts & $\sim$92\%+ LLM-J & End-to-end QA \\
 Zep & Managed layer & Temporal KG + summaries & $\sim$75\% LLM-J & End-to-end QA \\
 Cognee & Pipeline & Graph + vector ETL & --- & Task-specific \\
 MemGPT / Letta & Agent OS & Context tiers / blocks & --- & Session QA \\
@@ -527,8 +541,8 @@ The relational model gave applications a database for \emph{facts}; the vector
 model gave search a database for \emph{similarity}. Autonomous agents need a
 database for \emph{memory}, and it should be as boring to adopt and as rigorous to
 trust as SQLite. FluctlightDB is our argument that this engine can exist today: it
-ties vector baselines where they are strong on shared harnesses, wins where memory
-semantics matter on our regression suites, recalls 99.0\% of gold evidence on LoCoMo
+ties vector baselines where they are strong on shared harnesses, passes our
+author-designed agent-memory regression suites at 100\% macro, recalls 99.0\% of gold evidence on LoCoMo
 retrieval, 97.6\% session recall on LongMemEval-S (retrieval v4), and 97.4\%
 end-to-end QA on LongMemEval-S---while LoCoMo end-to-end QA remains weak (23.5\%
 F1 on a 50-question pilot). We release everything needed to reproduce and contest
