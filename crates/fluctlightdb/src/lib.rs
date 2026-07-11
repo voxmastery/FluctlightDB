@@ -77,6 +77,9 @@ pub mod store_lock;
 pub mod tau;
 pub mod tau_runtime;
 pub mod tenant;
+/// Process-wide env lock for tests that mutate `FLUCTLIGHT_*` (unit + integration).
+#[doc(hidden)]
+pub mod test_env;
 pub mod tokenize;
 pub mod types;
 pub mod wal;

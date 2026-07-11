@@ -11,11 +11,13 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+---
+
+## [0.5.10] - 2026-07-11
+
 ### Fixed
-- Windows `pypi-wheel-smoke` CI: cross-platform `scripts/pypi_wheel_smoke_install.py` (no bash `ls`/`head` on `.whl` paths).
-- Miri CI: `miri_*` pure-Rust tests; brain/sqlite tests `#[ignore]` under Miri; single documented `unsafe` in `serve.rs` (signals).
-- `docs/INTEGRATIONS.md`: paraphrase cue `"testing framework"` → lexical `"pytest"` (matches WM content).
-- Regression tests: `connect_agent()` graph wiring without `semantic_vector`, integrations snippet guard.
+- CI `test` flake: process-wide `test_env::EnvGuard` for all `FLUCTLIGHT_*` mutations (auth, fabric, agent, serve integration).
+- Windows `pypi-wheel-smoke`: invoke `python -m pip` (Windows blocks upgrading via `pip.exe`); pip upgrade is best-effort.
 
 ---
 

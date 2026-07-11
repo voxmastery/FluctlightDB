@@ -2,14 +2,19 @@
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::{Arc, Barrier, Mutex};
+use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
+use fluctlightdb::test_env::EnvGuard;
 use fluctlightdb::{request_shutdown, reset_shutdown_for_tests, BrainServer};
 use tempfile::tempdir;
 
-static SERVE_ITEST_LOCK: Mutex<()> = Mutex::new(());
+const AUTH_ENV: &[&str] = &[
+    "FLUCTLIGHT_API_KEYS",
+    "FLUCTLIGHT_REQUIRE_AUTH",
+    "FLUCTLIGHT_WAL_FSYNC",
+];
 
 fn post(port: u16, path: &str, body: &str, token: Option<&str>) -> (u16, String) {
     let mut stream = TcpStream::connect(format!("127.0.0.1:{port}")).expect("connect");
@@ -37,14 +42,30 @@ fn post(port: u16, path: &str, body: &str, token: Option<&str>) -> (u16, String)
     (status, resp[body_start..].to_string())
 }
 
+fn start_server(brain: std::path::PathBuf, keys: &str, port: u16) -> std::thread::JoinHandle<()> {
+    reset_shutdown_for_tests();
+    // Caller must hold EnvGuard for AUTH_ENV.
+    std::env::set_var("FLUCTLIGHT_API_KEYS", keys);
+    std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", "true");
+    let server = BrainServer::open(brain).unwrap();
+    let addr = format!("127.0.0.1:{port}");
+    let barrier = Arc::new(Barrier::new(2));
+    let b = barrier.clone();
+    let handle = thread::spawn(move || {
+        b.wait();
+        let _ = server.serve(&addr);
+    });
+    barrier.wait();
+    thread::sleep(Duration::from_millis(300));
+    handle
+}
+
 #[test]
 fn serve_auth_and_consolidate() {
-    let _guard = SERVE_ITEST_LOCK.lock().unwrap();
-    let prev_keys = std::env::var("FLUCTLIGHT_API_KEYS").ok();
-    let prev_req = std::env::var("FLUCTLIGHT_REQUIRE_AUTH").ok();
-    std::env::set_var("FLUCTLIGHT_API_KEYS", "default:testkey:admin");
-    std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", "true");
-    std::env::set_var("FLUCTLIGHT_WAL_FSYNC", "always");
+    let env = EnvGuard::acquire(AUTH_ENV);
+    env.set("FLUCTLIGHT_API_KEYS", "default:testkey:admin");
+    env.set("FLUCTLIGHT_REQUIRE_AUTH", "true");
+    env.set("FLUCTLIGHT_WAL_FSYNC", "always");
     reset_shutdown_for_tests();
 
     let dir = tempdir().unwrap();
@@ -83,43 +104,12 @@ fn serve_auth_and_consolidate() {
 
     request_shutdown();
     let _ = handle.join();
-
-    match prev_keys {
-        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
-        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
-    }
-    match prev_req {
-        Some(v) => std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", v),
-        None => std::env::remove_var("FLUCTLIGHT_REQUIRE_AUTH"),
-    }
-}
-
-fn start_server(
-    brain: std::path::PathBuf,
-    keys: &str,
-    port: u16,
-) -> (std::thread::JoinHandle<()>, Arc<Barrier>) {
-    reset_shutdown_for_tests();
-    std::env::set_var("FLUCTLIGHT_API_KEYS", keys);
-    std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", "true");
-    let server = BrainServer::open(brain).unwrap();
-    let addr = format!("127.0.0.1:{port}");
-    let barrier = Arc::new(Barrier::new(2));
-    let b = barrier.clone();
-    let handle = thread::spawn(move || {
-        b.wait();
-        let _ = server.serve(&addr);
-    });
-    barrier.wait();
-    thread::sleep(Duration::from_millis(300));
-    (handle, barrier)
+    drop(env);
 }
 
 #[test]
 fn serve_cross_tenant_path_forbidden() {
-    let _guard = SERVE_ITEST_LOCK.lock().unwrap();
-    let prev_keys = std::env::var("FLUCTLIGHT_API_KEYS").ok();
-    let prev_req = std::env::var("FLUCTLIGHT_REQUIRE_AUTH").ok();
+    let _env = EnvGuard::acquire(AUTH_ENV);
     let dir = tempdir().unwrap();
     let port = 18793u16;
     let handle = start_server(
@@ -136,23 +126,12 @@ fn serve_cross_tenant_path_forbidden() {
     assert_eq!(s_forbidden, 403, "tenant_b must not read tenant_a: {body}");
 
     request_shutdown();
-    let _ = handle.0.join();
-
-    match prev_keys {
-        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
-        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
-    }
-    match prev_req {
-        Some(v) => std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", v),
-        None => std::env::remove_var("FLUCTLIGHT_REQUIRE_AUTH"),
-    }
+    let _ = handle.join();
 }
 
 #[test]
 fn serve_read_role_cannot_write() {
-    let _guard = SERVE_ITEST_LOCK.lock().unwrap();
-    let prev_keys = std::env::var("FLUCTLIGHT_API_KEYS").ok();
-    let prev_req = std::env::var("FLUCTLIGHT_REQUIRE_AUTH").ok();
+    let _env = EnvGuard::acquire(AUTH_ENV);
     let dir = tempdir().unwrap();
     let port = 18794u16;
     let handle = start_server(dir.path().join("brain"), "tenant_a:read_only:read", port);
@@ -165,14 +144,5 @@ fn serve_read_role_cannot_write() {
     assert_eq!(s_write, 403, "read role must not write: {body}");
 
     request_shutdown();
-    let _ = handle.0.join();
-
-    match prev_keys {
-        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
-        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
-    }
-    match prev_req {
-        Some(v) => std::env::set_var("FLUCTLIGHT_REQUIRE_AUTH", v),
-        None => std::env::remove_var("FLUCTLIGHT_REQUIRE_AUTH"),
-    }
+    let _ = handle.join();
 }

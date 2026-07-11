@@ -263,13 +263,21 @@ pub(crate) fn new_fabric_state() -> (RecallFabric, Mutex<HashMap<String, MemoryT
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_env::EnvGuard;
     use crate::types::Episode;
+
+    const FABRIC_ENV_KEYS: &[&str] = &[
+        "FLUCTLIGHT_FABRIC",
+        "FLUCTLIGHT_FAST_INGEST",
+        "FLUCTLIGHT_VECTOR_FAST",
+    ];
 
     #[test]
     fn warm_fabric_backfills_chronos_from_engrams() {
-        std::env::set_var("FLUCTLIGHT_FABRIC", "1");
-        std::env::remove_var("FLUCTLIGHT_FAST_INGEST");
-        std::env::remove_var("FLUCTLIGHT_VECTOR_FAST");
+        let env = EnvGuard::acquire(FABRIC_ENV_KEYS);
+        env.set("FLUCTLIGHT_FABRIC", "1");
+        env.remove("FLUCTLIGHT_FAST_INGEST");
+        env.remove("FLUCTLIGHT_VECTOR_FAST");
         let mut brain = FluctlightBrain::new();
         for content in ["alpha", "beta", "gamma"] {
             let ep = Episode {
@@ -293,15 +301,15 @@ mod tests {
         assert_eq!(brain.fabric_len(), 3);
         let recent = brain.timeline(2);
         assert_eq!(recent.len(), 2);
-        std::env::remove_var("FLUCTLIGHT_FABRIC");
     }
 
     #[test]
     fn fabric_skips_ingest_on_fast_index_path() {
         use crate::types::RagRef;
-        std::env::set_var("FLUCTLIGHT_FABRIC", "1");
-        std::env::set_var("FLUCTLIGHT_FAST_INGEST", "1");
-        std::env::set_var("FLUCTLIGHT_VECTOR_FAST", "1");
+        let env = EnvGuard::acquire(FABRIC_ENV_KEYS);
+        env.set("FLUCTLIGHT_FABRIC", "1");
+        env.set("FLUCTLIGHT_FAST_INGEST", "1");
+        env.set("FLUCTLIGHT_VECTOR_FAST", "1");
         let mut brain = FluctlightBrain::new();
         let ep = Episode {
             content: "session user enjoys hiking".into(),
@@ -321,8 +329,5 @@ mod tests {
         brain.experience(ep).unwrap();
         assert_eq!(brain.fabric_len(), 0);
         assert!(brain.has_recall_index());
-        std::env::remove_var("FLUCTLIGHT_FABRIC");
-        std::env::remove_var("FLUCTLIGHT_FAST_INGEST");
-        std::env::remove_var("FLUCTLIGHT_VECTOR_FAST");
     }
 }

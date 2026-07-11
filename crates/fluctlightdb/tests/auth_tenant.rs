@@ -2,34 +2,29 @@
 
 use fluctlightdb::auth::{AuthConfig, AuthContext, Role};
 use fluctlightdb::auth_store::AuthStore;
+use fluctlightdb::test_env::EnvGuard;
 use tempfile::tempdir;
 
 #[test]
 fn auth_rejects_missing_bearer_when_keys_configured() {
-    let prev = std::env::var("FLUCTLIGHT_API_KEYS").ok();
-    std::env::set_var("FLUCTLIGHT_API_KEYS", "tenant_a:secret_a:write");
+    let _env = EnvGuard::acquire(&["FLUCTLIGHT_API_KEYS"]);
+    _env.set("FLUCTLIGHT_API_KEYS", "tenant_a:secret_a:write");
     let cfg = AuthConfig::from_env();
     assert!(cfg.authorize(None, None).is_none());
     assert!(cfg.authorize(Some("wrong"), None).is_none());
     assert!(cfg.authorize(Some("secret_a"), None).is_some());
-    match prev {
-        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
-        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
-    }
 }
 
 #[test]
 fn auth_key_binds_tenant_not_hint_on_mismatch() {
-    let prev = std::env::var("FLUCTLIGHT_API_KEYS").ok();
-    std::env::set_var("FLUCTLIGHT_API_KEYS", "tenant_a:secret_a:write");
+    let _env = EnvGuard::acquire(&["FLUCTLIGHT_API_KEYS"]);
+    _env.set("FLUCTLIGHT_API_KEYS", "tenant_a:secret_a:write");
     let cfg = AuthConfig::from_env();
-    let ctx = cfg.authorize(Some("secret_a"), Some("tenant_b")).unwrap();
+    let ctx = cfg
+        .authorize(Some("secret_a"), Some("tenant_b"))
+        .expect("secret_a must authorize under locked env");
     // Key wins — caller must enforce path/body tenant matches ctx (serve does).
     assert_eq!(ctx.tenant_id, "tenant_a");
-    match prev {
-        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
-        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
-    }
 }
 
 #[test]
@@ -82,16 +77,12 @@ fn auth_store_garbage_token_never_authorizes() {
 
 #[test]
 fn auth_malformed_env_entries_ignored() {
-    let prev = std::env::var("FLUCTLIGHT_API_KEYS").ok();
-    std::env::set_var(
+    let _env = EnvGuard::acquire(&["FLUCTLIGHT_API_KEYS"]);
+    _env.set(
         "FLUCTLIGHT_API_KEYS",
         "badentry,tenant_a:goodkey:write,also-bad",
     );
     let cfg = AuthConfig::from_env();
     assert!(cfg.authorize(Some("goodkey"), None).is_some());
     assert!(cfg.authorize(Some("badentry"), None).is_none());
-    match prev {
-        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
-        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
-    }
 }
