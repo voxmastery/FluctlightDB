@@ -36,7 +36,8 @@ make that case carefully, not categorically: we do not claim novelty over Mem0,
 Zep, or HippoRAG-style memory layers, only an embedded engine contract beneath them.
 Numbers below are typed by metric; retrieval is not generation.
 On LoCoMo (official \emph{evidence-recall}; 10 conversations, 1{,}982 gold spans),
-CHORUS retrieval reaches \textbf{99.0\%} on an internally reproduced July 2026 run,
+CHORUS retrieval reaches \textbf{99.0\%} at $k{=}150$ on an internally reproduced
+July 2026 run,
 while a 50-question end-to-end QA pilot yields only \textbf{23.5\%} category F1
 despite \textbf{99.5\%} retrieval on that slice.
 On LongMemEval-S (500 questions), official \texttt{session\_recall@8} is
@@ -95,7 +96,7 @@ comes before neuroscience-flavored rerank modules.
   no server process) exposing \texttt{experience()} / \texttt{activate()} /
   \texttt{checkpoint()}---one durable brain directory per agent.
   \item \textbf{Evidence.} Typed by metric: \textbf{99.0\%} LoCoMo evidence
-  \emph{retrieval} (CHORUS) vs.\ \textbf{23.5\%} LoCoMo end-to-end F1 on a
+  \emph{retrieval} (CHORUS, $k{=}150$; Table~\ref{tab:locomo-k}) vs.\ \textbf{23.5\%} LoCoMo end-to-end F1 on a
   50-question pilot; \textbf{97.6\%} LongMemEval-S \texttt{session\_recall@8} and
   \textbf{97.4\%} LongMemEval-S end-to-end QA (our reader/judge; 500 questions);
   BEIR SciFact CHORUS/Fabric edges Chroma nDCG@10 in a shared MiniLM harness;
@@ -353,7 +354,7 @@ evidence spans present in retrieved context. Configuration: \texttt{connect\_cho
 batch imprint per turn, $k{=}150$, SPECTRUM full readout when $k{>}100$ (PRISM
 certify cap), GRG recall with shared MiniLM vectors. The July 2026 internally
 reproduced run (embed cache warm) scores \textbf{99.0\%} mean evidence
-recall.
+recall at $k{=}150$ (Table~\ref{tab:locomo-k} for the budget--recall curve).
 
 \begin{table}[h]
 \centering
@@ -400,8 +401,10 @@ On the full LoCoMo set with \texttt{connect\_index()} at $k{=}50$, hybrid
 BM25+dense and vector-fast-only are statistically tied ($\sim$90.2\% vs.\
 $\sim$90.3\% mean evidence recall; frozen
 \texttt{locomo-hybrid-index-2026-07-10.json}). The headline 99.0\% figure uses
-CHORUS+Fabric at $k{=}150$, not the index lane. Lexical seeds help on some
-dialogue slices but are not a large uniform gain on this benchmark at moderate~$k$.
+CHORUS+Fabric at $k{=}150$, not the index lane. We keep BM25 as a candidate
+seed for entity- and date-heavy dialogue cues, but on this full-set ablation at
+moderate~$k$ it is not a large uniform gain over vector-only---so we do not sell
+hybrid as axiomatic superiority.
 
 \subsection{FAMB and provenance-conflict suite}
 Generic IR does not test what agents need. FAMB measures paraphrase recall@1
