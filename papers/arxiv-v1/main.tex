@@ -33,22 +33,27 @@ consolidation, provenance) and read semantics (cue-driven activation across a
 linked memory graph)---and present \textbf{FluctlightDB}, an embedded engine that
 implements this contract via \texttt{experience()} and \texttt{activate()}. We
 make that case carefully, not categorically: we do not claim novelty over Mem0,
-Zep, or HippoRAG-style memory layers, only an embedded engine contract beneath them. On LoCoMo (official \emph{evidence-recall} metric; 10
-conversations, 1{,}982 gold spans), CHORUS recalls \textbf{99.0\%} on an
-internally reproduced July 2026 run. On LongMemEval-S (500 questions, official
-\texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\%}
-(488/500); end-to-end QA with our reader/judge stack scores \textbf{97.4\%}
-(487/500)---these layers use different protocols than vendor leaderboard figures
-we cite for context only. On BEIR SciFact (shared MiniLM embeddings, same harness, Recall Fabric on),
-CHORUS/PRISM edges Chroma on nDCG@10 (\textbf{0.646} vs.\ \textbf{0.645}) and Recall@10
-(\textbf{0.792} vs.\ \textbf{0.783}). We also report a small author-designed
-regression suite (FAMB; paraphrase $n{=}10$, other sub-tests $n{=}1$) at 100\%
-macro---internal validation, not peer benchmark. Strangers can verify the engine
-in under a minute via \texttt{pip install "fluctlightdb[native]"} and a minimal
-\texttt{connect()}$\to$\texttt{experience()}$\to$\texttt{activate()} script (compiled
-wheel, not source-only). Harnesses and frozen JSON are MIT-licensed. We claim no
-new neuroscience and no new transformer; we propose a missing layer of the data
-stack and release an engine others can reproduce and contest.
+Zep, or HippoRAG-style memory layers, only an embedded engine contract beneath them.
+Numbers below are typed by metric; retrieval is not generation.
+On LoCoMo (official \emph{evidence-recall}; 10 conversations, 1{,}982 gold spans),
+CHORUS retrieval reaches \textbf{99.0\%} on an internally reproduced July 2026 run,
+while a 50-question end-to-end QA pilot yields only \textbf{23.5\%} category F1
+despite \textbf{99.5\%} retrieval on that slice.
+On LongMemEval-S (500 questions), official \texttt{session\_recall@8} is
+\textbf{97.6\%} (488/500); end-to-end QA with our reader/judge stack is
+\textbf{97.4\%} (487/500)---different protocols from vendor leaderboard figures we
+cite for context only.
+On BEIR SciFact (shared MiniLM embeddings, same harness, Recall Fabric on),
+CHORUS/PRISM edges Chroma on nDCG@10 (\textbf{0.646} vs.\ \textbf{0.645}) and
+Recall@10 (\textbf{0.792} vs.\ \textbf{0.783}).
+A graded provenance-conflict suite ($n{=}50$) scores \textbf{18\%} top-1 when all
+pairs share one brain---the realistic multi-tenant stress---versus \textbf{100\%}
+under per-case isolation (ceiling, not deployment evidence).
+Harnesses and frozen JSON are MIT-licensed; engine source is MIT on GitHub.
+The one-minute path (\texttt{pip install "fluctlightdb[native]"}) re-runs published
+numbers against the compiled wheel; rebuilding from source is supported but heavier.
+We claim no new neuroscience and no new transformer; we propose a missing layer of
+the data stack and release artifacts others can re-run and contest.
 \end{abstract}
 
 \section{Introduction}
@@ -89,14 +94,17 @@ comes before neuroscience-flavored rerank modules.
   \item \textbf{An embedded engine.} FluctlightDB ships as a Rust library (like SQLite:
   no server process) exposing \texttt{experience()} / \texttt{activate()} /
   \texttt{checkpoint()}---one durable brain directory per agent.
-  \item \textbf{Evidence.} \textbf{99.0\%} evidence recall on full LoCoMo (CHORUS),
-  \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
-  \textbf{97.4\%} end-to-end QA on LongMemEval-S (our reader/judge stack; 500 questions),
-  BEIR SciFact CHORUS/Fabric edges Chroma nDCG@10 in a shared harness (MiniLM), and FAMB
-  (author-designed regression; Section~\ref{sec:eval}) at 100\% macro on July 2026 reruns.
-  \item \textbf{Reproducibility.} Open harnesses, frozen result JSON, and a
-  one-minute \texttt{pip install "fluctlightdb[native]"} smoke path so every
-  number here can be re-run or contested without trusting maintainer scripts alone.
+  \item \textbf{Evidence.} Typed by metric: \textbf{99.0\%} LoCoMo evidence
+  \emph{retrieval} (CHORUS) vs.\ \textbf{23.5\%} LoCoMo end-to-end F1 on a
+  50-question pilot; \textbf{97.6\%} LongMemEval-S \texttt{session\_recall@8} and
+  \textbf{97.4\%} LongMemEval-S end-to-end QA (our reader/judge; 500 questions);
+  BEIR SciFact CHORUS/Fabric edges Chroma nDCG@10 in a shared MiniLM harness;
+  provenance-conflict \textbf{18\%} top-1 shared-brain / \textbf{100\%} isolated
+  ($n{=}50$). Author-designed FAMB stays in Section~\ref{sec:eval} only.
+  \item \textbf{Re-runnability.} Open harnesses and frozen JSON; MIT engine source
+  on GitHub. The one-minute \texttt{pip install "fluctlightdb[native]"} path
+  re-runs numbers against the published wheel; source rebuild is available but
+  not the smoke path.
 \end{itemize}
 
 \section{A Third Data Model for Agent Memory}
@@ -407,37 +415,40 @@ not as external validation.
 
 \textbf{Graded provenance conflicts ($n{=}50$).} Because FAMB provenance is a
 single wallet scenario, we add a separate benchmark:
-\texttt{benchmarks/provenance\_conflict\_bench.py}. Each of 50 isolated cases
-ingests a verified ledger/tool fact and a conflicting unverified chat claim in
+\texttt{benchmarks/provenance\_conflict\_bench.py}. Each case ingests a verified
+ledger/tool fact and a conflicting unverified chat claim in
 \texttt{connect\_agent()}; the cue asks for the grounded value. Top-1 must be the
-verified engram. The July 2026 run scores \textbf{100\%} (50/50) across ten
-domains (wallet, shipping, subscription, API quota, inventory, meeting, deployment,
-refund, license, temperature). This is still synthetic author-designed stress
-testing, not a peer benchmark, but it is stronger than $n{=}1$ for the provenance
-story.
+verified engram. Domains span wallet, shipping, subscription, API quota,
+inventory, meeting, deployment, refund, license, and temperature. This is
+synthetic author-designed stress testing, not a peer benchmark, but stronger than
+$n{=}1$ for the provenance story.
 
-\textbf{Shared-brain stress (multi-tenant analogue).} The same 50 cases ingested
-into a \emph{single} \texttt{connect\_agent()} brain---100 conflicting engrams,
-semantically similar cues---collapse to \textbf{18\%} top-1 (9/50;
-\texttt{--shared-brain} in the harness). We attribute this to \emph{cross-case
-cue contamination}: unrelated domains share lexical overlap (``balance,''
-``quota,'' ``version''), so activation returns another case's ledger or chat
-engram, not a failure of per-pair provenance ranking in isolation
-(Table~\ref{tab:provenance-conditions}). \textbf{Status:} no implementation mitigates
-this failure mode as of this preprint---\texttt{activate\_scoped} can post-filter by
-\texttt{agent\_id}, but ingest and benchmarks do not enforce per-tenant namespaces,
-and we have not re-run the suite under scoped activation (Section~\ref{sec:future}).
+\textbf{Shared-brain stress is the headline (multi-tenant analogue).} The thesis is
+provenance-weighted recall under realistic shared memory. When all 50 cases share
+one \texttt{connect\_agent()} brain---100 conflicting engrams, semantically similar
+cues---top-1 collapses to \textbf{18\%} (9/50; \texttt{--shared-brain}). We
+attribute this to \emph{cross-case cue contamination}: unrelated domains share
+lexical overlap (``balance,'' ``quota,'' ``version''), so activation returns
+another case's ledger or chat engram. Under \emph{per-case isolation} (one brain
+per conflict pair), the same suite scores \textbf{100\%} (50/50)---a ceiling under
+isolation, not evidence of multi-tenant readiness
+(Table~\ref{tab:provenance-conditions}). \textbf{Status:} no implementation
+mitigates the shared-brain failure as of this preprint---\texttt{activate\_scoped}
+can post-filter by \texttt{agent\_id}, but ingest and benchmarks do not enforce
+per-tenant namespaces, and we have not re-run the suite under scoped activation
+(Section~\ref{sec:future}).
 
 \begin{table}[h]
 \centering
-\caption{Provenance-conflict suite ($n{=}50$): isolated vs.\ shared brain.}
+\caption{Provenance-conflict suite ($n{=}50$): shared brain is the deployment stress;
+isolated is the isolation ceiling.}
 \label{tab:provenance-conditions}
 \begin{tabular}{lrr}
 \toprule
 Condition & Top-1 accuracy & Notes \\
 \midrule
-Isolated (one brain per case) & \textbf{100\%} & 50/50; FAMB protocol \\
 Shared (one brain, all cases) & \textbf{18\%} & 9/50; cross-case contamination \\
+Isolated (one brain per case) & \textbf{100\%} & 50/50; isolation ceiling \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -584,12 +595,13 @@ as axiomatic.
 
 \textbf{Limitations.}
 \textbf{Provenance under shared memory.} The graded 50-case suite scores
-\textbf{100\%} when each conflict pair lives in an isolated brain, but only
-\textbf{18\%} (9/50) when all pairs share one brain (Table~\ref{tab:provenance-conditions}).
-We do not treat the isolated figure as evidence of multi-tenant readiness; the
-shared-brain drop reflects cross-case cue contamination, not a broken
-verified-vs-chat ranker within a single scope. \textbf{Status:} unaddressed in code
-and unevaluated beyond this synthetic stress test (Section~\ref{sec:future}).
+\textbf{18\%} top-1 (9/50) when all pairs share one brain---the figure that tests
+the thesis under realistic co-location (Table~\ref{tab:provenance-conditions}).
+Per-case isolation reaches \textbf{100\%}; we treat that only as an isolation
+ceiling, not multi-tenant readiness. The shared-brain drop reflects cross-case
+cue contamination, not a broken verified-vs-chat ranker within a single scope.
+\textbf{Status:} unaddressed in code and unevaluated beyond this synthetic stress
+test (Section~\ref{sec:future}).
 
 \textbf{LoCoMo $k$ and metric choice.} Headline LoCoMo retrieval uses $k{=}150$;
 Table~\ref{tab:locomo-k} reports sensitivity to smaller budgets. We do not claim
@@ -620,7 +632,7 @@ not yet evaluated.
 
 \section{Future Work}
 \label{sec:future}
-The shared-brain provenance result (18\% top-1 vs.\ 100\% isolated) is the highest-priority
+The shared-brain provenance result (\textbf{18\%} top-1; 100\% only under isolation) is the highest-priority
 gap for a revised preprint: session- or agent-scoped \texttt{experience}/\texttt{activate},
 stricter hybrid candidate filtering, and a re-benchmark of
 \texttt{provenance\_conflict\_bench.py} under realistic multi-tenant load. That work
@@ -715,12 +727,13 @@ The relational model gave applications a database for \emph{facts}; the vector
 model gave search a database for \emph{similarity}. Autonomous agents need a
 database for \emph{memory}, and it should be as boring to adopt and as rigorous to
 trust as SQLite. FluctlightDB is our argument that this engine can exist today: it
-ties vector baselines where they are strong on shared harnesses, passes our
-author-designed agent-memory regression suites at 100\% macro, recalls 99.0\% of gold evidence on LoCoMo
-retrieval, 97.6\% session recall on LongMemEval-S (retrieval v4), and 97.4\%
-end-to-end QA on LongMemEval-S---while LoCoMo end-to-end QA remains weak (23.5\%
-F1 on a 50-question pilot). We release everything needed to reproduce and contest
-these claims.
+ties vector baselines where they are strong on shared harnesses, reaches 99.0\%
+LoCoMo evidence \emph{retrieval} while LoCoMo end-to-end QA remains weak (23.5\%
+F1 on a 50-question pilot), scores 97.6\% session recall and 97.4\% end-to-end QA
+on LongMemEval-S, and---on the provenance thesis under shared memory---only 18\%
+top-1 on the graded conflict suite (100\% under isolation). Harnesses, frozen
+JSON, and MIT engine source are released so others can re-run and contest these
+claims; the one-minute path uses the published wheel.
 
 \appendix
 \section{Recall Fabric mechanisms}
