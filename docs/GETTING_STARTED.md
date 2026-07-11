@@ -44,7 +44,7 @@ On modern Linux (Debian 12+, Ubuntu 23.04+), use a venv — not `sudo pip` ([PEP
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install "fluctlightdb[native]==0.5.9"
+pip install "fluctlightdb[native]==0.5.10"
 ```
 
 ```python

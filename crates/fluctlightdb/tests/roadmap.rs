@@ -107,16 +107,12 @@ fn auth_roles_hierarchy() {
 
 #[test]
 fn auth_keys_require_bearer() {
-    let prev = std::env::var("FLUCTLIGHT_API_KEYS").ok();
-    std::env::set_var("FLUCTLIGHT_API_KEYS", "default:sekret:admin");
+    let env = fluctlightdb::test_env::EnvGuard::acquire(&["FLUCTLIGHT_API_KEYS"]);
+    env.set("FLUCTLIGHT_API_KEYS", "default:sekret:admin");
     let cfg = AuthConfig::from_env();
     assert!(cfg.require_auth);
     assert!(cfg.authorize(None, None).is_none());
     assert!(cfg.authorize(Some("sekret"), None).is_some());
-    match prev {
-        Some(v) => std::env::set_var("FLUCTLIGHT_API_KEYS", v),
-        None => std::env::remove_var("FLUCTLIGHT_API_KEYS"),
-    }
 }
 
 #[test]

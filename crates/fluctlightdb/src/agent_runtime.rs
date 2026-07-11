@@ -519,9 +519,7 @@ mod tests {
 
     #[test]
     fn agent_env_wm_recall_without_semantic_vector() {
-        static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _guard = ENV_LOCK.lock().unwrap();
-        let prior: std::collections::HashMap<String, Option<String>> = [
+        let _env = crate::test_env::EnvGuard::acquire(&[
             "FLUCTLIGHT_AGENT_ERGONOMICS",
             "FLUCTLIGHT_CHORUS",
             "FLUCTLIGHT_CHORUS_FAST",
@@ -529,10 +527,7 @@ mod tests {
             "FLUCTLIGHT_VECTOR_FAST",
             "FLUCTLIGHT_AGENT_FAST",
             "FLUCTLIGHT_CANDIDATE_CAP",
-        ]
-        .into_iter()
-        .map(|k| (k.to_string(), std::env::var(k).ok()))
-        .collect();
+        ]);
         enable_agent_env();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("agent.brain.flct");
@@ -552,11 +547,5 @@ mod tests {
             "connect_agent-style env should recall lexical wm content: {:?}",
             out
         );
-        for (k, v) in prior {
-            match v {
-                Some(val) => std::env::set_var(k, val),
-                None => std::env::remove_var(k),
-            }
-        }
     }
 }

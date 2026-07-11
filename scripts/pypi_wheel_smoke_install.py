@@ -51,10 +51,18 @@ def _pick_native_wheel(matches: list[Path]) -> Path:
     return pool[-1]
 
 
+def _pip(py: Path, *args: str) -> None:
+    """Always invoke pip as ``python -m pip`` (required on Windows venvs)."""
+    cmd = [str(py), "-m", "pip", *args]
+    subprocess.check_call(cmd)
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     native = _pick_wheel(str(root / "dist-native" / "*.whl"))
     sdk = _pick_wheel(str(root / "dist-sdk" / "*.whl"))
+    print(f"selected native={native.name}")
+    print(f"selected sdk={sdk.name}")
 
     smoke_root = Path(os.environ.get("RUNNER_TEMP", "/tmp"))
     vdir = smoke_root / "flct-smoke"
@@ -63,12 +71,15 @@ def main() -> int:
 
     venv.create(vdir, with_pip=True)
     py = vdir / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    pip = vdir / ("Scripts/pip.exe" if os.name == "nt" else "bin/pip")
 
-    subprocess.check_call([str(pip), "install", "--upgrade", "pip"])
-    subprocess.check_call(
-        [str(pip), "install", "--force-reinstall", str(native), str(sdk)]
-    )
+    # Upgrade is optional — Windows rejects `pip.exe install --upgrade pip`
+    # and requires `python -m pip`; skip hard-fail if upgrade is blocked.
+    try:
+        _pip(py, "install", "--upgrade", "pip")
+    except subprocess.CalledProcessError as exc:
+        print(f"WARN: pip upgrade skipped ({exc})", file=sys.stderr)
+
+    _pip(py, "install", "--force-reinstall", str(native), str(sdk))
     subprocess.check_call(
         [
             str(py),
