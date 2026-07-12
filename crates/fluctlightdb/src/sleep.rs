@@ -69,6 +69,31 @@ pub fn sleep_cycle(
 
     let gate = neuromodulators.plasticity_gate(0.3);
     graph.co_activate(&active_union, gate);
+
+    // DA-gated STDP on sequential replay pairs (Wilson & McNaughton 1994 + Frémaux & Gerstner 2016).
+    // SWR replay fires engrams in forward temporal order: earlier engram's neurons are
+    // pre-synaptic to later engram's neurons → causal sequences consolidate via LTP.
+    // DA gate uses current dopamine level so rewarded sequences consolidate strongest.
+    let da_gate = neuromodulators.dopamine;
+    for pair in recent.windows(2) {
+        let (prev_id, curr_id) = (pair[0], pair[1]);
+        let prev = hippocampus.engrams.iter().find(|e| e.id == prev_id);
+        let curr = hippocampus.engrams.iter().find(|e| e.id == curr_id);
+        if let (Some(prev_e), Some(curr_e)) = (prev, curr) {
+            let pre_neurons: std::collections::HashSet<_> =
+                prev_e.neurons.iter().copied().collect();
+            let post_neurons: std::collections::HashSet<_> =
+                curr_e.neurons.iter().copied().collect();
+            graph.stdp_sequential(
+                &pre_neurons,
+                &post_neurons,
+                prev_e.encoded_at_tick,
+                curr_e.encoded_at_tick,
+                da_gate,
+            );
+        }
+    }
+
     let pruned = graph.prune_below(threshold);
     amygdala.decay();
     neuromodulators.on_sleep();

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::id::NeuronId;
-use crate::plasticity::{hebbian_strengthen, ltd_weaken, Synapse};
+use crate::plasticity::{hebbian_strengthen, ltd_weaken, stdp_update_da, Synapse};
 use crate::types::Region;
 
 /// The connectome — neurons linked by weighted synapses (not a graph DB API).
@@ -76,6 +76,35 @@ impl BrainGraph {
         for synapse in &mut self.synapses {
             if !active.contains(&synapse.from) && !active.contains(&synapse.to) {
                 ltd_weaken(synapse, delta);
+            }
+        }
+    }
+
+    /// DA-gated STDP on a directed sequential pair (Frémaux & Gerstner 2016).
+    ///
+    /// Called during SWR replay: neurons from the EARLIER engram are pre-synaptic;
+    /// neurons from the LATER engram are post-synaptic. Causal sequences that were
+    /// encoded in temporal order get LTP-amplified — this is how the brain consolidates
+    /// causal chains (A→B→C) during sleep instead of just strengthening co-activations.
+    ///
+    /// `pre_tick` / `post_tick`: encoded_at_tick values from the two engrams (used as
+    /// the discrete spike-timing difference). Engrams encoded many ticks apart will
+    /// fall outside the STDP window and won't be modified — only tight sequences consolidate.
+    pub fn stdp_sequential(
+        &mut self,
+        pre_neurons: &HashSet<NeuronId>,
+        post_neurons: &HashSet<NeuronId>,
+        pre_tick: u64,
+        post_tick: u64,
+        da_gate: f32,
+    ) {
+        // Map brain ticks to a STDP-window-friendly scale: divide by 10 so that
+        // engrams encoded 1–20 ticks apart fall inside the 20ms window.
+        let pre_ms = pre_tick / 10;
+        let post_ms = post_tick / 10;
+        for synapse in &mut self.synapses {
+            if pre_neurons.contains(&synapse.from) && post_neurons.contains(&synapse.to) {
+                stdp_update_da(synapse, pre_ms, post_ms, da_gate);
             }
         }
     }

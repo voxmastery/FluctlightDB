@@ -138,7 +138,11 @@ impl FluctlightBrain {
         self.touch_activity();
     }
 
-    /// Push content into working memory (7±2 ring).
+    /// Push content into working memory — ACh-gated capacity (Goldman-Rakic 1995).
+    ///
+    /// Capacity is not fixed: it adapts to the current acetylcholine level.
+    /// High ACh (encoding mode) → fewer slots (3–5) → tight focus on current input.
+    /// Low ACh (retrieval mode) → more slots (6–9) → broader context for multi-hop recall.
     pub fn wm_push(
         &mut self,
         content: impl Into<String>,
@@ -146,6 +150,8 @@ impl FluctlightBrain {
         salience: f32,
         semantic_vector: Option<Vec<f32>>,
     ) {
+        // ACh dynamically gates WM capacity before each push.
+        self.agent.wm.capacity = self.neuromodulators.wm_capacity();
         let tick = self.autonomic.total_ticks;
         self.agent.wm.push(WmSlot {
             content: content.into(),

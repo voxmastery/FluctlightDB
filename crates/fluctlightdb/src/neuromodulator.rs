@@ -78,6 +78,46 @@ impl Neuromodulators {
         self.acetylcholine = (self.acetylcholine - 0.12).max(0.1);
     }
 
+    /// ACh-gated working memory capacity (Goldman-Rakic 1995; Hasselmo & Sarter 2011).
+    ///
+    /// High ACh (encoding mode): high signal/noise ratio in PFC → narrow, selective WM.
+    /// Fewer active slots means only the most salient content gets through (clean encoding).
+    ///
+    /// Low ACh (retrieval mode): broader associative WM → more slots open for comparison,
+    /// enabling multi-hop inference by holding more past context simultaneously.
+    ///
+    /// Returns [3, 9] — matching WmRing's clamped range.
+    pub fn wm_capacity(&self) -> usize {
+        // ACh=1.0 → 3 slots (tight focus); ACh=0.0 → 9 slots (wide retrieval window)
+        let cap = 9.0_f32 - self.acetylcholine * 6.0;
+        cap.round().clamp(3.0, 9.0) as usize
+    }
+
+    /// Reward prediction error — DA/NE update (Schultz 1997; O'Reilly & Frank 2006).
+    ///
+    /// PE = actual_salience − expected_activation (cortex prior).
+    ///
+    /// Positive PE (better than expected): VTA fires a DA burst — the canonical Schultz
+    /// dopamine signal that marks outcomes as worth repeating.
+    ///
+    /// Negative PE (worse than expected): DA dip (expected didn't happen) + NE↑
+    /// (LC norepinephrine alerts the system to update its model).
+    ///
+    /// Large |PE|: NE arousal regardless of sign — unexpected = pay attention.
+    pub fn prediction_error(&mut self, expected: f32, actual: f32) {
+        let pe = actual - expected;
+        if pe > 0.0 {
+            // Positive RPE: better-than-expected → DA burst
+            self.dopamine = (self.dopamine + pe * 0.3).min(1.0);
+        } else {
+            // Negative RPE: worse-than-expected → DA dip + NE alerting
+            self.dopamine = (self.dopamine + pe * 0.2).max(0.0); // pe is negative
+            self.norepinephrine = (self.norepinephrine + (-pe) * 0.2).min(1.0);
+        }
+        // Mismatch arousal: any |PE| > 0 demands attention
+        self.norepinephrine = (self.norepinephrine + pe.abs() * 0.1).min(1.0);
+    }
+
     /// Tick decay — ACh drifts back toward baseline (0.7) between events.
     pub fn tick_decay(&mut self) {
         let baseline = 0.7_f32;
