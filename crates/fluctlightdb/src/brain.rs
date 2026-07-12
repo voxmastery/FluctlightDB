@@ -297,6 +297,15 @@ impl FluctlightBrain {
             self.neuromodulators.on_surprise(episode.salience_hint);
         }
 
+        // Prediction error signal (Schultz 1997; O'Reilly & Frank 2006):
+        // Use the cortex's prior knowledge of this content as the "expected" activation.
+        // High cortex prior (content seen before) = expected; low = truly unexpected.
+        // PE = actual_salience − expected → DA/NE update before encoding.
+        let expected_activation = (self.cortex.fact_boost(&episode.content)
+            + self.cortex.fact_boost(&episode.context) * 0.5)
+            .clamp(0.0, 1.0);
+        self.neuromodulators.prediction_error(expected_activation, salience);
+
         let verified = episode
             .provenance
             .as_ref()
