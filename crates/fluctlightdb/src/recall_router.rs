@@ -16,6 +16,72 @@ pub enum RecallMode {
     Corpus,
     Session,
     Hybrid,
+    /// Deterministic recall: bypass probabilistic activation, scan only
+    /// verified / provenance-backed engrams for exact content match.
+    /// Use when the user needs a precise answer (ID, amount, date, status).
+    Exact,
+}
+
+/// Detect whether a cue is asking for exact/deterministic information.
+///
+/// Associative dynamics is wrong for these queries — a user asking "what is
+/// invoice #4821?" or "what is the phone number of driver ID X?" needs a
+/// deterministic lookup, not a probability distribution over remembered content.
+///
+/// Patterns detected:
+/// - IDs and reference numbers: #\d+, invoice, order, trip, case
+/// - Exact quantities: phone numbers, amounts with ₹/$, percentages
+/// - Explicit precision markers: "exactly", "precisely", "confirm", "what is the exact"
+/// - Status queries: "is X [status]?" expecting a boolean or enum answer
+pub fn detect_exact_query(cue: &str) -> bool {
+    let low = cue.to_lowercase();
+
+    // Explicit precision intent
+    if any_substr(
+        &low,
+        &[
+            "exactly", "precisely", "exact value", "exact number", "confirm the",
+            "what is the exact", "tell me the exact", "what exactly is",
+        ],
+    ) {
+        return true;
+    }
+
+    // Reference ID patterns: #123, ID:, invoice, order, trip, case, ticket
+    if any_substr(&low, &["invoice #", "order #", "trip #", "case #", "ticket #", "id:"]) {
+        return true;
+    }
+
+    // Regex-free ID detection: # followed by digits
+    if low.contains('#') {
+        let after_hash = low.split('#').nth(1).unwrap_or("");
+        if after_hash.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+            return true;
+        }
+    }
+
+    // Phone number queries
+    if any_substr(&low, &["phone number", "phone no", "mobile number", "contact number"]) {
+        return true;
+    }
+
+    // Amount / financial precision
+    if any_substr(&low, &["₹", "inr", "rupee", "the amount", "total amount", "exact amount"]) {
+        return true;
+    }
+
+    // Status / boolean queries
+    if low.starts_with("is ") || low.starts_with("was ") || low.starts_with("did ") {
+        if any_substr(&low, &["pending", "completed", "cancelled", "confirmed", "approved", "rejected"]) {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn any_substr(haystack: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|n| haystack.contains(n))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

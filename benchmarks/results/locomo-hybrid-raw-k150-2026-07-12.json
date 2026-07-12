@@ -1,0 +1,23 @@
+{
+  "benchmark": "locomo",
+  "ablation": "hybrid_vs_vector_index",
+  "lane": "connect_index",
+  "top_k": 150,
+  "profiles": {
+    "hybrid_bm25_vector": {
+      "mean_evidence_recall": 0.9803091287065475,
+      "mean_evidence_recall_raw": 0.8013051136892491,
+      "mean_evidence_recall_expanded": 0.9803091287065475,
+      "evidence_all_in_context": 0.9656912209889001,
+      "evidence_hits": "1958/1982"
+    },
+    "vector_only_fast": {
+      "mean_evidence_recall": 0.9746421511453862,
+      "mean_evidence_recall_raw": 0.8121564986959577,
+      "mean_evidence_recall_expanded": 0.9746421511453862,
+      "evidence_all_in_context": 0.9601412714429869,
+      "evidence_hits": "1948/1982"
+    }
+  },
+  "wall_s": 33.8
+}

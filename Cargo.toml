@@ -8,3 +8,22 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Ganesh S"]
 repository = "https://github.com/voxmastery/FluctlightDB"
+
+# Fast dev profile: iterate on algorithms without waiting for full optimization.
+# `cargo check` is fastest (no codegen). `cargo build` with this profile gives
+# ~3-4× faster incremental rebuilds vs release.
+[profile.dev]
+opt-level = 0
+debug = true
+incremental = true
+
+# Optimize dependencies at level 1 even in dev mode.
+# Deps rarely change so this compiles once and is cached.
+[profile.dev.package."*"]
+opt-level = 1
+
+# ci profile: between dev and release — catches perf regressions without full LTO.
+[profile.ci]
+inherits = "dev"
+opt-level = 2
+debug = false
