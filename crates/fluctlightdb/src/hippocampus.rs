@@ -88,4 +88,58 @@ impl Hippocampus {
         out.reverse();
         out
     }
+
+    /// CA3 Hopfield attractor — pattern completion from a partial cue (Marr 1971; Hopfield 1982).
+    ///
+    /// The CA3 auto-associative network stores engrams as attractor states. A partial set of
+    /// active neurons relaxes toward the nearest stored engram via overlap scoring, weighted
+    /// by `ca3_recurrent_gain` (ACh-dependent: low ACh = strong recurrent collaterals =
+    /// better completion). This is what lets "I remember something about the payment fail..."
+    /// complete into the full stored trace without re-reading every engram.
+    ///
+    /// Returns None if the best overlap is below `overlap_threshold` (prevents hallucination).
+    pub fn ca3_attractor_complete(
+        &self,
+        cue_neurons: &[crate::id::NeuronId],
+        life_id: uuid::Uuid,
+        ca3_recurrent_gain: f32,
+        overlap_threshold: f32,
+    ) -> Option<&Engram> {
+        use std::collections::HashSet;
+        let cue_set: HashSet<_> = cue_neurons.iter().copied().collect();
+        if cue_set.is_empty() {
+            return None;
+        }
+        let mut best: Option<(&Engram, f32)> = None;
+        for engram in self.engrams_for_life(life_id) {
+            let stored: HashSet<_> = engram.neurons.iter().copied().collect();
+            if stored.is_empty() {
+                continue;
+            }
+            let intersection = cue_set.intersection(&stored).count() as f32;
+            let union = cue_set.union(&stored).count() as f32;
+            let jaccard = intersection / union;
+            // Scale by recurrent gain: low ACh amplifies the completion pull.
+            let score = jaccard * (0.3 + 0.7 * ca3_recurrent_gain);
+            if score > overlap_threshold {
+                if best.map_or(true, |(_, bs)| score > bs) {
+                    best = Some((engram, score));
+                }
+            }
+        }
+        best.map(|(e, _)| e)
+    }
+
+    /// Chronological replay order — forward temporal sequence (Wilson & McNaughton 1994).
+    ///
+    /// SWR replay during NREM sleep reactivates experiences in the ORDER they were encoded
+    /// (oldest-first), not recency-first. The consolidation loop should call this instead of
+    /// `recent()` so that causal chains are replayed coherently into the cortex.
+    pub fn replay_sequence(&self, life_id: uuid::Uuid, n: usize) -> Vec<&Engram> {
+        let mut v: Vec<_> = self.engrams_for_life(life_id).collect();
+        v.sort_by_key(|e| std::cmp::Reverse(e.encoded_at_tick));
+        v.truncate(n);
+        v.reverse(); // oldest-first = forward temporal replay
+        v
+    }
 }
