@@ -28,12 +28,14 @@ from locomo_eval import (  # noqa: E402
     CACHE_DIR,
     collect_turns,
     eval_conversation_chorus,
-    expand_session_neighbors,
     load_locomo,
     normalize_evidence,
     recalled_dia_ids_from_chorus,
+    score_evidence,
 )
-from locomo_metrics import evidence_hit, evidence_recall_fraction, summarize_hits  # noqa: E402
+
+
+from locomo_metrics import summarize_hits  # noqa: E402
 
 
 def eval_chorus_at_k(
@@ -43,6 +45,7 @@ def eval_chorus_at_k(
     *,
     max_k: int,
     target_k: int,
+    neighbor_window: int = 3,
 ) -> list[dict]:
     """Reuse a single chorus_recall_batch at max_k; derive metrics for target_k."""
     qas = [
@@ -58,17 +61,16 @@ def eval_chorus_at_k(
     rows: list[dict] = []
     for qa, hits in zip(qas, batch):
         truncated = (hits or [])[:target_k]
-        recalled = expand_session_neighbors(
-            recalled_dia_ids_from_chorus(truncated, target_k), item
-        )
+        found = recalled_dia_ids_from_chorus(truncated, target_k)
         evidence = normalize_evidence(qa.get("evidence") or [])
+        scored = score_evidence(
+            found, evidence, item, neighbor_window=neighbor_window
+        )
         rows.append(
             {
                 "question": (qa.get("question") or "").strip(),
-                "evidence": evidence,
-                "evidence_frac": evidence_recall_fraction(evidence, recalled),
-                "all_evidence": evidence_hit(evidence, recalled),
                 "recall_n": len(truncated),
+                **scored,
             }
         )
     return rows
@@ -111,16 +113,9 @@ def run_k_sweep(
             rows: list[dict] = []
             for qa, hits in zip(qas, batch):
                 truncated = (hits or [])[:k]
-                recalled = expand_session_neighbors(
-                    recalled_dia_ids_from_chorus(truncated, k), item
-                )
+                found = recalled_dia_ids_from_chorus(truncated, k)
                 evidence = normalize_evidence(qa.get("evidence") or [])
-                rows.append(
-                    {
-                        "evidence_frac": evidence_recall_fraction(evidence, recalled),
-                        "all_evidence": evidence_hit(evidence, recalled),
-                    }
-                )
+                rows.append(score_evidence(found, evidence, item, neighbor_window=3))
             per_k_rows[k].extend(rows)
 
     out: dict[str, Any] = {
@@ -128,6 +123,7 @@ def run_k_sweep(
         "ablation": "recall_at_k",
         "fabric_on": fabric,
         "ks": ks,
+        "neighbor_window": 3,
         "by_k": {},
         "wall_s": round(time.perf_counter() - t0, 1),
     }
@@ -135,6 +131,8 @@ def run_k_sweep(
         summary = summarize_hits(per_k_rows[k])
         out["by_k"][str(k)] = {
             "mean_evidence_recall": summary["mean_evidence_recall"],
+            "mean_evidence_recall_raw": summary["mean_evidence_recall_raw"],
+            "mean_evidence_recall_expanded": summary["mean_evidence_recall_expanded"],
             "evidence_all_in_context": summary["evidence_all_in_context"],
             "evidence_hits": summary.get("evidence_hits"),
             "questions": summary["questions"],
@@ -196,14 +194,8 @@ def eval_index_hybrid(
             import re
 
             recalled.update(re.findall(r"\bD\d+:\d+\b", content))
-        recalled = expand_session_neighbors(recalled, item)
         evidence = normalize_evidence(qa.get("evidence") or [])
-        rows.append(
-            {
-                "evidence_frac": evidence_recall_fraction(evidence, recalled),
-                "all_evidence": evidence_hit(evidence, recalled),
-            }
-        )
+        rows.append(score_evidence(recalled, evidence, item, neighbor_window=3))
     return rows
 
 
@@ -237,6 +229,8 @@ def run_hybrid_vs_vector(items: list[dict], embedder: EmbedCache, *, top_k: int)
         summary = summarize_hits(all_rows)
         out["profiles"][name] = {
             "mean_evidence_recall": summary["mean_evidence_recall"],
+            "mean_evidence_recall_raw": summary["mean_evidence_recall_raw"],
+            "mean_evidence_recall_expanded": summary["mean_evidence_recall_expanded"],
             "evidence_all_in_context": summary["evidence_all_in_context"],
             "evidence_hits": summary.get("evidence_hits"),
         }

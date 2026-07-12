@@ -45,13 +45,13 @@ Source: [`benchmarks/results/paper-2026-07-09.json`](benchmarks/results/paper-20
 
 | Benchmark | Metric | Result | Lane |
 |-----------|--------|--------|------|
-| **LoCoMo** (1,982 gold spans) | Evidence recall @150 | **99.0%** (1970/1982) | CHORUS + Fabric (paper profile) |
+| **LoCoMo** (1,982 gold spans) | Evidence recall @150 | **99.0%** expanded / see raw in docs | CHORUS + Fabric; ±3 neighbor expand is harness policy |
 | **LongMemEval-S** | session_recall@8 | **97.6%** (488/500) | hybrid index + mpnet (no Fabric) |
 | **LongMemEval E2E** (locked) | Overall QA | **97.4%** | Muon + paper profile |
 | **BEIR SciFact** | nDCG@10 / R@10 | **0.646 / 0.792** vs Chroma 0.645 / 0.783 | CHORUS/PRISM + Fabric |
 | **FAMB** | Macro | **100%** | agent + CHORUS (internal regression) |
 
-> Paper-profile CHORUS benchmarks (LoCoMo, BEIR, FAMB) use `FLUCTLIGHT_FABRIC=1`. LongMemEval retrieval uses `connect_index()` hybrid sidecar only. LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics. See [BENCHMARKS.md](docs/BENCHMARKS.md).
+> Paper-profile CHORUS benchmarks (LoCoMo, BEIR, FAMB) use `FLUCTLIGHT_FABRIC=1`. LongMemEval retrieval uses `connect_index()` hybrid sidecar only. LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics. LoCoMo’s historical **99.0%** uses harness `expand_session_neighbors(±3)` after retrieval (not upstream LoCoMo exact-hit scoring); `locomo_eval.py` now always reports **raw** and **expanded**. See [BENCHMARKS.md](docs/BENCHMARKS.md) and [#2](https://github.com/voxmastery/FluctlightDB/issues/2).
 
 ### Reproduce LoCoMo (one command)
 
