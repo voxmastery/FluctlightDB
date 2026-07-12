@@ -341,6 +341,17 @@ impl FluctlightBrain {
             salience,
         );
 
+        // ACh novelty/familiarity signal (Hasselmo 2006):
+        // High separation_index → truly novel pattern → DG orthogonalised it heavily →
+        //   raise ACh to suppress CA3 recurrence and encode cleanly without interference.
+        // Low separation_index → familiar / near-duplicate → lower ACh to open CA3
+        //   recurrent collaterals so subsequent retrieval can pattern-complete from partial cues.
+        if separation.separation_index > 0.6 {
+            self.neuromodulators.on_novelty();
+        } else if separation.separation_index < 0.25 {
+            self.neuromodulators.on_retrieval();
+        }
+
         if let Some(ref vector) = episode.semantic_vector {
             let ec_sem =
                 self.semantic
@@ -420,6 +431,8 @@ impl FluctlightBrain {
     pub(crate) fn tick_internal(&mut self, checkpoint: bool) -> Result<TickReport> {
         self.autonomic.on_tick();
         self.development.on_tick();
+        // Neuromodulator decay: ACh/DA/NE/5HT drift back to baseline each tick (Doya mapping).
+        self.neuromodulators.tick_decay();
         self.autonomic.roll_sleep_window(self.autonomic.total_ticks);
         let _ = self.agent_on_tick()?;
 
@@ -548,6 +561,47 @@ impl FluctlightBrain {
                 recall.activation += 0.15;
             }
         }
+        // CA3 Hopfield attractor: pattern-completion recall pathway (Marr 1971; Hopfield 1982).
+        // Active when in retrieval mode (ACh < 0.6): low ACh opens CA3 recurrent collaterals,
+        // allowing a partial query cue to "relax" to the nearest stored engram attractor state.
+        // This rescues recalls that BM25+dense missed because the surface tokens didn't overlap.
+        if !self.neuromodulators.is_encoding() {
+            let gain = self.neuromodulators.ca3_recurrent_gain();
+            let rich = crate::tokenize::tokenize_rich(cue, "", None);
+            let cue_neurons: Vec<crate::id::NeuronId> = rich
+                .iter()
+                .map(|t| crate::id::NeuronId::from_seeds(&["ec", &t.surface]))
+                .collect();
+            if let Some(completed) = self.hippocampus.ca3_attractor_complete(
+                &cue_neurons,
+                self.life.life_id,
+                gain,
+                0.07, // 7% Jaccard: loose enough for partial cues, tight enough to avoid noise
+            ) {
+                let boost = gain * 0.35;
+                if let Some(r) = result.recalls.iter_mut().find(|r| r.engram_id == completed.id) {
+                    // Amplify existing result — CA3 confirms the BM25+dense hit
+                    r.activation += boost;
+                    r.completion_strength = (r.completion_strength + gain).min(1.0);
+                } else {
+                    // CA3 rescued a recall that hybrid search missed
+                    result.recalls.push(crate::types::RecallResult {
+                        engram_id: completed.id,
+                        activation: boost,
+                        episode: completed.episode.clone(),
+                        completion_strength: gain,
+                        separation_index: completed.separation_index,
+                        verified: completed
+                            .episode
+                            .provenance
+                            .as_ref()
+                            .map_or(false, |p| p.verified),
+                        trust_note: None,
+                    });
+                }
+            }
+        }
+
         // Recall Fabric (opt-in): blend composed scores into hybrid activation. Off by default.
         self.fabric_on_activate(cue, cue_vector, &mut result.recalls);
         self.merge_chorus_recalls(cue, cue_vector, &mut result.recalls, top_k);
