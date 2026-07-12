@@ -60,3 +60,4 @@ papers/arxiv-v1/figures/04-longmemeval-e2e-by-type.pdf
 .fluctlight/agents/
 .fluctlight/**/.brain.lock
 .fluctlight/.handoffs.lock
+.beam-venv/
