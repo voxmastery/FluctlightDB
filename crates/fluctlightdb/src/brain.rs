@@ -614,6 +614,39 @@ impl FluctlightBrain {
         // Recall Fabric (opt-in): blend composed scores into hybrid activation. Off by default.
         self.fabric_on_activate(cue, cue_vector, &mut result.recalls);
         self.merge_chorus_recalls(cue, cue_vector, &mut result.recalls, top_k);
+
+        // ── Neuromodulator-gated recall scoring (Schultz 1997; Hasselmo 2006) ─────────────
+        // DA (dopamine) amplifies ALL recall scores proportionally — high DA means the
+        // current context is reward-relevant; the whole memory landscape is amplified.
+        // NE (norepinephrine) sharpens SNR: boosts strong signals, attenuates weak ones,
+        // modelling the "attentional spotlight" during arousal (Sara & Bouret 2012).
+        {
+            let da = self.neuromodulators.dopamine;
+            let ne = self.neuromodulators.norepinephrine;
+            if da > 0.5 || ne > 0.3 {
+                let da_boost = 1.0 + (da - 0.5_f32).max(0.0) * 0.20;
+                for recall in &mut result.recalls {
+                    // DA: uniform amplification proportional to above-baseline dopamine
+                    recall.activation *= da_boost;
+                    // NE: sharpens by amplifying confident hits, softly suppressing noise
+                    if recall.activation > 1.0 {
+                        recall.activation *= 1.0 + ne * 0.10;
+                    } else {
+                        recall.activation *= (1.0 - ne * 0.08).max(0.5);
+                    }
+                }
+            }
+        }
+
+        // ── LIF temporal coding: spike timing as recall confidence ────────────────────────
+        // Each recall score is treated as synaptic current driving a LIF neuron.
+        // Engrams that fire their neuron quickly (strong current = high activation) get a
+        // small bonus — "earlier spike = stronger representation" (rate → temporal recoding).
+        // This adds a non-linear sharpening effect between strong and marginal memories.
+        for recall in &mut result.recalls {
+            recall.activation += lif_score_boost(recall.activation);
+        }
+
         result
             .recalls
             .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
@@ -1271,6 +1304,32 @@ impl Clone for FluctlightBrain {
             chorus: self.chorus.clone(),
         }
     }
+}
+
+/// LIF temporal coding: convert an engram's activation score into a small score bonus.
+///
+/// Treats `activation` as a synaptic current driving a default LIF neuron.
+/// If the neuron fires within 50ms, the bonus scales inversely with fire time:
+/// fast-firing (strong current) → up to +0.30 bonus; slow/no-fire → 0.
+///
+/// Biology: temporal coding hypothesis (Thorpe 1996) — neurons that fire earlier
+/// carry stronger/more reliable information. Used here as a non-linear sharpening
+/// of the recall score: strong memories win over marginal ones by a slightly larger margin.
+fn lif_score_boost(activation: f32) -> f32 {
+    // Scale activation to nA current: I_threshold = 0.15 nA, so threshold activation ≈ 3.0
+    let i_syn = activation * 0.05_f32;
+    if i_syn < 0.01 {
+        return 0.0; // far below threshold — no boost
+    }
+    let mut n = crate::neuron::LIFNeuron::default();
+    for t in 1..=50u64 {
+        if n.integrate(i_syn, 1.0, t) {
+            // Fired at tick t: boost inversely proportional to fire time
+            // (t=1 → 0.30, t=50 → 0.0)
+            return (51 - t) as f32 / 50.0 * 0.30;
+        }
+    }
+    0.0
 }
 
 fn prefer_ledger_truth_on_balance_cue(
