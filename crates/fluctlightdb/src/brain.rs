@@ -25,7 +25,7 @@ use crate::hippocampus::Hippocampus;
 use crate::index::RecallIndex;
 use crate::life::{CoreMemoryStore, LifeState};
 use crate::neuromodulator::Neuromodulators;
-use crate::prefrontal::Prefrontal;
+use crate::prefrontal::{Prefrontal, RuleAction};
 use crate::raw_export::{export_raw, RawExport};
 use crate::semantic::SemanticField;
 use crate::sleep::{separate_and_encode, sleep_cycle};
@@ -442,6 +442,8 @@ impl FluctlightBrain {
         self.development.on_tick();
         // Neuromodulator decay: ACh/DA/NE/5HT drift back to baseline each tick (Doya mapping).
         self.neuromodulators.tick_decay();
+        // PFC working memory fades: goals & task context decay without rehearsal.
+        self.prefrontal.tick_decay(self.autonomic.total_ticks);
         self.autonomic.roll_sleep_window(self.autonomic.total_ticks);
         let _ = self.agent_on_tick()?;
 
@@ -645,6 +647,66 @@ impl FluctlightBrain {
         // This adds a non-linear sharpening effect between strong and marginal memories.
         for recall in &mut result.recalls {
             recall.activation += lif_score_boost(recall.activation);
+        }
+
+        // ── Prefrontal cortex: top-down goal bias + inhibitory control ────────────────────
+        // dlPFC: goals in working memory boost recall of goal-relevant engrams (Miller & Cohen 2001).
+        // vlPFC: inhibitory patterns suppress conflicting/irrelevant content (Aron 2007).
+        // ACC: rule set routes recall through explicit if/then executive filters.
+        if self.prefrontal.unlocked {
+            for recall in &mut result.recalls {
+                let content = &recall.episode.content;
+                // Goal-biased recall: up to +0.5 boost for goal-matching engrams
+                recall.activation += self.prefrontal.goal_bias_score(content, cue);
+                // Inhibitory control: suppresses engrams matching inhibited patterns
+                let suppression = self.prefrontal.inhibit_score(content);
+                recall.activation = (recall.activation + suppression).max(0.0);
+            }
+            // PFC rules: scan once, apply to whole recall set
+            let rules = self.prefrontal.matching_rules(cue);
+            if !rules.is_empty() {
+                for rule in rules {
+                    match &rule.action {
+                        RuleAction::BoostVerified => {
+                            for recall in &mut result.recalls {
+                                if recall.verified {
+                                    recall.activation *= 1.20;
+                                }
+                            }
+                        }
+                        RuleAction::RequireSource(src) => {
+                            let src = src.clone();
+                            result.recalls.retain(|r| {
+                                // Check provenance.source_uri then rag.source_uri
+                                let prov_match = r
+                                    .episode
+                                    .provenance
+                                    .as_ref()
+                                    .and_then(|p| p.source_uri.as_deref())
+                                    == Some(src.as_str());
+                                let rag_match = r
+                                    .episode
+                                    .rag
+                                    .as_ref()
+                                    .and_then(|rag| rag.source_uri.as_deref())
+                                    == Some(src.as_str());
+                                prov_match || rag_match
+                            });
+                        }
+                        RuleAction::InjectContext(ctx) => {
+                            // Prepend context hint to every recall episode so downstream
+                            // consumers see the top-down priming signal.
+                            let prefix = format!("[ctx: {}] ", ctx);
+                            for recall in &mut result.recalls {
+                                if !recall.episode.context.starts_with('[') {
+                                    recall.episode.context =
+                                        format!("{}{}", prefix, recall.episode.context);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         result
@@ -946,22 +1008,19 @@ impl FluctlightBrain {
         })
     }
 
-    /// Executive goal bias (HTTP API — always records, even before PFC stage unlock).
+    /// Executive goal bias (HTTP API — stores goal in working memory; PFC biases recall
+    /// toward matching engrams once unlocked).
     pub fn api_set_goal(&mut self, goal: String) -> Result<()> {
         let goal = goal.chars().take(200).collect::<String>();
-        if !goal.is_empty() && !self.prefrontal.goals.iter().any(|g| g == &goal) {
-            self.prefrontal.goals.push(goal);
-        }
+        self.prefrontal.add_goal(goal, self.autonomic.total_ticks);
         self.maybe_checkpoint()?;
         Ok(())
     }
 
-    /// Inhibit recall phrases matching action (HTTP API).
+    /// Inhibit recall phrases matching pattern (HTTP API — PFC suppresses matching engrams).
     pub fn api_inhibit(&mut self, action: String) -> Result<()> {
         let action = action.chars().take(200).collect::<String>();
-        if !action.is_empty() && !self.prefrontal.inhibit_actions.iter().any(|a| a == &action) {
-            self.prefrontal.inhibit_actions.push(action);
-        }
+        self.prefrontal.add_inhibit(action);
         self.maybe_checkpoint()?;
         Ok(())
     }
