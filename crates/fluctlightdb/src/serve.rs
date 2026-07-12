@@ -1350,9 +1350,10 @@ fn dispatch(
                 .ok_or_else(|| Error::Store("missing goal".into()))?;
             server.with_brain_write(tenant_id, |b| {
                 b.api_set_goal(goal)?;
+                let goal_texts: Vec<&str> = b.prefrontal.goals.iter().map(|g| g.text.as_str()).collect();
                 Ok(serde_json::json!({
                     "ok": true,
-                    "goals": b.prefrontal.goals,
+                    "goals": goal_texts,
                 }))
             })
         }
@@ -1365,9 +1366,10 @@ fn dispatch(
                 .ok_or_else(|| Error::Store("missing action".into()))?;
             server.with_brain_write(tenant_id, |b| {
                 b.api_inhibit(action)?;
+                let inhibit_patterns: Vec<&str> = b.prefrontal.inhibit_patterns.iter().map(|i| i.pattern.as_str()).collect();
                 Ok(serde_json::json!({
                     "ok": true,
-                    "inhibit_actions": b.prefrontal.inhibit_actions,
+                    "inhibit_actions": inhibit_patterns,
                 }))
             })
         }
