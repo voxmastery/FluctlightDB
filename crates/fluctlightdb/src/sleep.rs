@@ -33,8 +33,10 @@ pub fn sleep_cycle(
     let stage_before = development.stage.as_str().to_string();
     let threshold = development.stage.prune_threshold();
 
+    // Forward temporal replay order (Wilson & McNaughton 1994): experiences replay in the
+    // order they were encoded, not recency-first, so causal chains consolidate coherently.
     let recent: Vec<Uuid> = hippocampus
-        .recent(life.life_id, replay_limit)
+        .replay_sequence(life.life_id, replay_limit)
         .into_iter()
         .map(|e| e.id)
         .collect();
