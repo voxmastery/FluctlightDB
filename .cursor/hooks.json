@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/session_start.py",
+        "timeout": 15
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": ".cursor/hooks/session_end.py",
+        "timeout": 15
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/stop_handoff.py",
+        "timeout": 20
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/before_submit.py",
+        "timeout": 12
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": ".cursor/hooks/track_files.py",
+        "matcher": "Write|Edit",
+        "timeout": 10
+      }
+    ]
+  }
+}

@@ -54,3 +54,9 @@ papers/arxiv-v1/figures/04-longmemeval-e2e-by-type.pdf
 **/benchmarks/results/*.checkpoint.jsonl.bak
 **/benchmarks/results/*.log
 **/benchmarks/results/.*.lock
+
+# FluctlightDB embedded brains (local agent memory; optional commit for team sync)
+.fluctlight/project/
+.fluctlight/agents/
+.fluctlight/**/.brain.lock
+.fluctlight/.handoffs.lock

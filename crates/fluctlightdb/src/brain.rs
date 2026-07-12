@@ -623,6 +623,17 @@ impl FluctlightBrain {
                 .retain(|r| r.episode.agent_id.as_deref() == Some(aid));
         }
         prefer_ledger_truth_on_balance_cue(cue, &self.hippocampus, &mut result.recalls);
+
+        // Exact query override (generalised from ledger-truth).
+        // When the user asks for precise/deterministic data (IDs, amounts, phone numbers,
+        // status queries), probabilistic activation is the wrong model — verified engrams
+        // must WIN over all associative results, regardless of activation score.
+        // detect_exact_query() identifies these patterns; exact_verified_recall() scans
+        // only provenance-backed engrams and injects them at activation 2.0 (guaranteed top).
+        if crate::recall_router::detect_exact_query(cue) {
+            exact_verified_recall(cue, &self.hippocampus, self.life.life_id, &mut result.recalls);
+        }
+
         annotate_recall_trust(&mut result.recalls);
         self.activation_cache
             .lock()
@@ -1337,6 +1348,108 @@ fn boost_recall_engram(
 
 fn any_contains(hay: &str, needles: &[&str]) -> bool {
     needles.iter().any(|n| hay.contains(n))
+}
+
+/// Exact / deterministic recall — scans verified and tool-grounded engrams for content
+/// that overlaps with the cue, then injects them at the TOP of the recall list with
+/// activation 10.0, guaranteeing they win over any probabilistic associative result.
+///
+/// This is the correct model for "what is invoice #4821?" — the answer is a fact,
+/// not a probability distribution. The brain must produce the verified engram or
+/// nothing at all, not hallucinate a plausible answer from activation spreading.
+///
+/// Ranking within exact results: verified ground-truth (ledger/tool) first,
+/// then tool-grounded (unverified but from a reliable tool), then chat-asserted.
+fn exact_verified_recall(
+    cue: &str,
+    hippocampus: &crate::hippocampus::Hippocampus,
+    life_id: uuid::Uuid,
+    recalls: &mut Vec<crate::types::RecallResult>,
+) {
+    use crate::types::ProvenanceKind;
+
+    let cue_low = cue.to_lowercase();
+    // Tokenize into content keywords (skip stopwords, short tokens)
+    let cue_tokens: Vec<String> = cue_low
+        .split_whitespace()
+        .filter(|t| t.len() > 2 && !matches!(*t, "the" | "and" | "for" | "what" | "how" | "is"))
+        .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+        .filter(|t| !t.is_empty())
+        .collect();
+
+    if cue_tokens.is_empty() {
+        return;
+    }
+
+    // Scan engrams in this life for verified / provenance-backed ones
+    let mut matches: Vec<(&crate::engram::Engram, f32, u8)> = hippocampus
+        .engrams_for_life(life_id)
+        .filter_map(|e| {
+            let prov = e.episode.provenance.as_ref();
+            // Tier: 0=verified-ground-truth, 1=tool-grounded, 2=chat-asserted
+            let tier: u8 = match prov {
+                Some(p) if p.verified => 0,
+                Some(p)
+                    if matches!(
+                        p.kind,
+                        ProvenanceKind::ToolGrounded | ProvenanceKind::LedgerVerified
+                    ) =>
+                {
+                    1
+                }
+                _ => 2,
+            };
+            // Only tiers 0 and 1 qualify for exact recall
+            if tier > 1 {
+                return None;
+            }
+            // Score: fraction of cue tokens found in engram content + context
+            let text = format!("{} {}", e.episode.content, e.episode.context).to_lowercase();
+            let matched = cue_tokens.iter().filter(|t| text.contains(t.as_str())).count();
+            if matched == 0 {
+                return None;
+            }
+            let score = matched as f32 / cue_tokens.len() as f32;
+            if score < 0.25 {
+                // At least 25% of query tokens must appear in the engram
+                return None;
+            }
+            Some((e, score, tier))
+        })
+        .collect();
+
+    if matches.is_empty() {
+        return;
+    }
+
+    // Sort: tier ASC (verified first), score DESC (best match first)
+    matches.sort_by(|a, b| {
+        a.2.cmp(&b.2).then_with(|| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+    });
+
+    // Inject exact results at activation 10.0 (guaranteed to win over any associative result).
+    // Insert in reverse order so the best ends up at index 0.
+    for (engram, score, tier) in matches.into_iter().take(3).rev() {
+        let activation = 10.0 + score + (1.0 - tier as f32 * 0.3);
+        if let Some(existing) = recalls.iter_mut().find(|r| r.engram_id == engram.id) {
+            existing.activation = activation;
+            existing.verified = tier == 0;
+        } else {
+            recalls.insert(
+                0,
+                crate::types::RecallResult {
+                    engram_id: engram.id,
+                    activation,
+                    episode: engram.episode.clone(),
+                    completion_strength: score,
+                    separation_index: engram.separation_index,
+                    verified: tier == 0,
+                    trust_note: None,
+                },
+            );
+        }
+    }
+    recalls.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
 }
 
 fn annotate_recall_trust(recalls: &mut [crate::types::RecallResult]) {
