@@ -81,30 +81,34 @@ Index-mode query latency uses slim vector-fast recalls (large doc bodies omitted
 | Field | Value |
 |---|---|
 | **What** | Very long multi-session dialogues; QA, event summarization, multimodal variants |
-| **Metrics** | QA F1 / accuracy, summarization quality; official RAG **evidence recall** (gold `dia_id` in context) |
+| **Metrics** | Upstream LoCoMo: gold `dia_id` in retrieved context. **Our harness (historical):** also applies `expand_session_neighbors(±3)` before scoring — see [#2](https://github.com/voxmastery/FluctlightDB/issues/2) |
 | **Paper** | Maharana et al., *Evaluating Very Long-Term Conversational Memory of LLM Agents*, ACL 2024 |
 | **Site** | https://snap-research.github.io/locomo/ |
-| **Status** | **Full eval complete** — **99.0%** mean evidence recall (10 conv, k=150, CHORUS + Fabric); frozen in `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
-| **In-repo** | `benchmarks/locomo_eval.py`, `benchmarks/locomo_metrics.py` |
+| **Status** | Full eval: **99.0% expanded** @k=150 (CHORUS + Fabric); harness now always reports **raw + expanded**. Frozen expanded: `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
+| **In-repo** | `benchmarks/locomo_eval.py` (`--neighbor-window 0` for raw-only primary), `benchmarks/locomo_metrics.py` |
 
 **One-command reproduce:**
 
 ```bash
 make reproduce-locomo
 # or: bash scripts/reproduce-locomo.sh
+# dual scores (raw + expanded) are printed in JSON; --neighbor-window 0 disables expansion
 ```
 
 **FluctlightDB results (July 2026, CHORUS certified):**
 
-| Run | Mean evidence recall | Evidence hits | Wall time |
-|-----|---------------------|---------------|-----------|
-| Certified (embed cache warm) | **99.0%** | 1970/1982 | ~20s |
+| Run | Scoring | Mean evidence recall | Notes |
+|-----|---------|---------------------|-------|
+| Certified freeze | **expanded ±3** (harness) | **99.0%** (1970/1982) | Saturated protocol — trivial BM25/RRF also ~98–99% under same scoring ([#2](https://github.com/voxmastery/FluctlightDB/issues/2)) |
+| Same retrieval, strict | **raw** (no expand) | re-run via `locomo_eval.py` → `mean_evidence_recall_raw` | Use this to compare engines |
 
 Config: `connect_chorus()`, batch imprint per turn, `--top-k 150`, all-MiniLM-L6-v2 ONNX (via Chroma embedder in harness). For k>100, engine uses full SPECTRUM readout (PRISM certify cap).
 
-Historical index-mode run (June 2026): 98.1% — superseded by CHORUS cert; see `benchmarks/results/2025-06-22.json`.
+Historical index-mode run (June 2026): 98.1% expanded — superseded by CHORUS cert; see `benchmarks/results/2025-06-22.json`.
 
 > Mem0/Zep often report **LLM-as-judge end-to-end QA** on LoCoMo (~92% / ~75%) — not the same metric as evidence recall. Compare only when the metric column matches.
+>
+> **Other benches:** BEIR uses official pytrec_eval (no neighbor expand). LongMemEval uses official session_recall@K (gold session id in top-K; no post-hoc neighbor credit). FAMB is an internal regression suite.
 
 **BibTeX:**
 ```bibtex

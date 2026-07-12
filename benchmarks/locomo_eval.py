@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """LoCoMo long-dialogue evidence recall benchmark.
 
-Official metric: fraction of gold evidence dia_ids present in top-k recall context.
-Modern lanes (default **chorus**): bulk CHORUS imprint + GRG/vector recall.
-**muon**: session-bulk Muon/Tau imprint + episodic recall.
+Reports BOTH:
+  - raw: gold dia_ids in retrieved set only (stricter)
+  - expanded: retrieved set plus expand_session_neighbors(±window) (historical default window=3)
+
+The expanded protocol is a FluctlightDB harness choice (not upstream LoCoMo's
+exact-match-in-context check). Primary JSON field mean_evidence_recall aliases
+expanded for freeze compatibility; always read mean_evidence_recall_raw too.
 
 Usage:
-  LOCOMO_DATA=/tmp/locomo/locomo10.json \\
+  LOCOMO_DATA=/tmp/locomo10.json \\
   PYTHONPATH=sdks/python python3 benchmarks/locomo_eval.py --mode chorus --top-k 150
+  # strict only scoring window:
+  PYTHONPATH=sdks/python python3 benchmarks/locomo_eval.py --neighbor-window 0
 """
 
 from __future__ import annotations
@@ -306,12 +312,40 @@ def normalize_evidence(evidence: list) -> list[str]:
     return out
 
 
+def score_evidence(
+    found: set[str],
+    evidence: list[str],
+    item: dict,
+    *,
+    neighbor_window: int,
+) -> dict[str, Any]:
+    """Score gold evidence under raw (strict) and optional neighbor-expanded sets."""
+    raw = set(found)
+    expanded = (
+        expand_session_neighbors(raw, item, window=neighbor_window)
+        if neighbor_window > 0
+        else set(raw)
+    )
+    return {
+        "evidence": evidence,
+        "evidence_frac_raw": evidence_recall_fraction(evidence, raw),
+        "all_evidence_raw": evidence_hit(evidence, raw),
+        "evidence_frac_expanded": evidence_recall_fraction(evidence, expanded),
+        "all_evidence_expanded": evidence_hit(evidence, expanded),
+        # Legacy aliases = expanded protocol (historical freezes / issue #2 protocol).
+        "evidence_frac": evidence_recall_fraction(evidence, expanded),
+        "all_evidence": evidence_hit(evidence, expanded),
+        "neighbor_window": neighbor_window,
+    }
+
+
 def eval_conversation_chorus(
     brain: Any,
     item: dict,
     embedder: EmbedCache,
     *,
     top_k: int,
+    neighbor_window: int = 3,
 ) -> list[dict]:
     qas = [
         qa
@@ -325,15 +359,16 @@ def eval_conversation_chorus(
     batch = brain.chorus_recall_batch(questions, q_vecs, limit=top_k)
     rows: list[dict] = []
     for qa, hits in zip(qas, batch):
-        recalled = expand_session_neighbors(recalled_dia_ids_from_chorus(hits, top_k), item)
+        found = recalled_dia_ids_from_chorus(hits, top_k)
         evidence = normalize_evidence(qa.get("evidence") or [])
+        scored = score_evidence(
+            found, evidence, item, neighbor_window=neighbor_window
+        )
         rows.append(
             {
                 "question": (qa.get("question") or "").strip(),
-                "evidence": evidence,
-                "evidence_frac": evidence_recall_fraction(evidence, recalled),
-                "all_evidence": evidence_hit(evidence, recalled),
                 "recall_n": len(hits or []),
+                **scored,
             }
         )
     return rows
@@ -344,6 +379,7 @@ def eval_conversation_muon(
     item: dict,
     *,
     top_k: int,
+    neighbor_window: int = 3,
 ) -> list[dict]:
     qas = [
         qa
@@ -358,15 +394,16 @@ def eval_conversation_muon(
             raw = brain.muon_recall(question, limit=top_k)
             if isinstance(raw, dict):
                 raw = raw.get("hits") or []
-        recalled = expand_session_neighbors(recalled_dia_ids_from_muon(raw or [], top_k), item)
+        found = recalled_dia_ids_from_muon(raw or [], top_k)
         evidence = normalize_evidence(qa.get("evidence") or [])
+        scored = score_evidence(
+            found, evidence, item, neighbor_window=neighbor_window
+        )
         rows.append(
             {
                 "question": question,
-                "evidence": evidence,
-                "evidence_frac": evidence_recall_fraction(evidence, recalled),
-                "all_evidence": evidence_hit(evidence, recalled),
                 "recall_n": len(raw or []),
+                **scored,
             }
         )
     return rows
@@ -382,6 +419,16 @@ def main() -> int:
     )
     ap.add_argument("--rag-mode", choices=("dialog", "obs", "all"), default="all")
     ap.add_argument("--top-k", type=int, default=int(os.environ.get("LOCOMO_TOP_K", "150")))
+    ap.add_argument(
+        "--neighbor-window",
+        type=int,
+        default=int(os.environ.get("LOCOMO_NEIGHBOR_WINDOW", "3")),
+        help=(
+            "Expand each retrieved dia_id by ±N session neighbors before scoring "
+            "(historical default 3). Use 0 for strict raw evidence recall. "
+            "Both raw and expanded are always reported."
+        ),
+    )
     ap.add_argument("--limit", type=int, default=0, help="0 = all conversations")
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
@@ -402,11 +449,24 @@ def main() -> int:
         if args.mode == "chorus":
             total_ingest += ingest_chorus(brain, item, embedder, rag_mode=args.rag_mode)
             all_rows.extend(
-                eval_conversation_chorus(brain, item, embedder, top_k=args.top_k)
+                eval_conversation_chorus(
+                    brain,
+                    item,
+                    embedder,
+                    top_k=args.top_k,
+                    neighbor_window=args.neighbor_window,
+                )
             )
         else:
             total_ingest += ingest_muon(brain, item, rag_mode=args.rag_mode)
-            all_rows.extend(eval_conversation_muon(brain, item, top_k=args.top_k))
+            all_rows.extend(
+                eval_conversation_muon(
+                    brain,
+                    item,
+                    top_k=args.top_k,
+                    neighbor_window=args.neighbor_window,
+                )
+            )
 
     embedder.save()
 
@@ -419,6 +479,7 @@ def main() -> int:
         "lane": lane,
         "rag_mode": args.rag_mode,
         "top_k": args.top_k,
+        "neighbor_window": args.neighbor_window,
         "embedder": "all-MiniLM-L6-v2 ONNX CPU",
         "conversations": len(items),
         "memories_ingested": total_ingest,
