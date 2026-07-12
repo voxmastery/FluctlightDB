@@ -3,7 +3,8 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::id::NeuronId;
-use crate::plasticity::{hebbian_strengthen, ltd_weaken, stdp_update_da, Synapse};
+use crate::calcium::calcium_stdp_fast;
+use crate::plasticity::{hebbian_strengthen, ltd_weaken, Synapse};
 use crate::types::Region;
 
 /// The connectome — neurons linked by weighted synapses (not a graph DB API).
@@ -99,12 +100,16 @@ impl BrainGraph {
         da_gate: f32,
     ) {
         // Map brain ticks to a STDP-window-friendly scale: divide by 10 so that
-        // engrams encoded 1–20 ticks apart fall inside the 20ms window.
-        let pre_ms = pre_tick / 10;
-        let post_ms = post_tick / 10;
-        for synapse in &mut self.synapses {
-            if pre_neurons.contains(&synapse.from) && post_neurons.contains(&synapse.to) {
-                stdp_update_da(synapse, pre_ms, post_ms, da_gate);
+        // engrams encoded 1–20 ticks apart fall inside the ±100ms calcium window.
+        let pre_ms = (pre_tick / 10) as f32;
+        let post_ms = (post_tick / 10) as f32;
+        let delta_t_ms = post_ms - pre_ms; // positive = LTP (pre before post)
+        let dw = calcium_stdp_fast(delta_t_ms, da_gate);
+        if dw.abs() > 1e-6 {
+            for synapse in &mut self.synapses {
+                if pre_neurons.contains(&synapse.from) && post_neurons.contains(&synapse.to) {
+                    synapse.weight = (synapse.weight + dw).clamp(0.001, 1.0);
+                }
             }
         }
     }

@@ -248,6 +248,48 @@ pub fn nmda_mg_relief(v_post: f32) -> f32 {
     1.0 / (1.0 + MG_CONC_MM * (-ALPHA_MG * v_post).exp() / BETA_MG)
 }
 
+/// Fast analytical STDP weight change — no step simulation.
+///
+/// Computes the **peak Ca²⁺** from the coincidence model analytically
+/// (glu or bpap residue × conductance), then applies the same threshold
+/// rule as `CalciumSpine::tick()`. Safe for tight inner-loop use
+/// (sleep replay iterates over tens of thousands of synapses).
+///
+/// `delta_t_ms`: post_tick − pre_tick in ms. Positive = LTP direction (pre before post).
+/// `da_gate`:    dopamine gate [0..1] — scales LTP only; LTD is DA-independent.
+///
+/// # Accuracy vs `predict_stdp_outcome`
+/// This skips the full time-integral, so it underestimates weight change magnitude
+/// slightly. Direction (LTP/LTD/None) is always correct. Use `predict_stdp_outcome`
+/// for test assertions; use this for production synapse updates.
+pub fn calcium_stdp_fast(delta_t_ms: f32, da_gate: f32) -> f32 {
+    if delta_t_ms.abs() > 100.0 {
+        return 0.0;
+    }
+
+    // Peak Ca²⁺ at the moment of coincidence — mirrors CalciumSpine logic:
+    //   LTP: post fires at spike peak (0 mV), glu residue from pre × NMDA_BURST
+    //   LTD: pre fires, bpap residue from post drives partial NMDA opening
+    let peak_ca = if delta_t_ms >= 0.0 {
+        let glu_residue = (-delta_t_ms / TAU_GLU_MS).exp();
+        CA_INFLUX_NMDA_BURST * glu_residue * 0.83 + CA_INFLUX_POST_VDCC
+    } else {
+        let bpap_residue = (-delta_t_ms.abs() / TAU_BPAP_MS).exp();
+        CA_INFLUX_BPAP * bpap_residue + CA_INFLUX_PRE_VDCC
+    };
+
+    // Same threshold rule as CalciumSpine::tick()
+    if peak_ca > THETA_P {
+        // CaMKII: LTP, DA-gated. DA gate clamped so low-DA still allows some LTP.
+        GAMMA_P * (peak_ca - THETA_P) * (da_gate * 2.0).clamp(0.25, 2.0)
+    } else if peak_ca > THETA_D {
+        // Calcineurin: LTD, DA-independent (Frémaux & Gerstner 2016)
+        -GAMMA_D * (THETA_P - peak_ca)
+    } else {
+        0.0
+    }
+}
+
 /// Predict the plasticity direction for a given pre→post spike interval.
 ///
 /// This is the canonical Bi & Poo (1998) experiment in simulation:
