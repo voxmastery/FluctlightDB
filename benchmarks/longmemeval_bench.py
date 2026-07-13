@@ -92,14 +92,15 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
         queries.append("user preference likes enjoys uses owns bought watched " + " ".join(tokens[:10]))
         if any(w in ql for w in ("recommend", "suggest", "any ", "tips", "advice", "ideas")):
             queries.append("user context background interests hobbies " + " ".join(tokens[:8]))
-        # Domain bridges for implicit-preference questions (query omits prior facts)
-        if any(w in ql for w in ("dinner", "serve", "weekend", "meal", "cook", "recipe")):
+        # Domain bridges for implicit-preference questions (query omits prior facts).
+        # Keep triggers specific — bare "weekend"/"visit"/"travel" false-fire and pollute RRF.
+        if any(w in ql for w in ("dinner", "serve for", "meal", "cook", "recipe", "ingredients")):
             queries.append("user homegrown garden harvest tomatoes herbs basil mint ingredients")
         if any(w in ql for w in ("cocktail", "drink", "mixology", "bar")):
             queries.append("user mixology class summer drinks Pimm's Cup cocktails")
         if any(w in ql for w in ("documentary", "watch", "movie", "film", "netflix")):
             queries.append("user watched enjoyed documentary Our Planet Free Solo Tiger King")
-        if any(w in ql for w in ("commute", "drive", "travel", "listen")):
+        if any(w in ql for w in ("commute", "drive", "podcast", "audiobook")):
             queries.append("user podcast audiobook commute listening history genre")
         if any(w in ql for w in ("cookie", "bake", "baking", "dessert", "chocolate")):
             queries.append("user baking turbinado sugar chocolate chip cookies experiment")
@@ -111,9 +112,12 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
             queries.append(
                 "user camera flash lens sony godox tripod photography accessories upgrade"
             )
-        if any(w in ql for w in ("music store", "music", "instrument", "guitar")):
-            queries.append("user music store guitar instrument amplifier pedal vinyl")
-        if any(w in ql for w in ("denver", "trip", "visit", "travel")):
+        if any(w in ql for w in ("music store", "guitar", "instrument", "amplifier", "les paul", "stratocaster")):
+            queries.append(
+                "user music store guitar fender stratocaster gibson les paul "
+                "instrument amplifier pedal vinyl open tuning"
+            )
+        if "denver" in ql or ("colorado" in ql and "trip" in ql):
             queries.append("user trip denver colorado itinerary attractions restaurants")
         if any(w in ql for w in ("tokyo", "anxious", "getting around", "japan")):
             queries.append("user tokyo japan subway train pass navigation tips transport")
@@ -202,11 +206,27 @@ def user_fact_snippets(user_msgs: list[str]) -> str:
         "documentary",
         "debate team",
         "power bank",
+        "upgrading",
+        "upgrade from",
+        "considering",
+        "gibson",
+        "fender",
+        "les paul",
+        "stratocaster",
+        "guitar",
+    )
+    brand_pat = re.compile(
+        r"\b(?:gibson\s+les\s+paul|fender\s+stratocaster|les\s+paul|stratocaster|"
+        r"gibson|fender)\b",
+        re.I,
     )
     for msg in user_msgs:
         for pat in patterns:
             facts.extend(re.findall(pat, msg))
         ml = msg.lower()
+        brands = brand_pat.findall(msg)
+        if brands:
+            facts.append(" ".join(brands) + " guitar preference upgrade")
         if any(c in ml for c in purchase_cues):
             facts.append(msg[:350])
     seen: set[str] = set()
@@ -254,6 +274,12 @@ def preference_signals(user_msgs: list[str]) -> str:
         "turbinado",
         "homegrown",
         "power bank",
+        "guitar",
+        "les paul",
+        "stratocaster",
+        "gibson",
+        "fender",
+        "upgrading",
     )
     for msg in user_msgs:
         ml = msg.lower()
