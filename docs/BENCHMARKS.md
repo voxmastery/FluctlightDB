@@ -84,8 +84,8 @@ Index-mode query latency uses slim vector-fast recalls (large doc bodies omitted
 | **Metrics** | Upstream LoCoMo: gold `dia_id` in retrieved context. **Our harness (historical):** also applies `expand_session_neighbors(±3)` before scoring — see [#2](https://github.com/voxmastery/FluctlightDB/issues/2) |
 | **Paper** | Maharana et al., *Evaluating Very Long-Term Conversational Memory of LLM Agents*, ACL 2024 |
 | **Site** | https://snap-research.github.io/locomo/ |
-| **Status** | Full eval: **99.0% expanded** @k=150 (CHORUS + Fabric); harness now always reports **raw + expanded**. Frozen expanded: `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
-| **In-repo** | `benchmarks/locomo_eval.py` (`--neighbor-window 0` for raw-only primary), `benchmarks/locomo_metrics.py` |
+| **Status** | **Honest raw: 96.0% @k=150** (2608/2823 spans, no expansion). Frozen: `benchmarks/results/locomo-honest-2026-07-13.json`. The historical *99.0% expanded* is deprecated as a headline (see below). |
+| **In-repo** | `benchmarks/locomo_honest.py` (honest recipe), `benchmarks/locomo_eval.py` (`--neighbor-window 0` for raw CHORUS lane) |
 
 **One-command reproduce:**
 
@@ -95,16 +95,29 @@ make reproduce-locomo
 # dual scores (raw + expanded) are printed in JSON; --neighbor-window 0 disables expansion
 ```
 
-**FluctlightDB results (July 2026, CHORUS certified):**
+**FluctlightDB results (July 2026) — honest raw scoring, no expansion:**
 
-| Run | Scoring | Mean evidence recall | Notes |
-|-----|---------|---------------------|-------|
-| Certified freeze | **expanded ±3** (harness) | **99.0%** (1970/1982) | Saturated protocol — trivial BM25/RRF also ~98–99% under same scoring ([#2](https://github.com/voxmastery/FluctlightDB/issues/2)) |
-| Same retrieval, strict | **raw** (no expand) | re-run via `locomo_eval.py` → `mean_evidence_recall_raw` | Use this to compare engines |
+`benchmarks/locomo_honest.py`, all-MiniLM-L6-v2 ONNX (384d), context-window ±2, dense⊕BM25 weighted RRF (`w_bm=0.7`). A gold `dia_id` counts only if that exact turn is in top-k.
 
-Config: `connect_chorus()`, batch imprint per turn, `--top-k 150`, all-MiniLM-L6-v2 ONNX (via Chroma embedder in harness). For k>100, engine uses full SPECTRUM readout (PRISM certify cap).
+| Retrieval | raw recall@150 | Δ |
+|-----------|---------------|---|
+| Single-turn dense (MiniLM cosine) | 87.5% | baseline |
+| + episodic context binding (±2 neighbours in chunk) | 92.0% | +4.5 |
+| + dual-pathway dense⊕BM25 RRF | **96.0%** | **+8.5 total** |
 
-Historical index-mode run (June 2026): 98.1% expanded — superseded by CHORUS cert; see `benchmarks/results/2025-06-22.json`.
+**Recall@k profile (what a RAG app actually consumes):**
+
+| k | 5 | 10 | 20 | 50 | 150 |
+|---|---|---|---|----|-----|
+| raw recall | 60.9% | 71.9% | 80.2% | 90.1% | **96.0%** |
+
+Per-category @150: singlehop 99.0 · adversarial 97.9 · temporal 97.1 · multihop 88.1 · **opendomain 79.3** (the remaining gap — paraphrase-heavy, needs a stronger embedder; BM25 cannot bridge it).
+
+Two mechanisms tested and **rejected** for honesty/quality:
+- `expand_session_neighbors(±3)` — inflates to 99.0% by crediting neighbours never retrieved. A trivial BM25 baseline also scores ~99% under it, so it distinguishes no engine. **Not reported as a headline.**
+- CA3 pattern-completion via PRF/Rocchio query feedback — drifts on multi-topic dialogue (−1 to −2 pts). Genuine completion needs LLM-based HyDE (model access not assumed here).
+
+Path to 98%+: the opendomain/multihop gap is semantic, not lexical — it needs a stronger retrieval embedder (bge/e5/gte-large or mpnet, per LongMemEval's 97.6%). That is the next lever, not more chunking or fusion tricks.
 
 > Mem0/Zep often report **LLM-as-judge end-to-end QA** on LoCoMo (~92% / ~75%) — not the same metric as evidence recall. Compare only when the metric column matches.
 >

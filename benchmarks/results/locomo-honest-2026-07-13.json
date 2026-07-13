@@ -1,0 +1,30 @@
+{
+  "benchmark": "locomo",
+  "protocol": "honest-raw-no-expansion",
+  "scoring": "gold dia_id counts only if that exact turn is in top-k (no neighbor expansion)",
+  "retrieval": {
+    "embedder": "all-MiniLM-L6-v2 ONNX CPU (384d)",
+    "context_window": 2,
+    "fusion": "weighted RRF dense(cosine)+BM25",
+    "w_dense": 1.0,
+    "w_bm": 0.7
+  },
+  "conversations": 10,
+  "wall_s": 9.6,
+  "recall_at_k": {
+    "5": 60.91,
+    "10": 71.92,
+    "20": 80.22,
+    "50": 90.08,
+    "150": 95.98
+  },
+  "per_category_at_150": {
+    "multihop": 88.1,
+    "temporal": 97.1,
+    "opendomain": 79.3,
+    "singlehop": 99.0,
+    "adversarial": 97.9
+  },
+  "questions": 1982,
+  "span_hits_at_150": "2608/2823"
+}
