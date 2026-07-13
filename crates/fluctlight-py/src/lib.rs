@@ -353,6 +353,65 @@ impl PyBrain {
         Ok(self.inner.chorus_imprint_batch(&batch))
     }
 
+    /// Imprint traces with per-token MiniLM vectors for MaxSim late interaction.
+    /// Token vectors are passed flattened (avoids GB-scale JSON); `tok_counts[i]`
+    /// is the token count for trace i. The pooled photon vector is derived as the
+    /// L2-normalized mean of each trace's tokens.
+    #[pyo3(signature = (memory_ids, contents, contexts, tokens_flat, tok_counts, dim, salience=0.62))]
+    #[allow(clippy::too_many_arguments)]
+    fn chorus_imprint_maxsim_batch(
+        &mut self,
+        memory_ids: Vec<String>,
+        contents: Vec<String>,
+        contexts: Vec<String>,
+        tokens_flat: Vec<f32>,
+        tok_counts: Vec<usize>,
+        dim: usize,
+        salience: f32,
+    ) -> PyResult<usize> {
+        self.require_writable()?;
+        let n = memory_ids.len();
+        let mut batch: Vec<fluctlightdb::ChorusImprintInput> = Vec::with_capacity(n);
+        let mut off = 0usize;
+        for i in 0..n {
+            let cnt = tok_counts.get(i).copied().unwrap_or(0);
+            let mut toks: Vec<Vec<f32>> = Vec::with_capacity(cnt);
+            for _ in 0..cnt {
+                if dim > 0 && off + dim <= tokens_flat.len() {
+                    toks.push(tokens_flat[off..off + dim].to_vec());
+                    off += dim;
+                }
+            }
+            let pooled: Option<Vec<f32>> = if toks.is_empty() {
+                None
+            } else {
+                let mut m = vec![0.0f32; dim];
+                for t in &toks {
+                    for (a, b) in m.iter_mut().zip(t.iter()) {
+                        *a += *b;
+                    }
+                }
+                let norm = m.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm > 0.0 {
+                    for x in m.iter_mut() {
+                        *x /= norm;
+                    }
+                }
+                Some(m)
+            };
+            batch.push(fluctlightdb::ChorusImprintInput {
+                memory_id: memory_ids[i].clone(),
+                content: contents[i].clone(),
+                context: contexts.get(i).cloned().unwrap_or_default(),
+                semantic_vector: pooled,
+                token_vectors: Some(toks),
+                salience,
+                sheath: Default::default(),
+            });
+        }
+        Ok(self.inner.chorus_imprint_batch(&batch))
+    }
+
     #[pyo3(signature = (cue, limit=None, semantic_vector=None, fast=None, tag=None))]
     fn chorus_recall(
         &mut self,
@@ -412,6 +471,60 @@ impl PyBrain {
         }
         let batch = self.inner.chorus_recall_batch(&queries, k, opts);
         chorus_batch_to_py(py, &batch, fast)
+    }
+
+    /// Late-interaction batch recall: token-population MaxSim ⊕ BM25 (RRF).
+    /// Query token vectors are passed flattened; `tok_counts[i]` gives the number
+    /// of tokens for query i. The pooled query vector (mean of its tokens) is
+    /// derived here and used only for the photon prefilter on large stores.
+    #[pyo3(signature = (cues, tokens_flat, tok_counts, dim, limit=None, w_bm=0.7))]
+    #[allow(clippy::too_many_arguments)]
+    fn chorus_recall_maxsim_batch(
+        &self,
+        py: Python<'_>,
+        cues: Vec<String>,
+        tokens_flat: Vec<f32>,
+        tok_counts: Vec<usize>,
+        dim: usize,
+        limit: Option<usize>,
+        w_bm: f32,
+    ) -> PyResult<Py<PyAny>> {
+        let k = limit.unwrap_or(150);
+        let mut batch: Vec<Vec<fluctlightdb::ChorusHit>> = Vec::with_capacity(cues.len());
+        let mut offset = 0usize;
+        for (i, cue) in cues.iter().enumerate() {
+            let cnt = tok_counts.get(i).copied().unwrap_or(0);
+            let mut toks: Vec<Vec<f32>> = Vec::with_capacity(cnt);
+            for _ in 0..cnt {
+                if dim > 0 && offset + dim <= tokens_flat.len() {
+                    toks.push(tokens_flat[offset..offset + dim].to_vec());
+                    offset += dim;
+                }
+            }
+            // pooled = L2-normalized mean of the query's token vectors
+            let pooled: Option<Vec<f32>> = if toks.is_empty() {
+                None
+            } else {
+                let mut m = vec![0.0f32; dim];
+                for t in &toks {
+                    for (a, b) in m.iter_mut().zip(t.iter()) {
+                        *a += *b;
+                    }
+                }
+                let norm = m.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm > 0.0 {
+                    for x in m.iter_mut() {
+                        *x /= norm;
+                    }
+                }
+                Some(m)
+            };
+            let hits =
+                self.inner
+                    .chorus_recall_maxsim(cue, k, &toks, pooled.as_deref(), w_bm);
+            batch.push(hits);
+        }
+        chorus_batch_to_py(py, &batch, true)
     }
 
     fn chorus_sleep(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {

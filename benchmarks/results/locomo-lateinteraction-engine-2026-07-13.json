@@ -1,0 +1,36 @@
+{
+  "benchmark": "locomo",
+  "protocol": "honest-raw-no-expansion",
+  "lane": "chorus_engine",
+  "note": "MaxSim + BM25 running natively in the Rust CHORUS recall path (recall_maxsim). Per-token MiniLM vectors stored f16 in ChorusTrace (capped 48 tok/trace); BM25 over stored content; fused by RRF (w_bm=0.7). Scored honest raw: a gold dia_id counts only if that exact turn is retrieved into top-k. No neighbor expansion.",
+  "retrieval": {
+    "channel_1": "token-population MaxSim over stored f16 per-token vectors (ChorusField::recall_maxsim)",
+    "channel_2": "BM25 over stored content (±2 context bodies)",
+    "fusion": "weighted RRF",
+    "w_bm": 0.7,
+    "token_storage": "f16, TOKEN_CAP=48",
+    "candidate_gen": "full readout (store <= spectrum_full_readout_max=50000)"
+  },
+  "conversations": 10,
+  "questions": 1982,
+  "wall_s": 303,
+  "recall_at_k": {
+    "5": 65.86,
+    "10": 73.99,
+    "20": 81.96,
+    "50": 91.3,
+    "150": 96.9
+  },
+  "per_category_at_150": {
+    "multihop": 91.9,
+    "temporal": 98.4,
+    "opendomain": 82.9,
+    "singlehop": 98.8,
+    "adversarial": 98.3
+  },
+  "comparison": {
+    "python_prototype_at_150": 96.31,
+    "engine_at_150": 96.9,
+    "prev_committed_meanpool_bm25_at_150": 96.0
+  }
+}
