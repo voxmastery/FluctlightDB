@@ -104,10 +104,18 @@ def iter_sessions(conversation: dict) -> list[tuple[str, list[dict]]]:
     return sessions
 
 
-def collect_turns(item: dict, rag_mode: str) -> list[dict[str, str]]:
+def collect_turns(item: dict, rag_mode: str, context_window: int = 1) -> list[dict[str, str]]:
+    """Collect dialogue turns with a ±context_window sliding context window.
+
+    Each chunk keeps its own dia_id for evidence matching, but the stored body
+    includes adjacent turns from the same session — mimicking how the hippocampus
+    always encodes events within their temporal context (episodic binding).
+    """
     rows: list[dict[str, str]] = []
     conv = item.get("conversation") or {}
     for sess_key, turns in iter_sessions(conv):
+        # First pass: collect all valid turns in this session
+        sess_rows: list[dict[str, str]] = []
         for turn in turns:
             if not isinstance(turn, dict):
                 continue
@@ -116,10 +124,23 @@ def collect_turns(item: dict, rag_mode: str) -> list[dict[str, str]]:
             if not dia or not text:
                 continue
             speaker = turn.get("speaker") or "user"
-            rows.append(
+            sess_rows.append(
                 {
                     "dia": dia,
-                    "body": f"[{dia}] {speaker}: {text}",
+                    "bare": f"[{dia}] {speaker}: {text}",
+                    "kind": "turn",
+                }
+            )
+        # Second pass: enrich each turn with ±context_window neighbours (same session)
+        for i, row in enumerate(sess_rows):
+            lo = max(0, i - context_window)
+            hi = min(len(sess_rows), i + context_window + 1)
+            # Join neighbouring turn lines; current turn stays central
+            ctx_body = "  ".join(sess_rows[j]["bare"] for j in range(lo, hi))
+            rows.append(
+                {
+                    "dia": row["dia"],
+                    "body": ctx_body,
                     "chunk_id": sess_key,
                     "kind": "turn",
                 }
