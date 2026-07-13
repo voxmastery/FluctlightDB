@@ -1,0 +1,28 @@
+{
+  "benchmark": "locomo",
+  "protocol": "honest-raw-no-expansion",
+  "retrieval": {
+    "channel_1": "MiniLM token-population late interaction (MaxSim over last_hidden_state)",
+    "channel_2": "BM25 over \u00b12 context bodies",
+    "fusion": "weighted RRF",
+    "w_bm": 0.7
+  },
+  "conversations": 10,
+  "wall_s": 181.5,
+  "recall_at_k": {
+    "5": 64.15,
+    "10": 73.11,
+    "20": 81.13,
+    "50": 90.8,
+    "150": 96.31
+  },
+  "per_category_at_150": {
+    "multihop": 88.7,
+    "temporal": 98.1,
+    "opendomain": 80.8,
+    "singlehop": 98.7,
+    "adversarial": 98.5
+  },
+  "questions": 1982,
+  "span_hits_at_150": "2627/2823"
+}

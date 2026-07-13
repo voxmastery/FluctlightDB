@@ -45,7 +45,7 @@ Source: [`benchmarks/results/paper-2026-07-09.json`](benchmarks/results/paper-20
 
 | Benchmark | Metric | Result | Lane |
 |-----------|--------|--------|------|
-| **LoCoMo** (1,982 gold spans) | **Honest** evidence recall @150 (no expansion) | **96.0%** (2608/2823 spans) | context-binding + BM25⊕dense RRF (`locomo_honest.py`) |
+| **LoCoMo** (1,982 gold spans) | **Honest** evidence recall @150 (no expansion) | **96.3%** (2627/2823 spans) | token-population MaxSim ⊕ BM25 (`locomo_lateinteraction.py`) |
 | **LongMemEval-S** | session_recall@8 | **97.6%** (488/500) | hybrid index + mpnet (no Fabric) |
 | **LongMemEval E2E** (locked) | Overall QA | **97.4%** | Muon + paper profile |
 | **BEIR SciFact** | nDCG@10 / R@10 | **0.646 / 0.792** vs Chroma 0.645 / 0.783 | CHORUS/PRISM + Fabric |
