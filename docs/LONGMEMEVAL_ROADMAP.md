@@ -91,12 +91,22 @@ if < 90% session_recall@8 → next hypothesis
 
 **Status (2026-07-04):** Unified v4 full 500 on Colab GPU: **97.6%** (488/500) session@8. Preference **96.7%** (29/30) — **90% target met**.
 
+## World-record trophy (2026-07-13)
+
+Spec: `docs/superpowers/specs/2026-07-13-longmemeval-world-record-trophy-design.md`  
+Plan: `docs/superpowers/plans/2026-07-13-longmemeval-world-record-trophy.md`  
+Commands: `benchmarks/results/README-scoreboard.md`
+
+Targets: session_recall@5 > 97.6% (beat gbrain), BM25-hard slice win, preference 30/30.
+Do not claim #1 publicly until `longmemeval_scoreboard.py` prints `"all_pass": true`.
+
 ### Next experiments (post-arXiv v1)
 
-1. **Preference v4 Colab run** — `longmemeval_colab.ipynb` now defaults to `preference` profile + `PREF_FACTS_KEY` (mpnet GPU). Paste result → freeze JSON if ≥90%.
-2. **End-to-end QA** — reader LLM + GPT judge vs Mem0/Zep ([LONGMEMEVAL_E2E.md](LONGMEMEVAL_E2E.md)).
-3. **Temporal pre-filter** — `question_date` + `haystack_dates` candidate restriction.
-4. **LLM key expansion** — optional fact extraction on ingest (LongMemEval CP2 full).
+1. **World-record scoreboard** — dual BM25 (`--fast`) vs v4 multi-k; freeze hard-slice \(H\); preference 30/30; @5 above gbrain.
+2. **Preference miss autopsy** — qid `95228167` → 30/30.
+3. **Temporal pre-filter** — `question_date` + `haystack_dates` candidate restriction (CP3).
+4. **End-to-end QA** — reader LLM + GPT judge vs Mem0/Zep ([LONGMEMEVAL_E2E.md](LONGMEMEVAL_E2E.md)).
+5. **LLM key expansion** — optional fact extraction on ingest (LongMemEval CP2 full).
 
 See also: `docs/LONGMEMEVAL_E2E.md` for retrieval vs end-to-end metric separation.
 
