@@ -45,13 +45,13 @@ Source: [`benchmarks/results/paper-2026-07-09.json`](benchmarks/results/paper-20
 
 | Benchmark | Metric | Result | Lane |
 |-----------|--------|--------|------|
-| **LoCoMo** (1,982 gold spans) | Evidence recall @150 | **99.0%** expanded / see raw in docs | CHORUS + Fabric; ±3 neighbor expand is harness policy |
+| **LoCoMo** (1,982 gold spans) | **Honest** evidence recall @150 (no expansion) | **96.0%** (2608/2823 spans) | context-binding + BM25⊕dense RRF (`locomo_honest.py`) |
 | **LongMemEval-S** | session_recall@8 | **97.6%** (488/500) | hybrid index + mpnet (no Fabric) |
 | **LongMemEval E2E** (locked) | Overall QA | **97.4%** | Muon + paper profile |
 | **BEIR SciFact** | nDCG@10 / R@10 | **0.646 / 0.792** vs Chroma 0.645 / 0.783 | CHORUS/PRISM + Fabric |
 | **FAMB** | Macro | **100%** | agent + CHORUS (internal regression) |
 
-> Paper-profile CHORUS benchmarks (LoCoMo, BEIR, FAMB) use `FLUCTLIGHT_FABRIC=1`. LongMemEval retrieval uses `connect_index()` hybrid sidecar only. LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics. LoCoMo’s historical **99.0%** uses harness `expand_session_neighbors(±3)` after retrieval (not upstream LoCoMo exact-hit scoring); `locomo_eval.py` now always reports **raw** and **expanded**. See [BENCHMARKS.md](docs/BENCHMARKS.md) and [#2](https://github.com/voxmastery/FluctlightDB/issues/2).
+> **We report the honest raw number only.** A gold `dia_id` counts solely when that exact turn is retrieved into the top-150 — no neighbor expansion. The historical **99.0%** applied `expand_session_neighbors(±3)` after retrieval, crediting neighbours never retrieved; we no longer headline it (a trivial BM25 baseline also hits ~99% under that inflated protocol, so it distinguishes nothing). The honest **96.0%** comes from two brain-grounded, zero-dependency mechanisms: episodic **context binding** (±2 neighbours embedded into each chunk — Tulving encoding specificity) and a **dual-pathway** dense⊕BM25 RRF fusion. Reproduce: `PYTHONPATH=sdks/python python benchmarks/locomo_honest.py`. LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics. See [BENCHMARKS.md](docs/BENCHMARKS.md) and [#2](https://github.com/voxmastery/FluctlightDB/issues/2).
 
 ### Reproduce LoCoMo (one command)
 
