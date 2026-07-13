@@ -133,8 +133,20 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
             queries.append("user homegrown garden harvest tomatoes herbs basil mint ingredients")
         if any(w in ql for w in ("cocktail", "drink", "mixology", "bar")):
             queries.append("user mixology class summer drinks Pimm's Cup cocktails")
-        if any(w in ql for w in ("documentary", "watch", "movie", "film", "netflix")):
-            queries.append("user watched enjoyed documentary Our Planet Free Solo Tiger King")
+        if any(w in ql for w in ("documentary", "netflix", "film", "movie", "tv show", "watch tonight")):
+            # Prefer comedy/stand-up when the ask is entertainment; else nature docs.
+            if any(w in ql for w in ("comedy", "stand-up", "standup", "special", "show or movie", "recommend a show")):
+                queries.append(
+                    "user stand-up comedy specials netflix storytelling comedian "
+                    "Kid Gorgeous workshop watched enjoyed"
+                )
+            elif any(w in ql for w in ("documentary", "nature", "planet")):
+                queries.append("user watched enjoyed documentary Our Planet Free Solo Tiger King")
+            else:
+                queries.append(
+                    "user watched movie show netflix film recommendation enjoyed "
+                    "documentary comedy special"
+                )
         if any(w in ql for w in ("commute", "drive", "podcast", "audiobook")):
             queries.append("user podcast audiobook commute listening history genre")
         if any(w in ql for w in ("cookie", "bake", "baking", "dessert", "chocolate")):
@@ -143,9 +155,24 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
             queries.append("user portable power bank battery phone charging")
         if any(w in ql for w in ("reunion", "high school", "nostalgic")):
             queries.append("user high school debate team advanced placement history economics")
-        if any(w in ql for w in ("photograph", "camera", "flash", "lens", "accessories", "setup")):
+        if any(
+            w in ql
+            for w in (
+                "photograph",
+                "photography",
+                "camera",
+                "flash",
+                "lens",
+                "tripod",
+                "godox",
+            )
+        ) or ("accessories" in ql and "photo" in ql):
             queries.append(
-                "user camera flash lens sony godox tripod photography accessories upgrade"
+                "user camera flash lens sony a7r godox tripod photography "
+                "accessories upgrade camera bag"
+            )
+            queries.append(
+                "Sony A7R IV Godox V1 camera flash lens tripod Gitzo camera bag accessories"
             )
         if any(w in ql for w in ("music store", "guitar", "instrument", "amplifier", "les paul", "stratocaster")):
             queries.append(
@@ -153,7 +180,10 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
                 "instrument amplifier pedal vinyl open tuning"
             )
         if "denver" in ql or ("colorado" in ql and "trip" in ql):
-            queries.append("user trip denver colorado itinerary attractions restaurants")
+            queries.append(
+                "user trip denver colorado red rocks amphitheater concerts "
+                "killers music itinerary attractions restaurants"
+            )
         if any(w in ql for w in ("tokyo", "anxious", "getting around", "japan")):
             queries.append("user tokyo japan subway train pass navigation tips transport")
         if any(w in ql for w in ("accessories",)) and "phone" in ql:
@@ -249,10 +279,17 @@ def user_fact_snippets(user_msgs: list[str]) -> str:
         "les paul",
         "stratocaster",
         "guitar",
+        "sony",
+        "a7r",
+        "camera",
+        "netflix",
+        "comedy",
+        "concert",
+        "red rocks",
     )
     brand_pat = re.compile(
         r"\b(?:gibson\s+les\s+paul|fender\s+stratocaster|les\s+paul|stratocaster|"
-        r"gibson|fender)\b",
+        r"gibson|fender|sony\s+a7r(?:\s*iv)?|sony|godox|red\s+rocks)\b",
         re.I,
     )
     for msg in user_msgs:
@@ -261,7 +298,7 @@ def user_fact_snippets(user_msgs: list[str]) -> str:
         ml = msg.lower()
         brands = brand_pat.findall(msg)
         if brands:
-            facts.append(" ".join(brands) + " guitar preference upgrade")
+            facts.append(" ".join(brands) + " preference equipment owned")
         if any(c in ml for c in purchase_cues):
             facts.append(msg[:350])
     seen: set[str] = set()
@@ -315,6 +352,12 @@ def preference_signals(user_msgs: list[str]) -> str:
         "gibson",
         "fender",
         "upgrading",
+        "sony",
+        "camera",
+        "comedy",
+        "netflix",
+        "concert",
+        "red rocks",
     )
     for msg in user_msgs:
         ml = msg.lower()
@@ -586,7 +629,7 @@ def activate_merged(
 ) -> list[dict]:
     pool_k = max(top_k * 2, 16)
     if question_type == "single-session-preference":
-        pool_k = max(top_k * 3, 24)
+        pool_k = max(top_k * 4, 32)
     queries = (
         expand_queries(question, question_type)
         if query_expand
