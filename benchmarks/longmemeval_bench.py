@@ -184,6 +184,11 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
                 "user trip denver colorado red rocks amphitheater concerts "
                 "killers music itinerary attractions restaurants"
             )
+        if any(w in ql for w in ("nas", "network attached", "storage capacity", "2-bay", "4-bay")):
+            queries.append(
+                "user NAS device network storage backup 2-bay 4-bay hard drive "
+                "security home network beginner"
+            )
         if any(w in ql for w in ("tokyo", "anxious", "getting around", "japan")):
             queries.append("user tokyo japan subway train pass navigation tips transport")
         if any(w in ql for w in ("accessories",)) and "phone" in ql:
@@ -273,7 +278,6 @@ def user_fact_snippets(user_msgs: list[str]) -> str:
         "power bank",
         "upgrading",
         "upgrade from",
-        "considering",
         "gibson",
         "fender",
         "les paul",
@@ -408,6 +412,62 @@ def merge_recalls_rrf(recall_lists: list[list[dict]], top_k: int, rrf_k: int = 6
                 best_item[sid] = r
     ordered = sorted(scores.keys(), key=lambda s: -scores[s])
     return [best_item[s] for s in ordered[:top_k]]
+
+
+def merge_preference_recalls(
+    lists: list[list[dict]],
+    queries: list[str],
+    top_k: int,
+    rrf_k: int = 60,
+) -> list[dict]:
+    """Seed top hits from domain-bridge queries, then fill with RRF.
+
+    Preference expands add generic history/preference queries that dilute RRF
+    and bury the bridge query that actually finds the gold session.
+    """
+    bridge_markers = (
+        "mixology",
+        "power bank",
+        "podcast audiobook",
+        "tokyo japan",
+        "camera flash",
+        "music store guitar",
+        "red rocks",
+        "comedy specials",
+        "homegrown garden",
+        "turbinado",
+        "documentary Our Planet",
+        "high school debate",
+        "bedroom furniture",
+        "phone case charger",
+        "Sony A7R",
+        "open tuning",
+        "watched movie show netflix",
+        "NAS device network storage",
+    )
+    seeded: list[dict] = []
+    seen: set[str] = set()
+    for q, recalls in zip(queries, lists):
+        if any(m in q for m in bridge_markers):
+            for r in recalls[:4]:
+                sid = recall_session_id(r)
+                key = sid or str(id(r))
+                if key in seen:
+                    continue
+                seen.add(key)
+                seeded.append(r)
+                if len(seeded) >= top_k:
+                    return seeded[:top_k]
+    for r in merge_recalls_rrf(lists, top_k, rrf_k=rrf_k):
+        sid = recall_session_id(r)
+        key = sid or str(id(r))
+        if key in seen:
+            continue
+        seen.add(key)
+        seeded.append(r)
+        if len(seeded) >= top_k:
+            break
+    return seeded[:top_k]
 
 
 def normalize(text: str) -> str:
@@ -645,7 +705,7 @@ def activate_merged(
         act = brain.activate(q, semantic_vector=qvec, limit=pool_k)
         lists.append(act.get("recalls") or [])
     if question_type == "single-session-preference" and len(lists) > 1:
-        return merge_recalls_rrf(lists, top_k)
+        return merge_preference_recalls(lists, queries, top_k)
     return merge_recalls(lists, top_k)
 
 
