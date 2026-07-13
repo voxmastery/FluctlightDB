@@ -535,6 +535,63 @@ class FluctlightBrain:
             raw = self._brain.chorus_recall_batch_flat(cues, flat, dim, limit, fast)
         return raw if isinstance(raw, list) else []
 
+    # --- Late interaction: token-population MaxSim ⊕ BM25 (RRF) ---
+
+    @staticmethod
+    def _flatten_tokens(
+        token_batches: list[list[list[float]]],
+    ) -> tuple[list[float], list[int], int]:
+        """Flatten a list of per-item token matrices into (flat, counts, dim)."""
+        counts = [len(toks) for toks in token_batches]
+        dim = 0
+        for toks in token_batches:
+            if toks:
+                dim = len(toks[0])
+                break
+        flat: list[float] = []
+        for toks in token_batches:
+            for row in toks:
+                flat.extend(row)
+        return flat, counts, dim
+
+    def chorus_imprint_maxsim(self, items: list[dict[str, Any]]) -> int:
+        """Imprint traces with per-token vectors for MaxSim late interaction.
+
+        Each item: {memory_id, content, token_vectors: list[list[float]],
+        context?: str, salience?: float}. The pooled photon vector is derived
+        from the tokens natively.
+        """
+        if not items:
+            return 0
+        memory_ids = [str(it["memory_id"]) for it in items]
+        contents = [str(it.get("content", "")) for it in items]
+        contexts = [str(it.get("context", it["memory_id"])) for it in items]
+        token_batches = [list(it.get("token_vectors") or []) for it in items]
+        salience = float(items[0].get("salience", 0.62))
+        flat, counts, dim = self._flatten_tokens(token_batches)
+        return int(
+            self._brain.chorus_imprint_maxsim_batch(
+                memory_ids, contents, contexts, flat, counts, dim, salience
+            )
+        )
+
+    def chorus_recall_maxsim(
+        self,
+        cues: list[str],
+        query_token_vectors: list[list[list[float]]],
+        *,
+        limit: int = 150,
+        w_bm: float = 0.7,
+    ) -> list[list[Any]]:
+        """Batch MaxSim⊕BM25 recall. `cues[i]` drives BM25;
+        `query_token_vectors[i]` is that query's per-token vector matrix.
+        Returns per-query lists of (memory_id, score)."""
+        if not cues:
+            return []
+        flat, counts, dim = self._flatten_tokens(query_token_vectors)
+        raw = self._brain.chorus_recall_maxsim_batch(cues, flat, counts, dim, limit, w_bm)
+        return raw if isinstance(raw, list) else []
+
     def chorus_sleep(self) -> dict[str, Any]:
         raw = self._brain.chorus_sleep()
         return raw if isinstance(raw, dict) else {}

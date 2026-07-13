@@ -39,16 +39,6 @@ from locomo_eval import collect_turns, normalize_evidence  # noqa: E402
 
 CATS = {1: "multihop", 2: "temporal", 3: "opendomain", 4: "singlehop", 5: "adversarial"}
 KS = [5, 10, 20, 50, 150]
-DIM = 384
-
-
-def flat_tokens(texts, tokcache):
-    flat, counts = [], []
-    for t in texts:
-        T = tokcache[t[:800]].astype(np.float32)
-        counts.append(T.shape[0])
-        flat.append(T.ravel())
-    return (np.concatenate(flat).astype(np.float32).tolist() if flat else []), counts
 
 
 def main() -> int:
@@ -82,16 +72,24 @@ def main() -> int:
             c = seen.get(d, 0)
             seen[d] = c + 1
             keys.append(d if c == 0 else f"{d}#s{c}")
-        tflat, tcounts = flat_tokens(bodies0, tokcache)
-        brain._brain.chorus_imprint_maxsim_batch(keys, bodies2, keys, tflat, tcounts, DIM, 0.62)
+        items = [
+            {
+                "memory_id": key,
+                "content": b2,
+                "context": key,
+                "token_vectors": tokcache[b0[:800]].astype(np.float32).tolist(),
+            }
+            for key, b0, b2 in zip(keys, bodies0, bodies2)
+        ]
+        brain.chorus_imprint_maxsim(items)  # public brain.py API
 
         qas = [
             q for q in item.get("qa", [])
             if isinstance(q, dict) and (q.get("question") or "").strip() and q.get("evidence")
         ]
         cues = [(q.get("question") or "").strip()[:400] for q in qas]
-        qflat, qcounts = flat_tokens(cues, tokcache)
-        batch = brain._brain.chorus_recall_maxsim_batch(cues, qflat, qcounts, DIM, 150, args.w_bm)
+        qtok = [tokcache[c[:800]].astype(np.float32).tolist() for c in cues]
+        batch = brain.chorus_recall_maxsim(cues, qtok, limit=150, w_bm=args.w_bm)
         for qa, hits in zip(qas, batch):
             order = [h[0] for h in hits]
             ev = normalize_evidence(qa.get("evidence") or [])
