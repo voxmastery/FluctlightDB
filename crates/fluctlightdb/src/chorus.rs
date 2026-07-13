@@ -13,6 +13,7 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
+use crate::late_interaction::{maxsim, pack_tokens, rrf_fuse, tokenize, Bm25Index};
 use crate::muon::count_sketch;
 use crate::photon::{PhotonCode, PhotonStore, SimHasher, DEFAULT_BITS};
 use crate::prism::{self, PrismSignature, DEFAULT_CERTIFY_M, DEFAULT_PRISM_FULL_MAX};
@@ -90,6 +91,11 @@ pub struct ChorusTrace {
     pub salience: f32,
     pub sheath: ProvenanceSheath,
     pub split_generation: u8,
+    /// MiniLM per-token vectors (f16 bits, L2-normalized, capped) for MaxSim
+    /// late interaction. Empty = trace predates late interaction; recall falls
+    /// back to the pooled photon/spectrum path.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub token_vectors: Vec<Vec<u16>>,
 }
 
 /// Scored resonance hit.
@@ -156,6 +162,10 @@ pub struct ChorusImprintInput {
     pub context: String,
     #[serde(default)]
     pub semantic_vector: Option<Vec<f32>>,
+    /// MiniLM per-token vectors (f32, L2-normalized) for MaxSim late interaction.
+    /// The pooled `semantic_vector` is still used for the photon prefilter.
+    #[serde(default)]
+    pub token_vectors: Option<Vec<Vec<f32>>>,
     #[serde(default)]
     pub salience: f32,
     #[serde(default)]
@@ -243,6 +253,9 @@ pub struct ChorusField {
     plane_cache: Mutex<HashMap<usize, Vec<Vec<f32>>>>,
     dendrite: Vec<SolitonPacket>,
     splits_total: u32,
+    /// BM25 lexical channel over trace content, fused with MaxSim in recall.
+    #[serde(default)]
+    bm25: Bm25Index,
 }
 
 fn empty_plane_cache() -> Mutex<HashMap<usize, Vec<Vec<f32>>>> {
@@ -263,6 +276,7 @@ impl Clone for ChorusField {
             plane_cache: Mutex::new(HashMap::new()),
             dendrite: self.dendrite.clone(),
             splits_total: self.splits_total,
+            bm25: self.bm25.clone(),
         }
     }
 }
@@ -288,6 +302,7 @@ impl ChorusField {
             trace_order: Vec::new(),
             dendrite: Vec::new(),
             splits_total: 0,
+            bm25: Bm25Index::new(),
         }
     }
 
@@ -427,9 +442,18 @@ impl ChorusField {
                 .encode(&Self::wavelet_taps(&input.content, &input.context, 64))
         };
 
-        if let Some((_, nearest)) = self.photon.nearest(&code) {
-            if nearest.hamming(&code) < self.config.dedup_hamming {
-                return false;
+        // Pooled-photon dedup collapses traces whose mean-pooled centroids collide —
+        // but token-level (MaxSim) traces stay distinct even at close centroids, so
+        // skip the dedup gate when per-token vectors are provided.
+        let has_tokens = input
+            .token_vectors
+            .as_ref()
+            .is_some_and(|t| !t.is_empty());
+        if !has_tokens {
+            if let Some((_, nearest)) = self.photon.nearest(&code) {
+                if nearest.hamming(&code) < self.config.dedup_hamming {
+                    return false;
+                }
             }
         }
 
@@ -468,6 +492,12 @@ impl ChorusField {
             salience,
             sheath: input.sheath.clone(),
             split_generation: 0,
+            token_vectors: input
+                .token_vectors
+                .as_ref()
+                .filter(|t| !t.is_empty())
+                .map(|t| pack_tokens(t))
+                .unwrap_or_default(),
         };
 
         if let Some(split) = self.maybe_split(&trace) {
@@ -476,6 +506,7 @@ impl ChorusField {
             self.trace_order.push(split_id);
         }
 
+        self.bm25.add(&input.memory_id, &input.content);
         self.photon.insert(input.memory_id.clone(), code);
         self.traces.insert(input.memory_id.clone(), trace);
         self.trace_order.push(input.memory_id.clone());
@@ -620,6 +651,106 @@ impl ChorusField {
     /// C-6 resonance recall — GRG shortlist + vector cosine rerank + field tie-break.
     pub fn recall(&self, cue: &str, k: usize, cue_vector: Option<&[f32]>) -> Vec<ChorusHit> {
         self.recall_with_opts(cue, k, cue_vector, ChorusRecallOpts::default())
+    }
+
+    /// Late-interaction recall: token-population MaxSim ⊕ BM25, fused by RRF.
+    ///
+    /// `query_tokens` are the query's per-token MiniLM vectors (f32). `cue_vector`
+    /// is the pooled query vector, used only for the photon prefilter on large
+    /// stores. `w_bm` weights the BM25 channel (0 => default 0.7). Falls back to
+    /// scoring all traces when the store fits the full-readout budget.
+    pub fn recall_maxsim(
+        &self,
+        cue: &str,
+        k: usize,
+        query_tokens: &[Vec<f32>],
+        cue_vector: Option<&[f32]>,
+        w_bm: f32,
+    ) -> Vec<ChorusHit> {
+        if self.traces.is_empty() || query_tokens.is_empty() {
+            return Vec::new();
+        }
+        // 1. Prefilter candidates: full readout if it fits, else photon shortlist.
+        let candidate_ids: Vec<String> = if self.traces.len()
+            <= self.config.spectrum_full_readout_max
+        {
+            self.trace_order.clone()
+        } else if let Some(v) = cue_vector.filter(|v| !v.is_empty()) {
+            let qcode = self.encode_vector(&as_unit_vector(v));
+            let gate_k = self
+                .config
+                .grg_shortlist_k
+                .max(k.saturating_mul(32))
+                .min(self.photon.len().max(1));
+            self.grg_shortlist(&qcode, gate_k)
+        } else {
+            self.trace_order.clone()
+        };
+
+        let q: Vec<Vec<f32>> = query_tokens
+            .iter()
+            .map(|t| as_unit_vector(t).into_owned())
+            .collect();
+        let terms = tokenize(cue);
+
+        // 2+3. Score both channels, keyed by parent id (max over any split children).
+        let mut maxsim_by_id: HashMap<String, f32> = HashMap::new();
+        let mut bm25_by_id: HashMap<String, f32> = HashMap::new();
+        for id in &candidate_ids {
+            let Some(trace) = self
+                .traces
+                .get(id)
+                .or_else(|| self.find_trace_by_parent(id))
+            else {
+                continue;
+            };
+            let pid = parent_memory_id(&trace.memory_id).to_string();
+            let ms = if trace.token_vectors.is_empty() {
+                0.0
+            } else {
+                maxsim(&q, &trace.token_vectors)
+            };
+            let e = maxsim_by_id.entry(pid.clone()).or_insert(f32::NEG_INFINITY);
+            if ms > *e {
+                *e = ms;
+            }
+            // BM25 is keyed by the trace's own id (unique per row); roll up to parent.
+            let bm = self.bm25.score(&terms, &trace.memory_id);
+            let e2 = bm25_by_id.entry(pid).or_insert(0.0);
+            if bm > *e2 {
+                *e2 = bm;
+            }
+        }
+
+        // 4. Ranked id lists per channel.
+        let mut dense: Vec<(String, f32)> = maxsim_by_id.into_iter().collect();
+        dense.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let dense_ids: Vec<String> = dense.into_iter().map(|(id, _)| id).collect();
+
+        let mut lex: Vec<(String, f32)> =
+            bm25_by_id.into_iter().filter(|(_, s)| *s > 0.0).collect();
+        lex.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let lex_ids: Vec<String> = lex.into_iter().map(|(id, _)| id).collect();
+
+        // 5. RRF fusion (MaxSim weight 1.0, BM25 weight w_bm).
+        let wb = if w_bm > 0.0 { w_bm } else { 0.7 };
+        let fused = rrf_fuse(&[(dense_ids, 1.0), (lex_ids, wb)], 60.0);
+
+        // 6. Emit hits.
+        fused
+            .into_iter()
+            .take(k)
+            .map(|(memory_id, score)| ChorusHit {
+                memory_id,
+                score,
+                photon: 0.0,
+                field: 0.0,
+                lexical: 0.0,
+                theta: 0,
+                lane: "grg-maxsim-bm25".into(),
+                snippet: String::new(),
+            })
+            .collect()
     }
 
     /// Batch recall — one GRG pass per query, amortizes Python/FFI overhead.
@@ -919,6 +1050,7 @@ impl ChorusField {
             trace.amplitude *= 0.85;
             if trace.amplitude < 0.08 {
                 self.traces.remove(&id);
+                self.bm25.remove(&id);
                 pruned += 1;
             }
         }
@@ -940,6 +1072,7 @@ impl ChorusField {
         let n = ids.len() as u32;
         for id in ids {
             self.traces.remove(&id);
+            self.bm25.remove(&id);
         }
         self.trace_order.retain(|id| self.traces.contains_key(id));
         self.photon.retain(|id| self.traces.contains_key(id));
@@ -1093,6 +1226,7 @@ mod tests {
             content: "magnesium supplementation improves sleep quality".into(),
             context: "doc-a".into(),
             semantic_vector: Some(vec_unit(1, 32)),
+            token_vectors: None,
             salience: 0.8,
             sheath: Default::default(),
         };
@@ -1101,6 +1235,7 @@ mod tests {
             content: "quantum chromodynamics lattice gauge theory".into(),
             context: "doc-b".into(),
             semantic_vector: Some(vec_unit(99, 32)),
+            token_vectors: None,
             salience: 0.8,
             sheath: Default::default(),
         };
@@ -1112,6 +1247,38 @@ mod tests {
     }
 
     #[test]
+    fn recall_maxsim_ranks_token_and_lexical_match() {
+        let mut field = ChorusField::default();
+        // Two token vectors per doc; doc-a shares a token with the query.
+        let a = ChorusImprintInput {
+            memory_id: "doc-a".into(),
+            content: "caroline visited the lgbtq support group in may".into(),
+            context: "doc-a".into(),
+            semantic_vector: Some(vec![1.0, 0.0, 0.0]),
+            token_vectors: Some(vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]]),
+            salience: 0.7,
+            sheath: Default::default(),
+        };
+        let b = ChorusImprintInput {
+            memory_id: "doc-b".into(),
+            content: "quantum chromodynamics lattice gauge theory".into(),
+            context: "doc-b".into(),
+            semantic_vector: Some(vec![0.0, 0.0, 1.0]),
+            token_vectors: Some(vec![vec![0.0, 0.0, 1.0], vec![0.0, 0.0, -1.0]]),
+            salience: 0.7,
+            sheath: Default::default(),
+        };
+        assert!(field.imprint(&a));
+        assert!(field.imprint(&b));
+        // Query token aligns with doc-a's first token AND lexical "caroline lgbtq".
+        let qtok = vec![vec![1.0, 0.0, 0.0]];
+        let hits = field.recall_maxsim("caroline lgbtq", 2, &qtok, Some(&[1.0, 0.0, 0.0]), 0.7);
+        assert!(!hits.is_empty());
+        assert_eq!(hits[0].memory_id, "doc-a", "MaxSim+BM25 should rank doc-a first");
+        assert_eq!(hits[0].lane, "grg-maxsim-bm25");
+    }
+
+    #[test]
     fn dedup_skips_near_duplicate() {
         let mut field = ChorusField::default();
         let row = ChorusImprintInput {
@@ -1119,6 +1286,7 @@ mod tests {
             content: "same text".into(),
             context: "c".into(),
             semantic_vector: Some(vec_unit(5, 32)),
+            token_vectors: None,
             salience: 0.7,
             sheath: Default::default(),
         };
@@ -1144,6 +1312,7 @@ mod tests {
                 content: format!("content topic {i} alpha beta"),
                 context: format!("ctx{i}"),
                 semantic_vector: Some(vec_unit(i as u8, 32)),
+                token_vectors: None,
                 salience: 0.6,
                 sheath: Default::default(),
             })
@@ -1165,6 +1334,7 @@ mod tests {
             content: "user prefers dark mode in the IDE".into(),
             context: "settings".into(),
             semantic_vector: Some(vec_unit(7, 32)),
+            token_vectors: None,
             salience: 0.9,
             sheath: ProvenanceSheath {
                 verified: true,
@@ -1191,6 +1361,7 @@ mod tests {
                 content: format!("topic {i}"),
                 context: format!("c{i}"),
                 semantic_vector: Some(vec_unit(i as u8, 32)),
+                token_vectors: None,
                 salience: 0.6,
                 sheath: Default::default(),
             })
@@ -1219,6 +1390,7 @@ mod tests {
                 content: format!("topic {i}"),
                 context: format!("c{i}"),
                 semantic_vector: Some(vec_unit(i as u8, 32)),
+                token_vectors: None,
                 salience: 0.6,
                 sheath: Default::default(),
             })
@@ -1245,6 +1417,7 @@ mod tests {
                 content: format!("topic {i}"),
                 context: format!("c{i}"),
                 semantic_vector: Some(vec_unit(i as u8, 32)),
+                token_vectors: None,
                 salience: 0.6,
                 sheath: Default::default(),
             })

@@ -254,6 +254,7 @@ impl FluctlightBrain {
                 content: input.result.clone(),
                 context: input.tool_name.clone(),
                 semantic_vector: input.semantic_vector.clone(),
+                token_vectors: None,
                 salience,
                 sheath: crate::chorus::ProvenanceSheath {
                     agent_id: None,

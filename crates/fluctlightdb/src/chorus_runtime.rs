@@ -101,6 +101,22 @@ impl FluctlightBrain {
         hits
     }
 
+    /// Late-interaction recall: token-population MaxSim ⊕ BM25 (RRF).
+    pub fn chorus_recall_maxsim(
+        &self,
+        cue: &str,
+        k: usize,
+        query_tokens: &[Vec<f32>],
+        cue_vector: Option<&[f32]>,
+        w_bm: f32,
+    ) -> Vec<ChorusHit> {
+        if !chorus_enabled() {
+            return Vec::new();
+        }
+        self.chorus
+            .recall_maxsim(cue, k, query_tokens, cue_vector, w_bm)
+    }
+
     pub fn chorus_recall_batch(
         &self,
         queries: &[(&str, Option<&[f32]>)],
