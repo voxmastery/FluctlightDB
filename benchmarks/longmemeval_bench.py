@@ -25,6 +25,41 @@ from fluctlightdb import connect_brain, connect_conv, connect_index  # noqa: E40
 DEFAULT_DATA = Path("/tmp/longmemeval/data/longmemeval_s_cleaned.json")
 
 
+def session_date_in_window(
+    session_date: str,
+    *,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+) -> bool:
+    """Return True if session_date is inside [start, end] (inclusive).
+
+    Unparseable dates are treated as in-window (never hard-drop on parse failure).
+    Accepts LongMemEval forms like ``2023/05/30 (Tue) 23:40`` and ISO ``2023-05-30``.
+    """
+    from datetime import date
+
+    def parse(s: Optional[str]) -> Optional[date]:
+        if not s:
+            return None
+        s = s.strip()
+        m = re.match(r"(\d{4})[/-](\d{1,2})[/-](\d{1,2})", s)
+        if not m:
+            return None
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except Exception:
+            return None
+
+    sd, a, b = parse(session_date), parse(start), parse(end)
+    if sd is None:
+        return True
+    if a and sd < a:
+        return False
+    if b and sd > b:
+        return False
+    return True
+
+
 def _embed_base_url() -> str:
     raw = os.environ.get("FLUCTLIGHT_EMBED_URL", "http://127.0.0.1:8793").rstrip("/")
     if raw.endswith("/embed"):
@@ -510,6 +545,35 @@ def _ingest_turns(brain: Any, item: dict, embedder: EmbedCache, *, fast: bool) -
     return n
 
 
+def soft_boost_temporal(
+    recalls: list[dict],
+    *,
+    question_date: Optional[str],
+    session_ids: list[str],
+    session_dates: list[str],
+    top_k: int,
+    boost: float = 0.15,
+) -> list[dict]:
+    """Soft-boost sessions dated on/before question_date (LongMemEval CP3-lite)."""
+    if not question_date or not recalls:
+        return recalls[:top_k]
+    date_by_sid = {
+        str(sid): date
+        for sid, date in zip(session_ids, session_dates)
+        if sid is not None
+    }
+    boosted: list[dict] = []
+    for r in recalls:
+        rr = dict(r)
+        sid = recall_session_id(r)
+        sd = date_by_sid.get(str(sid), "") if sid else ""
+        if sid and sd and session_date_in_window(sd, start=None, end=question_date):
+            rr["activation"] = float(rr.get("activation") or 0.0) + boost
+        boosted.append(rr)
+    boosted.sort(key=lambda x: -float(x.get("activation") or 0.0))
+    return boosted[:top_k]
+
+
 def activate_merged(
     brain: Any,
     question: str,
@@ -635,9 +699,17 @@ def retrieve_item(
             question_type=item.get("question_type"),
             embedder=embedder,
             fast=fast,
-            top_k=top_k,
+            top_k=max(top_k * 2, 16) if item.get("question_type") == "temporal-reasoning" else top_k,
             query_expand=query_expand,
         )
+        if item.get("question_type") == "temporal-reasoning":
+            recalls = soft_boost_temporal(
+                recalls,
+                question_date=item.get("question_date"),
+                session_ids=list(item.get("haystack_session_ids") or []),
+                session_dates=list(item.get("haystack_dates") or []),
+                top_k=top_k,
+            )
     hit = session_in_recalls(recalls, item.get("answer_session_ids") or [], top_k=top_k)
     return recalls, hit, ingested, brain
 
