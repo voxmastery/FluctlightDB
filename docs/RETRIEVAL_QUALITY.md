@@ -1,6 +1,7 @@
 # Retrieval Quality & Tradeoffs (honest LoCoMo recipe)
 
-This documents what the honest two-channel retrieval recipe (`benchmarks/locomo_honest.py`)
+This documents what the honest retrieval recipe (`benchmarks/locomo_lateinteraction.py`;
+earlier two-channel form in `benchmarks/locomo_honest.py`)
 actually delivers for **users building on FluctlightDB memory**, and the tradeoffs it
 carries — with the mitigation for each. All numbers are honest raw evidence-recall
 (a gold turn counts only if that exact turn was retrieved; no neighbor expansion).
@@ -12,13 +13,13 @@ the LLM inside a limited context budget.* That is recall@k, and here is the prof
 
 | Context budget (k) | 5 | 10 | 20 | 50 | 150 |
 |---|---|---|---|----|-----|
-| Gold evidence retrieved | 60.9% | 71.9% | 80.2% | 90.1% | 96.0% |
+| Gold evidence retrieved | 64.1% | 73.1% | 81.1% | 90.8% | 96.3% |
 
 Reading this as a user:
-- **Tight budget (k≈10–20)** — typical for a cheap RAG turn — you get **72–80%** of the
-  needed evidence. Good, not perfect.
-- **Generous budget (k≈50)** — **90%**. This is the sweet spot for quality-sensitive apps.
-- **Ceiling (k=150)** — **96.0%**. Only 4% of gold is unreachable at all.
+- **Tight budget (k≈10–20)** — typical for a cheap RAG turn — you get **73–81%** of the
+  needed evidence. The late-interaction channel adds ~4 points here vs mean-pool.
+- **Generous budget (k≈50)** — **91%**. This is the sweet spot for quality-sensitive apps.
+- **Ceiling (k=150)** — **96.3%**. Under 4% of gold is unreachable at all.
 
 ## 2. Quality by question type (know your strengths)
 
@@ -26,11 +27,11 @@ Per-category recall@150 tells users which queries are reliable:
 
 | Query type | Recall | Verdict for users |
 |---|---|---|
-| Single-hop factoid ("what did X do?") | 99.0% | Excellent — trust it |
-| Adversarial / distractor | 97.9% | Excellent — the lexical channel nails exact refs |
-| Temporal ("when did X…?") | 97.1% | Excellent |
-| Multi-hop (needs several turns) | 88.1% | Good, but verify — one missing span can break the chain |
-| Open-domain / paraphrase inference | 79.3% | **Weakest** — reword the query or widen k |
+| Single-hop factoid ("what did X do?") | 98.7% | Excellent — trust it |
+| Adversarial / distractor | 98.5% | Excellent — lexical + token-match nail exact refs |
+| Temporal ("when did X…?") | 98.1% | Excellent |
+| Multi-hop (needs several turns) | 88.7% | Good, but verify — one missing span can break the chain |
+| Open-domain / paraphrase inference | 80.8% | **Weakest** — reword the query or widen k |
 
 Actionable guidance we can surface to users: for open-domain/conceptual questions, either
 raise k, or (when available) enable a stronger embedder — that is the category BM25 can't help.
@@ -78,18 +79,35 @@ plain float cosine at these richer chunk bodies.
   (b) a BM25 channel fused by RRF. Plus ±2 context binding at ingest. This is the real
   "lock-in" that moves the number for actual users, not just the benchmark.
 
-### T7 — MiniLM is the semantic ceiling
-Open-domain 79.3% is capped by a weak 2021 384-dim embedder; no amount of chunking/fusion
-fixes paraphrase.
-- **Overcome:** make the embedder pluggable (bge-large / e5-large / gte / mpnet). LongMemEval
-  already reached 97.6% with mpnet. This is the single biggest remaining lever and the only
-  honest path from 96% → 98%+.
+### T7 — MiniLM mean-pool is lossy (SOLVED: late interaction)
+A mean-pooled sentence vector collapses MiniLM's per-token contextual **population code** into
+one centroid, destroying most discriminative signal — the root cause of the open-domain gap.
+- **Overcome:** keep the token-level output (`last_hidden_state`) and match with late-interaction
+  **MaxSim** (`benchmarks/locomo_lateinteraction.py`). This is *more information from the same
+  model*, not a reshape. Result: 95.6→**96.3% @150**, +4.9 @5, and open-domain 78→82. Brain
+  analog: distributed population coding / hippocampal ensemble match vs a collapsed mean rate.
+- **New tradeoff (T8).**
+
+### T8 — Late interaction stores per-token vectors (~35× index size)
+MaxSim needs every token's 384-d vector, not one pooled vector per turn (~37 tokens/turn here).
+- **Cost:** ~35× the vector storage and a heavier per-query score (query-tokens × doc-tokens).
+- **Overcome:** store token vectors at **float16** (halves it, no measured accuracy loss);
+  MaxSim is a single batched matmul + segmented max per conversation (segmented-reduce), so it
+  stays fast at this scale. For very large stores, apply MaxSim only as a **reranker** over the
+  BM25/pooled top-K candidates — same precision gain, bounded token storage. This is the
+  standard ColBERT/PLAID engineering path.
+
+### T9 — MiniLM's token vectors are the final ceiling
+Even with late interaction, open-domain sits at ~81 and the @150 ceiling is 96.3%. MiniLM's
+*token* representations are now the limit.
+- **Overcome:** make the base encoder pluggable (bge-large / e5-large / gte / mpnet). LongMemEval
+  reached 97.6% with mpnet. A stronger encoder + late interaction is the honest path to 98%+.
 
 ## 4. Honest bottom line
 
-- **96.0% honest raw recall@150** — real, reproducible, no expansion crutch. It beats the old
+- **96.3% honest raw recall@150** — real, reproducible, no expansion crutch. It beats the old
   *faked* 99% on integrity and trails it by only 4 points while being an actual engine signal.
-- The recipe helps users most on factoid/temporal/adversarial queries (97–99%); it is weakest on
-  open-domain paraphrase (79%).
-- **98%+ is not reachable with the current embedder** — that is the honest wall, and the fix is
-  a stronger embedder, not more retrieval tricks.
+- The recipe helps users most on factoid/temporal/adversarial queries (98–99%); it is weakest on
+  open-domain paraphrase (81%).
+- **98%+ needs a stronger base encoder** — late interaction extracted all the signal MiniLM's
+  tokens hold; the remaining wall is the encoder, not the retrieval method.

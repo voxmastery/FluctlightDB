@@ -101,17 +101,23 @@ make reproduce-locomo
 
 | Retrieval | raw recall@150 | Δ |
 |-----------|---------------|---|
-| Single-turn dense (MiniLM cosine) | 87.5% | baseline |
+| Single-turn dense (MiniLM mean-pool cosine) | 87.5% | baseline |
 | + episodic context binding (±2 neighbours in chunk) | 92.0% | +4.5 |
-| + dual-pathway dense⊕BM25 RRF | **96.0%** | **+8.5 total** |
+| + dual-pathway dense⊕BM25 RRF | 96.0% | +8.5 |
+| **+ token-population MaxSim** (late interaction, replaces mean-pool) ⊕ BM25 | **96.3%** | **+8.8 total** |
 
 **Recall@k profile (what a RAG app actually consumes):**
 
 | k | 5 | 10 | 20 | 50 | 150 |
 |---|---|---|---|----|-----|
-| raw recall | 60.9% | 71.9% | 80.2% | 90.1% | **96.0%** |
+| mean-pool ⊕ BM25 | 59.2% | 69.1% | 77.3% | 89.4% | 95.6% |
+| **MaxSim ⊕ BM25** | **64.1%** | **73.1%** | **81.1%** | **90.8%** | **96.3%** |
 
-Per-category @150: singlehop 99.0 · adversarial 97.9 · temporal 97.1 · multihop 88.1 · **opendomain 79.3** (the remaining gap — paraphrase-heavy, needs a stronger embedder; BM25 cannot bridge it).
+The biggest wins are at small k (the operational range): **+4.9 @5, +4.0 @10** — because late
+interaction matches query tokens to document tokens directly instead of comparing collapsed
+centroids. MaxSim alone also lifts open-domain paraphrase recall 78→82.
+
+Per-category @150: temporal 98.1 · singlehop 98.7 · adversarial 98.5 · multihop 88.7 · **opendomain 80.8** (the remaining gap — the last points to 98%+ need a stronger *base* encoder, e.g. mpnet/bge/e5; MiniLM's token vectors are the ceiling).
 
 Two mechanisms tested and **rejected** for honesty/quality:
 - `expand_session_neighbors(±3)` — inflates to 99.0% by crediting neighbours never retrieved. A trivial BM25 baseline also scores ~99% under it, so it distinguishes no engine. **Not reported as a headline.**
