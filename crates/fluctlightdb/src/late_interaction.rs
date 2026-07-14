@@ -121,6 +121,70 @@ pub fn maxsim(query: &[Vec<f32>], doc: &[Vec<u16>]) -> f32 {
     total
 }
 
+/// Predictive-coding salience weights for query tokens: each token's divergence
+/// from the query centroid. Content tokens diverge (high weight); function tokens
+/// and [CLS]/[SEP] cluster near the centroid (low weight). Normalized to mean 1.
+pub fn salience_weights(query: &[Vec<f32>]) -> Vec<f32> {
+    let n = query.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let dim = query[0].len();
+    let mut c = vec![0.0f32; dim];
+    for q in query {
+        for (a, b) in c.iter_mut().zip(q.iter()) {
+            *a += *b;
+        }
+    }
+    let norm = c.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        for x in c.iter_mut() {
+            *x /= norm;
+        }
+    }
+    let mut w: Vec<f32> = query
+        .iter()
+        .map(|q| {
+            let dot: f32 = q.iter().zip(c.iter()).map(|(a, b)| a * b).sum();
+            (1.0 - dot).max(0.0)
+        })
+        .collect();
+    let mean = w.iter().sum::<f32>() / n as f32;
+    if mean > 1e-6 {
+        for x in w.iter_mut() {
+            *x /= mean;
+        }
+    } else {
+        w.iter_mut().for_each(|x| *x = 1.0);
+    }
+    w
+}
+
+/// Salience-gated MaxSim: `sum_i weight_i * max_j cos(q_i, d_j)`.
+pub fn maxsim_weighted(query: &[Vec<f32>], weights: &[f32], doc: &[Vec<u16>]) -> f32 {
+    if query.is_empty() || doc.is_empty() {
+        return 0.0;
+    }
+    let doc_f32: Vec<Vec<f32>> = doc
+        .iter()
+        .map(|row| row.iter().map(|&b| f16_bits_to_f32(b)).collect())
+        .collect();
+    let mut total = 0.0f32;
+    for (qi, q) in query.iter().enumerate() {
+        let mut best = f32::NEG_INFINITY;
+        for d in &doc_f32 {
+            let dot: f32 = q.iter().zip(d.iter()).map(|(a, b)| a * b).sum();
+            if dot > best {
+                best = dot;
+            }
+        }
+        if best.is_finite() {
+            total += weights.get(qi).copied().unwrap_or(1.0) * best;
+        }
+    }
+    total
+}
+
 // ── BM25 lexical index (incremental, in-memory) ──────────────────────────────
 
 /// Okapi BM25 index over trace content, updated incrementally on imprint.
@@ -132,6 +196,9 @@ pub struct Bm25Index {
     tf: HashMap<String, HashMap<String, u32>>,
     /// per-doc token length
     len: HashMap<String, u32>,
+    /// per-doc term positions (for conjunctive proximity binding)
+    #[serde(default)]
+    pos: HashMap<String, HashMap<String, Vec<u32>>>,
     total_len: u64,
     k1: f32,
     b: f32,
@@ -181,8 +248,10 @@ impl Bm25Index {
             return;
         }
         let mut tf: HashMap<String, u32> = HashMap::new();
-        for t in &toks {
+        let mut pos: HashMap<String, Vec<u32>> = HashMap::new();
+        for (i, t) in toks.iter().enumerate() {
             *tf.entry(t.clone()).or_insert(0) += 1;
+            pos.entry(t.clone()).or_default().push(i as u32);
         }
         for term in tf.keys() {
             *self.df.entry(term.clone()).or_insert(0) += 1;
@@ -190,6 +259,7 @@ impl Bm25Index {
         self.total_len += toks.len() as u64;
         self.len.insert(id.to_string(), toks.len() as u32);
         self.tf.insert(id.to_string(), tf);
+        self.pos.insert(id.to_string(), pos);
     }
 
     pub fn remove(&mut self, id: &str) {
@@ -203,6 +273,7 @@ impl Bm25Index {
                 }
             }
         }
+        self.pos.remove(id);
         if let Some(l) = self.len.remove(id) {
             self.total_len -= l as u64;
         }
@@ -238,6 +309,111 @@ impl Bm25Index {
         }
         s
     }
+
+    /// Surprisal information content of a term: -log p(term) = ln(N / df).
+    fn idf_surprisal(&self, term: &str) -> f32 {
+        let n = self.len.len().max(1) as f32;
+        let df = (*self.df.get(term).unwrap_or(&0)).max(1) as f32;
+        (n / df).ln()
+    }
+
+    /// Conjunctive surprisal: information content with a saturating neural response
+    /// (Weber–Fechner, no ad-hoc k1/b) plus a proximity-bound bonus for co-occurring
+    /// rare query terms (conjunctive binding). `tau` saturates TF; `window` bounds
+    /// the proximity kernel.
+    pub fn surprisal_conjunctive(
+        &self,
+        query_terms: &[String],
+        id: &str,
+        tau: f32,
+        window: u32,
+    ) -> f32 {
+        let Some(tf) = self.tf.get(id) else {
+            return 0.0;
+        };
+        // dedup query terms present in this doc
+        let mut present: Vec<&String> = Vec::new();
+        let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut s = 0.0f32;
+        for term in query_terms {
+            if !seen.insert(term.as_str()) {
+                continue;
+            }
+            if let Some(&f) = tf.get(term) {
+                s += self.idf_surprisal(term) * (1.0 - (-(f as f32) / tau).exp());
+                present.push(term);
+            }
+        }
+        // conjunctive binding over co-occurring rare pairs
+        if present.len() >= 2 {
+            if let Some(pmap) = self.pos.get(id) {
+                for a in 0..present.len() {
+                    for b in (a + 1)..present.len() {
+                        let (Some(pa), Some(pb)) =
+                            (pmap.get(present[a].as_str()), pmap.get(present[b].as_str()))
+                        else {
+                            continue;
+                        };
+                        let mut gap = u32::MAX;
+                        for &x in pa {
+                            for &y in pb {
+                                gap = gap.min(x.abs_diff(y));
+                            }
+                        }
+                        if gap <= window {
+                            let bind = (self.idf_surprisal(present[a])
+                                * self.idf_surprisal(present[b]))
+                            .sqrt()
+                                * (-(gap as f32) / window as f32).exp();
+                            s += bind;
+                        }
+                    }
+                }
+            }
+        }
+        s
+    }
+}
+
+// ── Evidence-integration fusion (Ernst–Banks optimal cue combination) ─────────
+
+/// Fuse two channels by z-scoring each over the candidate set and taking a
+/// reliability-weighted sum, instead of RRF's rank heuristic. This preserves
+/// score magnitude (which RRF discards), sharpening the top ranks. Both maps
+/// must cover the same candidate ids; missing entries are treated as the channel
+/// minimum. Returns ids sorted by fused score, descending.
+pub fn evidence_fuse(
+    dense: &HashMap<String, f32>,
+    lex: &HashMap<String, f32>,
+    w_lex: f32,
+) -> Vec<(String, f32)> {
+    let mut ids: Vec<String> = dense.keys().cloned().collect();
+    for id in lex.keys() {
+        if !dense.contains_key(id) {
+            ids.push(id.clone());
+        }
+    }
+    if ids.is_empty() {
+        return Vec::new();
+    }
+    let zscore = |vals: &[f32]| -> Vec<f32> {
+        let n = vals.len() as f32;
+        let mean = vals.iter().sum::<f32>() / n;
+        let var = vals.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n;
+        let sd = var.sqrt() + 1e-9;
+        vals.iter().map(|x| (x - mean) / sd).collect()
+    };
+    let dvals: Vec<f32> = ids.iter().map(|id| *dense.get(id).unwrap_or(&0.0)).collect();
+    let lvals: Vec<f32> = ids.iter().map(|id| *lex.get(id).unwrap_or(&0.0)).collect();
+    let dz = zscore(&dvals);
+    let lz = zscore(&lvals);
+    let mut out: Vec<(String, f32)> = ids
+        .into_iter()
+        .enumerate()
+        .map(|(i, id)| (id, dz[i] + w_lex * lz[i]))
+        .collect();
+    out.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    out
 }
 
 // ── Reciprocal Rank Fusion ───────────────────────────────────────────────────
@@ -351,5 +527,58 @@ mod tests {
         let ch2 = (vec!["B".to_string(), "A".to_string()], 0.1);
         let fused = rrf_fuse(&[ch1, ch2], 60.0);
         assert_eq!(fused[0].0, "A"); // strong channel wins
+    }
+
+    #[test]
+    fn salience_downweights_generic_tokens() {
+        // token near the centroid (generic) gets low weight; divergent one high.
+        let q = vec![vec![1.0, 0.0], vec![0.0, 1.0], vec![1.0, 0.0]];
+        let w = salience_weights(&q);
+        assert_eq!(w.len(), 3);
+        // mean-normalized => average ~1
+        assert!(approx(w.iter().sum::<f32>() / 3.0, 1.0));
+        // the lone divergent token (index 1) should weigh more than the aligned pair
+        assert!(w[1] > w[0] && w[1] > w[2]);
+    }
+
+    #[test]
+    fn maxsim_weighted_scales_by_weight() {
+        let q = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let d = pack_tokens(&[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let plain = maxsim(&q, &d);
+        let weighted = maxsim_weighted(&q, &[2.0, 0.0], &d);
+        assert!(approx(plain, 2.0));
+        assert!(approx(weighted, 2.0)); // 2*1 + 0*1
+    }
+
+    #[test]
+    fn conjunctive_rewards_proximity() {
+        let mut ix = Bm25Index::new();
+        ix.add("near", "alpha beta gamma delta"); // rare terms adjacent-ish
+        ix.add("far", "alpha zzz yyy xxx www vvv uuu ttt beta"); // rare terms far apart
+        // pad corpus so alpha/beta are rare
+        for i in 0..20 {
+            ix.add(&format!("pad{i}"), "common common common");
+        }
+        let q = tokenize("alpha beta");
+        let near = ix.surprisal_conjunctive(&q, "near", 1.0, 8);
+        let far = ix.surprisal_conjunctive(&q, "far", 1.0, 8);
+        assert!(near > far, "near={near} far={far}");
+    }
+
+    #[test]
+    fn evidence_fuse_preserves_magnitude() {
+        let mut dense = HashMap::new();
+        dense.insert("A".to_string(), 10.0);
+        dense.insert("B".to_string(), 1.0);
+        dense.insert("C".to_string(), 0.5);
+        let mut lex = HashMap::new();
+        lex.insert("A".to_string(), 0.0);
+        lex.insert("B".to_string(), 5.0);
+        lex.insert("C".to_string(), 0.0);
+        let fused = evidence_fuse(&dense, &lex, 0.6);
+        assert_eq!(fused.len(), 3);
+        // A dominates dense strongly => stays on top
+        assert_eq!(fused[0].0, "A");
     }
 }

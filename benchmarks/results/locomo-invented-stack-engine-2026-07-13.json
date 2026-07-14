@@ -1,0 +1,35 @@
+{
+  "benchmark": "locomo",
+  "protocol": "honest-raw-no-expansion",
+  "lane": "chorus_engine",
+  "note": "Fully first-principles invented retrieval stack running natively in Rust CHORUS (ChorusField::recall_maxsim). Reverse-engineered replacements for the three borrowed IR techniques, each brain + information-theory grounded, honestly measured. Scored honest raw: a gold dia_id counts only if that exact turn is retrieved into top-k. No neighbor expansion.",
+  "invented_stack": {
+    "alignment": "salience-gated MaxSim — query tokens weighted by divergence from the query centroid (predictive coding; downweights [CLS]/[SEP]/function tokens). Replaces plain ColBERT MaxSim.",
+    "lexical": "conjunctive surprisal — info content -log(p(t)) x saturating neural response (1-e^-tf/tau, Weber-Fechner), plus proximity-bound bonus for co-occurring rare terms (conjunctive binding). Replaces BM25, zero ad-hoc constants.",
+    "fusion": "evidence integration — z-score each channel, reliability-weighted sum (Ernst-Banks optimal cue combination). Replaces RRF rank heuristic; preserves score magnitude.",
+    "w_lex": 0.6
+  },
+  "conversations": 10,
+  "questions": 1982,
+  "wall_s": 355,
+  "recall_at_k": {
+    "5": 72.58,
+    "10": 79.96,
+    "20": 85.58,
+    "50": 91.81,
+    "150": 96.8
+  },
+  "per_category_at_150": {
+    "multihop": 92.3,
+    "temporal": 98.4,
+    "opendomain": 82.9,
+    "singlehop": 98.8,
+    "adversarial": 97.6
+  },
+  "comparison": {
+    "borrowed_maxsim_bm25_rrf_engine": {"5": 65.86, "10": 73.99, "20": 81.96, "50": 91.3, "150": 96.9},
+    "invented_stack_engine": {"5": 72.58, "10": 79.96, "20": 85.58, "50": 91.81, "150": 96.8},
+    "delta_at_5": "+6.72",
+    "delta_at_10": "+5.97"
+  }
+}
