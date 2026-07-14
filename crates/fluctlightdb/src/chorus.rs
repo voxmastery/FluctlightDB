@@ -13,7 +13,9 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-use crate::late_interaction::{maxsim, pack_tokens, rrf_fuse, tokenize, Bm25Index};
+use crate::late_interaction::{
+    evidence_fuse, maxsim_weighted, pack_tokens, salience_weights, tokenize, Bm25Index,
+};
 use crate::muon::count_sketch;
 use crate::photon::{PhotonCode, PhotonStore, SimHasher, DEFAULT_BITS};
 use crate::prism::{self, PrismSignature, DEFAULT_CERTIFY_M, DEFAULT_PRISM_FULL_MAX};
@@ -691,11 +693,17 @@ impl ChorusField {
             .iter()
             .map(|t| as_unit_vector(t).into_owned())
             .collect();
+        // Predictive-coding salience weights for the query tokens (computed once).
+        let weights = salience_weights(&q);
         let terms = tokenize(cue);
+        const TAU: f32 = 1.0;
+        const WINDOW: u32 = 8;
 
         // 2+3. Score both channels, keyed by parent id (max over any split children).
-        let mut maxsim_by_id: HashMap<String, f32> = HashMap::new();
-        let mut bm25_by_id: HashMap<String, f32> = HashMap::new();
+        //   dense: salience-gated MaxSim over per-token vectors
+        //   lex:   conjunctive surprisal (proximity-bound co-occurring rare terms)
+        let mut dense_by_id: HashMap<String, f32> = HashMap::new();
+        let mut lex_by_id: HashMap<String, f32> = HashMap::new();
         for id in &candidate_ids {
             let Some(trace) = self
                 .traces
@@ -708,33 +716,32 @@ impl ChorusField {
             let ms = if trace.token_vectors.is_empty() {
                 0.0
             } else {
-                maxsim(&q, &trace.token_vectors)
+                maxsim_weighted(&q, &weights, &trace.token_vectors)
             };
-            let e = maxsim_by_id.entry(pid.clone()).or_insert(f32::NEG_INFINITY);
+            let e = dense_by_id.entry(pid.clone()).or_insert(f32::NEG_INFINITY);
             if ms > *e {
                 *e = ms;
             }
-            // BM25 is keyed by the trace's own id (unique per row); roll up to parent.
-            let bm = self.bm25.score(&terms, &trace.memory_id);
-            let e2 = bm25_by_id.entry(pid).or_insert(0.0);
-            if bm > *e2 {
-                *e2 = bm;
+            // Lexical keyed by the trace's own id (unique per row); roll up to parent.
+            let lx = self
+                .bm25
+                .surprisal_conjunctive(&terms, &trace.memory_id, TAU, WINDOW);
+            let e2 = lex_by_id.entry(pid).or_insert(0.0);
+            if lx > *e2 {
+                *e2 = lx;
+            }
+        }
+        // clean sentinel (candidates always get a finite MaxSim, but be safe)
+        for v in dense_by_id.values_mut() {
+            if !v.is_finite() {
+                *v = 0.0;
             }
         }
 
-        // 4. Ranked id lists per channel.
-        let mut dense: Vec<(String, f32)> = maxsim_by_id.into_iter().collect();
-        dense.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let dense_ids: Vec<String> = dense.into_iter().map(|(id, _)| id).collect();
-
-        let mut lex: Vec<(String, f32)> =
-            bm25_by_id.into_iter().filter(|(_, s)| *s > 0.0).collect();
-        lex.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        let lex_ids: Vec<String> = lex.into_iter().map(|(id, _)| id).collect();
-
-        // 5. RRF fusion (MaxSim weight 1.0, BM25 weight w_bm).
-        let wb = if w_bm > 0.0 { w_bm } else { 0.7 };
-        let fused = rrf_fuse(&[(dense_ids, 1.0), (lex_ids, wb)], 60.0);
+        // 4+5. Evidence-integration fusion (Ernst–Banks): z-score each channel,
+        // reliability-weighted sum. w_bm is reused as the lexical reliability weight.
+        let wb = if w_bm > 0.0 { w_bm } else { 0.6 };
+        let fused = evidence_fuse(&dense_by_id, &lex_by_id, wb);
 
         // 6. Emit hits.
         fused
@@ -747,7 +754,7 @@ impl ChorusField {
                 field: 0.0,
                 lexical: 0.0,
                 theta: 0,
-                lane: "grg-maxsim-bm25".into(),
+                lane: "grg-salience-conjunctive-evidence".into(),
                 snippet: String::new(),
             })
             .collect()
@@ -1274,8 +1281,8 @@ mod tests {
         let qtok = vec![vec![1.0, 0.0, 0.0]];
         let hits = field.recall_maxsim("caroline lgbtq", 2, &qtok, Some(&[1.0, 0.0, 0.0]), 0.7);
         assert!(!hits.is_empty());
-        assert_eq!(hits[0].memory_id, "doc-a", "MaxSim+BM25 should rank doc-a first");
-        assert_eq!(hits[0].lane, "grg-maxsim-bm25");
+        assert_eq!(hits[0].memory_id, "doc-a", "invented stack should rank doc-a first");
+        assert_eq!(hits[0].lane, "grg-salience-conjunctive-evidence");
     }
 
     #[test]

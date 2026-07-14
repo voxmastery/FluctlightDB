@@ -1,12 +1,17 @@
-"""LoCoMo honest recall through the NATIVE Rust CHORUS MaxSim+BM25 path.
+"""LoCoMo honest recall through the NATIVE Rust CHORUS late-interaction path.
 
 Proves the engine (not a Python prototype) produces the number: ingests per-token
-MiniLM vectors via `chorus_imprint_maxsim_batch` and recalls via
-`chorus_recall_maxsim_batch` (ChorusField::recall_maxsim in Rust). Honest raw
-recall@k, no neighbor expansion.
+MiniLM vectors via `chorus_imprint_maxsim`/`chorus_recall_maxsim` (public brain.py
+API over ChorusField::recall_maxsim in Rust). Honest raw recall@k, no expansion.
 
-Frozen result: benchmarks/results/locomo-lateinteraction-engine-2026-07-13.json
-  raw recall@150 = 96.9%  (beats the 96.3% Python prototype)
+The engine's recall_maxsim runs the fully first-principles invented stack:
+  - salience-gated MaxSim  (predictive-coding query-token weights)
+  - conjunctive surprisal  (info content x Weber-Fechner saturation + proximity binding)
+  - evidence-integration fusion (Ernst-Banks reliability-weighted, replaces RRF)
+
+Frozen result: benchmarks/results/locomo-invented-stack-engine-2026-07-13.json
+  raw recall@150 = 96.8%; @5 72.6 @10 80.0 @20 85.6 (vs 65.9/74.0/82.0 for
+  borrowed MaxSim+BM25+RRF — +6.7 @5 from the invented stack).
 
 Requires:
   - a native build with the MaxSim bindings (cargo build -p fluctlightdb-native --release,
@@ -45,7 +50,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="LoCoMo native CHORUS MaxSim+BM25 recall")
     ap.add_argument("--data", type=Path, default=Path("/tmp/locomo/locomo10.json"))
     ap.add_argument("--tokcache", type=Path, default=Path("/tmp/locomo/cache/tok16.pkl"))
-    ap.add_argument("--w-bm", type=float, default=0.7)
+    ap.add_argument("--w-bm", type=float, default=0.6)  # evidence-fusion lexical reliability weight
     ap.add_argument("--json-out", type=Path, default=None)
     args = ap.parse_args()
 
@@ -111,7 +116,12 @@ def main() -> int:
         "benchmark": "locomo",
         "protocol": "honest-raw-no-expansion",
         "lane": "chorus_engine",
-        "retrieval": {"channel_1": "MaxSim (f16 tokens)", "channel_2": "BM25", "w_bm": args.w_bm},
+        "retrieval": {
+            "channel_1": "salience-gated MaxSim (f16 tokens)",
+            "channel_2": "conjunctive surprisal",
+            "fusion": "evidence-integration (Ernst-Banks)",
+            "w_lex": args.w_bm,
+        },
         "conversations": len(data),
         "questions": nq,
         "wall_s": round(time.time() - t0, 1),
