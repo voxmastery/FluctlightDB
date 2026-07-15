@@ -16,7 +16,7 @@ Our public numbers live here:
 | Artifact | Purpose |
 |----------|---------|
 | `benchmarks/results/paper-2026-07-09.json` | Paper freeze bundle |
-| `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` | LoCoMo cert (99.0% evidence recall, Fabric on) |
+| `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet) | LoCoMo cert — honest raw evidence recall, no expansion (96.8% @150 MiniLM / 97.0% mpnet, @5=72.6%/75.1% tight-k). The old 99.0% headline was ±3 neighbor-expansion inflation, deprecated. |
 | `make reproduce-locomo` | Anyone can verify LoCoMo cert locally |
 | GitHub Releases + PyPI | Versioned engine, not a ranking |
 

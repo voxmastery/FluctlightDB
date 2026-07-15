@@ -13,7 +13,7 @@ bash scripts/sync-paper-public.sh
 Frozen artifacts (must match `main.tex`):
 
 - `benchmarks/results/paper-2026-07-09.json`
-- `benchmarks/results/locomo-chorus-fabric-2026-07-09.json`
+- `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM) / `locomo-mpnet-engine-2026-07-15.json` (mpnet)
 - `benchmarks/results/beir-prism-fabric-2026-07-09.json`
 - `benchmarks/results/famb-*-fabric-2026-07-09.json`
 - `benchmarks/results/longmemeval-colab-v2-full-2026-07-04.json`
@@ -50,7 +50,7 @@ Produces `main.pdf` and `fluctlightdb-arxiv-source.zip` (`main.tex`, `references
 
 | Benchmark | Metric | Score |
 |-----------|--------|------:|
-| LoCoMo | Evidence recall (Fabric on) | **99.0%** (1970/1982, k=150) |
+| LoCoMo | Raw evidence recall, no expansion (MiniLM-384) | **96.8%** @k=150 (mpnet-768 **97.0%**); tight-k @5 **72.6%** |
 | LongMemEval-S | session_recall@8 (hybrid index, no Fabric) | **97.6%** (488/500) |
 | LongMemEval-S E2E | overall accuracy | **97.4%** (487/500) |
 | BEIR SciFact | nDCG@10 / R@10 (Fabric on) | **0.646 / 0.792** vs Chroma 0.645 / 0.783 |
@@ -60,7 +60,7 @@ Produces `main.pdf` and `fluctlightdb-arxiv-source.zip` (`main.tex`, `references
 
 **Say:** embedded engine (SQLite-style), candidate third data model, Fabric-on for CHORUS benchmarks, hybrid index for LongMemEval, chaos-tested durability.
 
-**Do not say:** strict LongMemEval SOTA; production case study; BEIR dominates Chroma on every metric.
+**Do not say:** 99% LoCoMo evidence recall (deprecated — it was a ±3 `expand_session_neighbors` scoring artifact, not the engine; a trivial BM25 baseline also scored ~99% under it); strict LongMemEval SOTA; production case study; BEIR dominates Chroma on every metric. LoCoMo numbers are raw, unexpanded evidence recall from the native Rust CHORUS stack, and evidence-recall ≠ LLM-judge QA.
 
 ## 6. After acceptance
 

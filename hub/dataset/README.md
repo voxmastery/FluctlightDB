@@ -30,7 +30,7 @@ Official frozen metrics for the FluctlightDB research paper (July 2026).
 
 | Benchmark | Metric | Score |
 |-----------|--------|------:|
-| LoCoMo | Evidence recall | **99.0%** (1970/1982, k=150) |
+| LoCoMo | Evidence recall @150 | **96.8%** MiniLM-384 / **97.0%** mpnet-768 (native Rust, no expansion; @5=72.6%/75.1%) |
 | LongMemEval-S | session_recall@8 | **97.6%** (488/500) |
 | BEIR SciFact | nDCG@10 / R@10 | **0.646 / 0.792** (CHORUS/PRISM + Fabric) |
 | FAMB | Macro | **98%** index / **97%** agent |

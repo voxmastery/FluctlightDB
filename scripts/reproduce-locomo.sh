@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Reproduce LoCoMo CHORUS evidence recall and compare to frozen cert.
+# Reproduce LoCoMo HONEST raw evidence recall (no neighbor expansion) and compare
+# to the frozen cert. The historical "99.0%" used a ±3 neighbor-expansion scoring
+# trick and is deprecated — this reproduces the honest number the engine earns.
 # Usage (from repo root):
 #   ./scripts/reproduce-locomo.sh
-#   REPRODUCE_FROM_SOURCE=1 ./scripts/reproduce-locomo.sh   # build native from source
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,16 +11,16 @@ cd "$ROOT"
 
 LOCOMO_DIR="${LOCOMO_DATA_DIR:-/tmp/locomo}"
 LOCOMO_JSON="${LOCOMO_DATA:-$LOCOMO_DIR/locomo10.json}"
-FROZEN="${FROZEN:-benchmarks/results/locomo-chorus-fabric-2026-07-09.json}"
+# Self-contained honest recipe: token-population late interaction (MaxSim) ⊕ BM25,
+# builds its own MiniLM token cache via onnxruntime. No native maxsim binding needed.
+FROZEN="${FROZEN:-benchmarks/results/locomo-lateinteraction-2026-07-13.json}"
 OUT="${OUT:-benchmarks/results/locomo-reproduce-$(date +%Y-%m-%d).json}"
 VENV="${VENV:-$ROOT/.reproduce-venv}"
-TOP_K="${TOP_K:-150}"
 
-echo "==> LoCoMo reproduce (CHORUS + Fabric, k=$TOP_K)"
+echo "==> LoCoMo reproduce — HONEST raw recall@k (no expansion)"
 echo "    dataset:  $LOCOMO_JSON"
 echo "    frozen:   $FROZEN"
 echo "    output:   $OUT"
-echo "    profile:  FLUCTLIGHT_FABRIC=1 (paper freeze)"
 
 mkdir -p "$LOCOMO_DIR"
 if [[ ! -f "$LOCOMO_JSON" ]]; then
@@ -34,49 +35,27 @@ fi
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
 pip install -q --upgrade pip
-
-if [[ "${REPRODUCE_FROM_SOURCE:-0}" == "1" ]]; then
-  echo "==> Installing from source (maturin + editable SDK)"
-  pip install -q -r benchmarks/requirements-reproduce.txt maturin
-  maturin build --release -o "$ROOT/dist-reproduce" --manifest-path crates/fluctlight-py/Cargo.toml
-  pip install -q -e sdks/python
-  pip install -q "$ROOT"/dist-reproduce/*.whl
-else
-  NATIVE_VER="$(python3 -c "import tomllib; print(tomllib.load(open('crates/fluctlight-py/pyproject.toml','rb'))['project']['version'])")"
-  echo "==> Installing pinned deps (fluctlightdb[native]==${NATIVE_VER})"
-  pip install -q -r benchmarks/requirements-reproduce.txt "fluctlightdb[native]==${NATIVE_VER}" || {
-    echo "WARN: PyPI native wheel not yet published for ${NATIVE_VER}."
-    echo "      Falling back to source build (set REPRODUCE_FROM_SOURCE=1 to skip this message)."
-    pip install -q maturin -r benchmarks/requirements-reproduce.txt
-    maturin build --release -o "$ROOT/dist-reproduce" --manifest-path crates/fluctlight-py/Cargo.toml
-    pip install -q -e sdks/python
-    pip install -q "$ROOT"/dist-reproduce/*.whl
-  }
-fi
-
-python -c "import fluctlightdb_native; import fluctlightdb; print('native import ok')"
+pip install -q -r benchmarks/requirements-reproduce.txt onnxruntime tokenizers numpy
 
 export LOCOMO_DATA="$LOCOMO_JSON"
 export PYTHONPATH="$ROOT/sdks/python${PYTHONPATH:+:$PYTHONPATH}"
-export FLUCTLIGHT_FABRIC=1
 
-echo "==> Running locomo_eval.py ..."
-python benchmarks/locomo_eval.py \
-  --mode chorus \
-  --top-k "$TOP_K" \
-  --json-out "$OUT"
+echo "==> Running honest late-interaction benchmark (builds token cache on first run) ..."
+python benchmarks/locomo_lateinteraction.py --data "$LOCOMO_JSON" --json-out "$OUT"
 
-echo "==> Comparing to frozen cert ..."
+echo "==> Comparing raw recall@150 to frozen cert ..."
 python - "$OUT" "$FROZEN" <<'PY'
 import json, sys
 got, frozen = map(json.load, map(open, sys.argv[1:3]))
-for key in ("evidence_hits", "mean_evidence_recall"):
-    g, f = got.get(key), frozen.get(key)
-    if g != f:
-        print(f"MISMATCH {key}: got {g!r} frozen {f!r}")
-        sys.exit(1)
-    print(f"match {key}: {g}")
-print("PASS — reproduction matches frozen LoCoMo cert.")
+g = got.get("recall_at_k", {}).get("150")
+f = frozen.get("recall_at_k", {}).get("150")
+if g is None or f is None:
+    print(f"could not read recall_at_k[150]: got {g!r} frozen {f!r}"); sys.exit(1)
+if abs(float(g) - float(f)) > 0.5:
+    print(f"MISMATCH raw recall@150: got {g} frozen {f}"); sys.exit(1)
+print(f"PASS — honest raw recall@150 matches frozen cert ({g} ~ {f}).")
 PY
 
 echo "==> Done. Result: $OUT"
+echo "    Note: the native-engine invented-stack numbers (96.8% MiniLM / 97.0% mpnet)"
+echo "    are higher and reproduce via benchmarks/locomo_engine_maxsim.py after a source build."

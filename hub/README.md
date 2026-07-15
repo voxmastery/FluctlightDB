@@ -26,7 +26,7 @@ pip install "fluctlightdb[native]==0.5.9"
 
 | Benchmark | Result |
 |-----------|--------|
-| LoCoMo evidence recall @150 | **99.0%** (1970/1982; CHORUS + Fabric) |
+| LoCoMo evidence recall @150 | **96.8%** MiniLM-384 / **97.0%** mpnet-768 (native Rust engine, no expansion; tight-k @5=72.6%/75.1%) |
 | LongMemEval-S session@8 | **97.6%** (488/500) |
 | LongMemEval-S E2E QA | **97.4%** (487/500) |
 | BEIR SciFact nDCG@10 / R@10 | **0.646 / 0.792** (Fabric on) |

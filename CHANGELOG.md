@@ -11,6 +11,9 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+### Changed
+- **LoCoMo headline corrected to honest raw evidence recall (no expansion):** **96.8% @150 (MiniLM) / 97.0% (mpnet)**, tight-k @5=72.6%/75.1%, @10=80.0%/82.6%, @20=85.6%/87.2%, @50=91.8%/92.4% — native Rust CHORUS first-principles invented stack (salience-gated MaxSim + conjunctive surprisal + evidence-integration fusion). Bench `benchmarks/locomo_engine_maxsim.py`; frozen `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet). The prior **99.0%** headline was ±3 neighbor-expansion scoring inflation (`expand_session_neighbors`), not the engine — **deprecated**. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15, retrieval-bound).
+
 ---
 
 ## [0.5.10] - 2026-07-11
@@ -111,7 +114,7 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 - `scripts/verify-pypi-wheel.sh` + `make test-native-wheel`
 - `docs/STABILITY.md`, `docs/EMBEDDINGS.md`
 - README restructure (install / API / benchmarks first)
-- Paper freeze `benchmarks/results/paper-2026-07-09.json`; LoCoMo cert **99.0%**
+- Paper freeze `benchmarks/results/paper-2026-07-09.json`; LoCoMo cert **99.0%** *(later found to be ±3 neighbor-expansion inflation; superseded by honest 96.8% @150 no-expansion — see [Unreleased] and `locomo-invented-stack-engine-2026-07-13.json`)*
 
 ---
 
@@ -172,7 +175,7 @@ Commits before `v0.4.0` cover Rust core, CHORUS/PRISM benchmarks, arxiv preprint
 
 **Benchmark milestones (not tied 1:1 to semver tags):**
 
-- LoCoMo CHORUS evidence recall certified **99.0%** — July 2026
+- LoCoMo evidence recall (honest raw, no expansion): **96.8% @150 (MiniLM) / 97.0% (mpnet)**, @5=72.6%/75.1% tight-k — native Rust CHORUS invented stack, July 2026. (The earlier **99.0%** was ±3 neighbor-expansion inflation, deprecated. Evidence recall ≠ QA accuracy; E2E ≈85% @k=15.)
 - LongMemEval session@8 **97.6%**, E2E **97.4%** — July 2026 paper freeze
 - BEIR SciFact nDCG@10 **0.645** — July 2026
 

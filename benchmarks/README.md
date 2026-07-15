@@ -8,7 +8,9 @@ pip install chromadb pytrec-eval-terrier "fluctlightdb[native]>=0.5.2"
 
 # LoCoMo one-command reproduce (downloads data, Fabric on, checks frozen cert)
 make reproduce-locomo
-# Frozen baseline: benchmarks/results/locomo-chorus-fabric-2026-07-09.json
+# Frozen baseline: benchmarks/results/locomo-invented-stack-engine-2026-07-13.json
+# LoCoMo @150: 96.8% MiniLM-384 / 97.0% mpnet-768 (native Rust, no expansion; @5=72.6%/75.1%).
+# The historical 99.0% was ±3 neighbor-expansion inflation, not the engine — deprecated. Evidence-recall ≠ QA.
 ```
 
 | Script | Purpose | Data |

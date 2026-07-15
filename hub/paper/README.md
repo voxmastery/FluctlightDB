@@ -25,7 +25,7 @@ Long-term agent memory is a **third data model** — not SQL rows, not vector AN
 
 | Benchmark | Metric | Result |
 |-----------|--------|--------|
-| **LoCoMo** (10 conv, 1,982 gold spans) | Mean evidence recall @ k=150 | **99.0%** |
+| **LoCoMo** (10 conv, 1,982 gold spans) | Mean evidence recall @ k=150 | **96.8%** MiniLM / **97.0%** mpnet (no expansion; tight-k @5=72.6%/75.1%) |
 | **LongMemEval-S** (500 questions) | session_recall@8 | **97.6%** (488/500 unified v4) |
 | **BEIR SciFact** | nDCG@10 / R@10 | **0.646 / 0.792** (Fabric on; vs Chroma 0.645 / 0.783) |
 | **FAMB** | Macro (index / agent) | **98% / 97%** |
@@ -36,7 +36,7 @@ Frozen metrics: [fluctlightdb-benchmarks](https://huggingface.co/datasets/Voxies
 
 For fifty years, data systems answered two questions: which records match a predicate (relational), and which vectors lie nearest a query (vector). Autonomous agents ask a third: *what have I learned, and what of it can I trust?*
 
-We present **FluctlightDB**, an embedded brain-native database with write path `experience()` and read path `activate()`. On full LoCoMo it recalls **99.0%** of gold evidence. On LongMemEval-S it scores **97.6%** session recall@8 (unified v4 full 500); preference **96.7%** (29/30) with v4 pref-facts. On BEIR SciFact it edges Chroma on nDCG@10 and Recall@10 in a shared harness (Fabric on). On FAMB it scores **100%** macro (internal regression).
+We present **FluctlightDB**, an embedded brain-native database with write path `experience()` and read path `activate()`. On full LoCoMo (1,982 questions) its native Rust engine recalls **96.8%** of gold evidence @150 with MiniLM-384 (**97.0%** with mpnet-768), no neighbor expansion; E2E QA is retrieval-bound at ~85% @k=15. On LongMemEval-S it scores **97.6%** session recall@8 (unified v4 full 500); preference **96.7%** (29/30) with v4 pref-facts. On BEIR SciFact it edges Chroma on nDCG@10 and Recall@10 in a shared harness (Fabric on). On FAMB it scores **100%** macro (internal regression).
 
 ## Install
 
@@ -88,7 +88,7 @@ See also [CITATION.cff](https://github.com/voxmastery/FluctlightDB/blob/main/CIT
 
 ## Metric note
 
-LoCoMo **evidence recall** = fraction of gold dialogue evidence in retrieved context (official RAG metric). Mem0/Zep often report **LLM-as-judge end-to-end QA** — a different, harder number. Do not compare 99.0% recall to ~92% QA without naming the metric.
+LoCoMo **evidence recall** = fraction of gold dialogue evidence in retrieved context (official RAG metric). Mem0/Zep often report **LLM-as-judge end-to-end QA** — a different, harder number. Do not compare 96.8% recall to ~92% QA without naming the metric; evidence-recall ≠ QA. (The historical **99.0%** headline came from ±3 neighbor-expansion scoring, not the engine — deprecated.)
 
 ## License
 
