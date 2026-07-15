@@ -13,13 +13,13 @@ the LLM inside a limited context budget.* That is recall@k, and here is the prof
 
 | Context budget (k) | 5 | 10 | 20 | 50 | 150 |
 |---|---|---|---|----|-----|
-| Gold evidence retrieved | 64.1% | 73.1% | 81.1% | 90.8% | 96.3% |
+| Gold evidence retrieved | 72.6% | 80.0% | 85.6% | 91.8% | 96.8% |
 
 Reading this as a user:
 - **Tight budget (k≈10–20)** — typical for a cheap RAG turn — you get **73–81%** of the
   needed evidence. The late-interaction channel adds ~4 points here vs mean-pool.
 - **Generous budget (k≈50)** — **91%**. This is the sweet spot for quality-sensitive apps.
-- **Ceiling (k=150)** — **96.3%**. Under 4% of gold is unreachable at all.
+- **Ceiling (k=150)** — **96.8%** (lenient budget; read tight-k above). ~3% of gold is unreachable at all.
 
 ## 2. Quality by question type (know your strengths)
 
@@ -98,15 +98,15 @@ MaxSim needs every token's 384-d vector, not one pooled vector per turn (~37 tok
   standard ColBERT/PLAID engineering path.
 
 ### T9 — MiniLM's token vectors are the final ceiling
-Even with late interaction, open-domain sits at ~81 and the @150 ceiling is 96.3%. MiniLM's
+Even with the invented stack, open-domain sits at ~83 and the @150 ceiling is 96.8%. MiniLM's
 *token* representations are now the limit.
 - **Overcome:** make the base encoder pluggable (bge-large / e5-large / gte / mpnet). LongMemEval
   reached 97.6% with mpnet. A stronger encoder + late interaction is the honest path to 98%+.
 
 ## 4. Honest bottom line
 
-- **96.3% honest raw recall@150** — real, reproducible, no expansion crutch. It beats the old
-  *faked* 99% on integrity and trails it by only 4 points while being an actual engine signal.
+- **96.8% honest raw recall@150** (and **72.6% @5** — the tight-k number that matters) — real, reproducible, no expansion crutch. It beats the old
+  *faked* 99% on integrity and trails it by ~2 points while being an honest, native-engine signal.
 - The recipe helps users most on factoid/temporal/adversarial queries (98–99%); it is weakest on
   open-domain paraphrase (81%).
 - **98%+ needs a stronger base encoder** — late interaction extracted all the signal MiniLM's

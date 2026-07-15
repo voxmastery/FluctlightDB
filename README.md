@@ -45,13 +45,13 @@ Source: [`benchmarks/results/paper-2026-07-09.json`](benchmarks/results/paper-20
 
 | Benchmark | Metric | Result | Lane |
 |-----------|--------|--------|------|
-| **LoCoMo** (1,982 gold spans) | **Honest** evidence recall @150 (no expansion) | **96.3%** (2627/2823 spans) | token-population MaxSim ⊕ BM25 (`locomo_lateinteraction.py`) |
+| **LoCoMo** (1,982 gold spans) | **Honest** evidence recall (no expansion) | **96.8% @150** · **72.6% @5** (2627/2823 spans) | first-principles invented stack, native Rust engine (`locomo_engine_maxsim.py`) |
 | **LongMemEval-S** | session_recall@8 | **97.6%** (488/500) | hybrid index + mpnet (no Fabric) |
 | **LongMemEval E2E** (locked) | Overall QA | **97.4%** | Muon + paper profile |
 | **BEIR SciFact** | nDCG@10 / R@10 | **0.646 / 0.792** vs Chroma 0.645 / 0.783 | CHORUS/PRISM + Fabric |
 | **FAMB** | Macro | **100%** | agent + CHORUS (internal regression) |
 
-> **We report the honest raw number only.** A gold `dia_id` counts solely when that exact turn is retrieved into the top-150 — no neighbor expansion. The historical **99.0%** applied `expand_session_neighbors(±3)` after retrieval, crediting neighbours never retrieved; we no longer headline it (a trivial BM25 baseline also hits ~99% under that inflated protocol, so it distinguishes nothing). The honest **96.0%** comes from two brain-grounded, zero-dependency mechanisms: episodic **context binding** (±2 neighbours embedded into each chunk — Tulving encoding specificity) and a **dual-pathway** dense⊕BM25 RRF fusion. Reproduce: `PYTHONPATH=sdks/python python benchmarks/locomo_honest.py`. LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics. See [BENCHMARKS.md](docs/BENCHMARKS.md) and [#2](https://github.com/voxmastery/FluctlightDB/issues/2).
+> **We report the honest raw number only.** A gold `dia_id` counts solely when that exact turn is retrieved into the top-150 — no neighbor expansion. The historical **99.0%** applied `expand_session_neighbors(±3)` after retrieval, crediting neighbours never retrieved; we no longer headline it (a trivial BM25 baseline also hits ~99% under that inflated protocol, so it distinguishes nothing). The honest **96.8% @150** comes from a first-principles invented retrieval stack running natively in the Rust engine: episodic **context binding** (Tulving), **salience-gated token-population MaxSim** (predictive coding), **conjunctive surprisal** (Weber–Fechner + binding), and **evidence-integration fusion** (Ernst–Banks). **Read tight-k too: @5=72.6%, @10=80.0%** — @150 retrieves ~18% of a conversation and is a lenient ceiling; a real RAG turn uses the top ~5–20, so tight-k is the operational number. Reproduce: `PYTHONPATH=sdks/python python benchmarks/locomo_engine_maxsim.py`. LoCoMo **evidence recall** ≠ Mem0/Zep **LLM-judge E2E QA** — different metrics (QA accuracy unmeasured here). See [BENCHMARKS.md](docs/BENCHMARKS.md) and [#2](https://github.com/voxmastery/FluctlightDB/issues/2).
 
 ### Reproduce LoCoMo (one command)
 

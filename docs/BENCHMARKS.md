@@ -84,8 +84,8 @@ Index-mode query latency uses slim vector-fast recalls (large doc bodies omitted
 | **Metrics** | Upstream LoCoMo: gold `dia_id` in retrieved context. **Our harness (historical):** also applies `expand_session_neighbors(±3)` before scoring — see [#2](https://github.com/voxmastery/FluctlightDB/issues/2) |
 | **Paper** | Maharana et al., *Evaluating Very Long-Term Conversational Memory of LLM Agents*, ACL 2024 |
 | **Site** | https://snap-research.github.io/locomo/ |
-| **Status** | **Honest raw: 96.0% @k=150** (2608/2823 spans, no expansion). Frozen: `benchmarks/results/locomo-honest-2026-07-13.json`. The historical *99.0% expanded* is deprecated as a headline (see below). |
-| **In-repo** | `benchmarks/locomo_honest.py` (honest recipe), `benchmarks/locomo_eval.py` (`--neighbor-window 0` for raw CHORUS lane) |
+| **Status** | **Honest raw: 96.8% @k=150** (2627/2823 spans, no expansion) via the first-principles invented stack in the Rust engine. **Tight-k (what a RAG app actually uses): @5 72.6%, @10 80.0%, @20 85.6%.** Frozen: `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json`. The historical *99.0% expanded* is deprecated as a headline (see below). |
+| **In-repo** | `benchmarks/locomo_engine_maxsim.py` (native invented stack), `benchmarks/locomo_honest.py` (2-channel prototype), `benchmarks/locomo_eval.py` (`--neighbor-window 0` for raw CHORUS lane) |
 
 **One-command reproduce:**
 
@@ -97,27 +97,32 @@ make reproduce-locomo
 
 **FluctlightDB results (July 2026) — honest raw scoring, no expansion:**
 
-`benchmarks/locomo_honest.py`, all-MiniLM-L6-v2 ONNX (384d), context-window ±2, dense⊕BM25 weighted RRF (`w_bm=0.7`). A gold `dia_id` counts only if that exact turn is in top-k.
+all-MiniLM-L6-v2 ONNX (384d). A gold `dia_id` counts only if that exact turn is in top-k. The
+final number runs the first-principles invented stack natively in the Rust CHORUS engine
+(`benchmarks/locomo_engine_maxsim.py`); the earlier 2-channel prototype is `locomo_honest.py`.
 
 | Retrieval | raw recall@150 | Δ |
 |-----------|---------------|---|
 | Single-turn dense (MiniLM mean-pool cosine) | 87.5% | baseline |
 | + episodic context binding (±2 neighbours in chunk) | 92.0% | +4.5 |
 | + dual-pathway dense⊕BM25 RRF | 96.0% | +8.5 |
-| **+ token-population MaxSim** (late interaction, replaces mean-pool) ⊕ BM25 | **96.3%** | **+8.8 total** |
+| + token-population MaxSim (late interaction) ⊕ BM25 | 96.3% | +8.8 |
+| **+ first-principles invented stack** (salience-MaxSim + conjunctive surprisal + evidence fusion) | **96.8%** | **+9.3 total** |
 
-**Recall@k profile (what a RAG app actually consumes):**
+**Recall@k profile (what a RAG app actually consumes — the tight-k numbers that matter):**
 
 | k | 5 | 10 | 20 | 50 | 150 |
 |---|---|---|---|----|-----|
 | mean-pool ⊕ BM25 | 59.2% | 69.1% | 77.3% | 89.4% | 95.6% |
-| **MaxSim ⊕ BM25** | **64.1%** | **73.1%** | **81.1%** | **90.8%** | **96.3%** |
+| MaxSim ⊕ BM25 (borrowed) | 65.9% | 74.0% | 82.0% | 91.3% | 96.9% |
+| **invented stack** | **72.6%** | **80.0%** | **85.6%** | **91.8%** | **96.8%** |
 
-The biggest wins are at small k (the operational range): **+4.9 @5, +4.0 @10** — because late
-interaction matches query tokens to document tokens directly instead of comparing collapsed
-centroids. MaxSim alone also lifts open-domain paraphrase recall 78→82.
+**Read the tight-k row, not just @150.** @150 retrieves ~18% of a conversation's turns — a lenient
+ceiling. A real RAG turn feeds only ~5–20 memories to the LLM, so **@5=72.6% / @10=80.0% is the
+honest operational number**; @150=96.8% is the upper bound. The invented stack's gains are
+concentrated exactly there (+6.7 @5, +6.0 @10 over the borrowed baseline).
 
-Per-category @150: temporal 98.1 · singlehop 98.7 · adversarial 98.5 · multihop 88.7 · **opendomain 80.8** (the remaining gap — the last points to 98%+ need a stronger *base* encoder, e.g. mpnet/bge/e5; MiniLM's token vectors are the ceiling).
+Per-category @150: temporal 98.4 · singlehop 98.8 · adversarial 97.6 · multihop 92.3 · **opendomain 82.9** (the remaining gap — the last points to 98%+ need a stronger *base* encoder, e.g. mpnet/bge/e5; MiniLM's token vectors are the ceiling).
 
 Two mechanisms tested and **rejected** for honesty/quality:
 - `expand_session_neighbors(±3)` — inflates to 99.0% by crediting neighbours never retrieved. A trivial BM25 baseline also scores ~99% under it, so it distinguishes no engine. **Not reported as a headline.**
