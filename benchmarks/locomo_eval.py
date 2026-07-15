@@ -104,16 +104,33 @@ def iter_sessions(conversation: dict) -> list[tuple[str, list[dict]]]:
     return sessions
 
 
-def collect_turns(item: dict, rag_mode: str, context_window: int = 1) -> list[dict[str, str]]:
+def collect_turns(
+    item: dict,
+    rag_mode: str,
+    context_window: int = 1,
+    stamp_date: bool = False,
+) -> list[dict[str, str]]:
     """Collect dialogue turns with a ±context_window sliding context window.
 
     Each chunk keeps its own dia_id for evidence matching, but the stored body
     includes adjacent turns from the same session — mimicking how the hippocampus
     always encodes events within their temporal context (episodic binding).
+
+    When ``stamp_date`` is set, each turn line is prefixed with its session date
+    (``[8 May, 2023] [D1:3] ...``). Temporal QA needs this anchor: a retrieved
+    turn says "last Friday"/"last month" and the reader can only resolve it to an
+    absolute date if the session date travels with the turn. This closes ~half of
+    LoCoMo QA failures at zero retrieval cost.
     """
     rows: list[dict[str, str]] = []
     conv = item.get("conversation") or {}
     for sess_key, turns in iter_sessions(conv):
+        date_prefix = ""
+        if stamp_date:
+            raw = str(conv.get(f"{sess_key}_date_time") or "").strip()
+            day = raw.split(" on ", 1)[-1].strip() if " on " in raw else raw
+            if day:
+                date_prefix = f"[{day}] "
         # First pass: collect all valid turns in this session
         sess_rows: list[dict[str, str]] = []
         for turn in turns:
@@ -127,7 +144,7 @@ def collect_turns(item: dict, rag_mode: str, context_window: int = 1) -> list[di
             sess_rows.append(
                 {
                     "dia": dia,
-                    "bare": f"[{dia}] {speaker}: {text}",
+                    "bare": f"{date_prefix}[{dia}] {speaker}: {text}",
                     "kind": "turn",
                 }
             )
