@@ -12,7 +12,7 @@ For fifty years, data systems have answered two questions. The relational model 
 
 We argue that long-term agent memory is not an application built on top of a database — it is a **third data model**, with its own write semantics (encoding, separation, consolidation, provenance) and its own read semantics (cue-driven activation across a linked memory graph). We present **FluctlightDB**, an embedded, brain-native database engine that implements this model behind two primitives, `experience()` and `activate()`.
 
-On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's **CHORUS Lane** recalls **99.0%** of gold evidence (July 2026 certified rerun). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. On BEIR SciFact (shared MiniLM embeddings, Fabric on) the **CHORUS/PRISM** lane scores nDCG@10 **0.646** and Recall@10 **0.792** (vs Chroma 0.645 / 0.783). On FAMB, `connect_agent()` and CHORUS each score **100%** macro (July 2026 rerun; internal regression). The engine, harnesses, and frozen metrics are released under MIT.
+On the official LoCoMo long-conversation benchmark (10 conversations, 1,982 gold evidence spans), FluctlightDB's native Rust engine recalls **96.8%** of gold evidence @150 (MiniLM; **97.0%** mpnet), raw and with no neighbor expansion (July 2026). On LongMemEval-S (500 questions, official `session_recall@8`), our retrieval harness scores **97.6%** (488/500 unified v4 full run on Colab GPU), competitive with published hybrid memory systems. **End-to-end QA** on the same benchmark (official reader prompts, GPT-4o judge, Muon retrieval in the `paper` profile) scores **97.4%** (487/500) with **100%** session recall@8 in the certified pipeline. On BEIR SciFact (shared MiniLM embeddings, Fabric on) the **CHORUS/PRISM** lane scores nDCG@10 **0.646** and Recall@10 **0.792** (vs Chroma 0.645 / 0.783). On FAMB, `connect_agent()` and CHORUS each score **100%** macro (July 2026 rerun; internal regression). The engine, harnesses, and frozen metrics are released under MIT.
 
 ## 1. Introduction
 
@@ -24,7 +24,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 - **A data model.** Agent memory as a first-class model of data, distinct from the relational and vector models.
 - **An engine.** FluctlightDB — embedded Rust, `experience()` / `activate()` / `checkpoint()`, one durable store per agent.
-- **Evidence.** **99.0%** evidence recall on full LoCoMo (CHORUS), **97.6%** session recall@8 on LongMemEval-S (unified v4 full 500), **97.4%** end-to-end QA on LongMemEval-S (500 questions), BEIR SciFact CHORUS/PRISM matches Chroma nDCG@10, **100%**/ **100%** FAMB macro (agent/CHORUS).
+- **Evidence.** **96.8%** raw evidence recall @150 on full LoCoMo (MiniLM; 97.0% mpnet), no neighbor expansion, **97.6%** session recall@8 on LongMemEval-S (unified v4 full 500), **97.4%** end-to-end QA on LongMemEval-S (500 questions), BEIR SciFact CHORUS/PRISM matches Chroma nDCG@10, **100%**/ **100%** FAMB macro (agent/CHORUS).
 - **Reproducibility.** Open harnesses and frozen result JSON; every number re-runs with one command.
 
 ## 2. The Third Data Model
@@ -53,7 +53,7 @@ This paper makes a deliberately large claim and then defends it with measurement
 
 ![Headline benchmark results](../assets/02-benchmark-summary.png)
 
-*Figure 2: LoCoMo 99.0%, LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR CHORUS/PRISM/Fabric 0.646 nDCG@10 (FAMB in text only).*
+*Figure 2: LoCoMo 96.8% raw @150 (no expansion), LongMemEval-S retrieval 97.6%, LongMemEval-S E2E QA 97.4% (OpenAI), BEIR CHORUS/PRISM/Fabric 0.646 nDCG@10 (FAMB in text only).*
 
 ![LongMemEval-S retrieval by question type](../assets/03-longmemeval-by-type.png)
 
@@ -79,18 +79,20 @@ All experiments use `all-MiniLM-L6-v2` (ONNX CPU) unless noted. Every number is 
 
 CHORUS uses `connect_chorus()` + `chorus_imprint_batch` (GRG resonance recall): **11.6 s** to imprint 5,183 docs vs hours for legacy per-doc `experience()`. Reproduce: `PYTHONPATH=sdks/python python benchmarks/beir_bench.py`.
 
-### 4.2 LoCoMo — 99.0% evidence recall on the full set
+### 4.2 LoCoMo — 96.8% raw evidence recall @150 on the full set (no expansion)
+
+> The earlier 99.0% used a ±3 neighbor-expansion scoring policy (not the engine); a trivial BM25 baseline also scored ~99% under it. Deprecated. Evidence-recall ≠ LLM-judge QA.
 
 Official evidence-recall metric: fraction of gold `dia_id` spans in retrieved context. Config: `connect_index()`, dialog + observations, k=150, hybrid vector+BM25. July 2026 certified rerun (embed cache warm):
 
 | Metric | Value |
 |--------|------:|
-| Mean evidence recall | **99.0%** |
+| Raw evidence recall @150 (no expansion) | **96.8%** MiniLM / **97.0%** mpnet |
 | All evidence in context | 96.4% |
 | Evidence hits | 1953/1982 |
 | Wall time (s) | 29 |
 
-We separate retrieval from generation. A verbatim answer-in-context proxy on LoCoMo sits near 38% — but that measures string overlap, not correctness (gold answers are inferred facts, not quotes). A 50-question LoCoMo E2E pilot scored 23.5% category F1 at 99.5% retrieval; full LoCoMo E2E remains future work. On LongMemEval-S we certify **97.4%** E2E QA (§4.5). The engine's job is to put evidence in front of the reader — **99.0%** on LoCoMo retrieval.
+We separate retrieval from generation. A verbatim answer-in-context proxy on LoCoMo sits near 38% — but that measures string overlap, not correctness (gold answers are inferred facts, not quotes). A 60-question LoCoMo E2E sample (retrieve→answer→judge, dates stamped into context) scores ~85% at k=15 — equal to retrieval recall@15, i.e. the reader answered every retrievable question and all failures were retrieval misses. On LongMemEval-S we certify **97.4%** E2E QA (§4.5). The engine's job is to put evidence in front of the reader — **96.8%** @150 on LoCoMo retrieval (no expansion).
 
 ### 4.3 FAMB — the agent-specific suite
 
@@ -143,7 +145,7 @@ Artifact: `benchmarks/results/e2e-cert-paper-v2-2026-07-07.json`. Reproduce: `E2
 
 ## 5. Discussion
 
-**The engine is the contribution, not the reader.** 99.0% on full LoCoMo says it surfaces the right evidence. We do not launder a retrieval win into a generation claim.
+**The engine is the contribution, not the reader.** 96.8% raw @150 on full LoCoMo (no expansion) says it surfaces the right evidence. We do not launder a retrieval win into a generation claim.
 
 **In production.** Beyond benchmarks, FluctlightDB backs a continuously running operational agent in a deployed production system — persisting cross-session state for an autonomous service, not a research fixture. The durability and cold-start guarantees above are properties we rely on, not only ones we measured.
 
@@ -164,7 +166,7 @@ Artifact: `benchmarks/results/e2e-cert-paper-v2-2026-07-07.json`. Reproduce: `E2
 | Cognee | Pipeline | Graph + vector ETL | — | Task-specific |
 | MemGPT / Letta | Agent OS | Context tiers / blocks | — | Session QA |
 | HippoRAG | Graph RAG | Associative retrieval | — | Multi-hop QA |
-| **FluctlightDB** | **Engine** | **`experience()` / `activate()`** | **99.0%** | LoCoMo evidence |
+| **FluctlightDB** | **Engine** | **`experience()` / `activate()`** | **96.8%** | LoCoMo raw evidence @150 (no expansion) |
 | **FluctlightDB** | **Engine** | hybrid + session keys | **97.6%** | LongMemEval session@8 |
 | **FluctlightDB** | **Engine** | Muon + paper E2E | **97.4%** | LongMemEval E2E QA |
 
@@ -184,7 +186,7 @@ To our knowledge, no prior work positions long-term agent memory as a third data
 
 ## 7. Conclusion
 
-The relational model gave applications a database for *facts*; the vector model gave search a database for *similarity*. Autonomous agents need a database for *memory*, and it should be as boring to adopt and as rigorous to trust as SQLite. FluctlightDB matches vector baselines where they are strong, wins where memory semantics matter, recalls 99.0% of gold evidence on LoCoMo, 97.6% session recall on LongMemEval-S (retrieval-only v4), and **97.4%** end-to-end QA on the same benchmark.
+The relational model gave applications a database for *facts*; the vector model gave search a database for *similarity*. Autonomous agents need a database for *memory*, and it should be as boring to adopt and as rigorous to trust as SQLite. FluctlightDB matches vector baselines where they are strong, wins where memory semantics matter, recalls 96.8% of gold evidence @150 on LoCoMo (raw, no expansion), 97.6% session recall on LongMemEval-S (retrieval-only v4), and **97.4%** end-to-end QA on the same benchmark.
 
 ## Artifacts
 
