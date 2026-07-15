@@ -124,6 +124,18 @@ concentrated exactly there (+6.7 @5, +6.0 @10 over the borrowed baseline).
 
 Per-category @150: temporal 98.4 · singlehop 98.8 · adversarial 97.6 · multihop 92.3 · **opendomain 82.9** (the remaining gap — the last points to 98%+ need a stronger *base* encoder, e.g. mpnet/bge/e5; MiniLM's token vectors are the ceiling).
 
+**E2E QA (read-the-context, retrieve→answer→judge).** On a 60-question sample at k=15
+(reader = an LLM answering from *only* the retrieved turns), honest QA accuracy is **85%**,
+and it equals the retrieval recall@15 exactly: the reader answered **51/51 of the *retrievable*
+questions correctly** — every failure was a retrieval miss (gold turn not in top-k), zero
+reading/reasoning failures. This required one fix: **date-stamping** each retrieved turn with its
+session date (`collect_turns(stamp_date=True)`). Temporal questions ("which month?", "when?")
+are unanswerable when the turn only says "last month" — the absolute date lives in session
+metadata, not the turn text. Stamping it in context lifted QA 77.5%→85% and made QA
+**purely retrieval-bound**. Implication: the QA lever is retrieval recall (raise k, or the
+invented stack / a stronger embedder), not the reader. Caveat: single-judge estimate, n=60, not a
+certified 500-question figure.
+
 Two mechanisms tested and **rejected** for honesty/quality:
 - `expand_session_neighbors(±3)` — inflates to 99.0% by crediting neighbours never retrieved. A trivial BM25 baseline also scores ~99% under it, so it distinguishes no engine. **Not reported as a headline.**
 - CA3 pattern-completion via PRF/Rocchio query feedback — drifts on multi-topic dialogue (−1 to −2 pts). Genuine completion needs LLM-based HyDE (model access not assumed here).
