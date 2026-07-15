@@ -115,7 +115,13 @@ final number runs the first-principles invented stack natively in the Rust CHORU
 |---|---|---|---|----|-----|
 | mean-pool ⊕ BM25 | 59.2% | 69.1% | 77.3% | 89.4% | 95.6% |
 | MaxSim ⊕ BM25 (borrowed) | 65.9% | 74.0% | 82.0% | 91.3% | 96.9% |
-| **invented stack** | **72.6%** | **80.0%** | **85.6%** | **91.8%** | **96.8%** |
+| **invented stack (MiniLM-384)** | 72.6% | 80.0% | 85.6% | 91.8% | 96.8% |
+| **invented stack (mpnet-768)** | **75.1%** | **82.6%** | **87.2%** | **92.4%** | **97.0%** |
+
+The engine's late-interaction path (`chorus_imprint_maxsim`) takes caller-supplied token
+vectors, so it is **embedder-agnostic** — swapping MiniLM→mpnet needed zero engine changes and
+lifts every k (+2.5 @5, +0.2 @150). Frozen: `locomo-invented-stack-engine-2026-07-13.json`
+(MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet).
 
 **Read the tight-k row, not just @150.** @150 retrieves ~18% of a conversation's turns — a lenient
 ceiling. A real RAG turn feeds only ~5–20 memories to the LLM, so **@5=72.6% / @10=80.0% is the
@@ -267,7 +273,7 @@ Headline numbers in `benchmarks/results/paper-2026-07-10.json` (reviewer remedia
 
 | Benchmark | Config frozen | Final cert JSON | Notes |
 |---|---|---|---|
-| LoCoMo CHORUS + Fabric | 2026-07-09 | `locomo-chorus-fabric-2026-07-09.json` | 99.0% @ $k{=}150$; k-sweep: `locomo-k-sweep-fabric-2026-07-10.json` |
+| LoCoMo invented stack (native engine) | 2026-07-15 | `locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet) | **96.8% / 97.0% raw @$k{=}150$, no expansion** (deprecated ±3-expansion 99.0% removed) |
 | LoCoMo hybrid vs vector (index) | 2026-07-10 | `locomo-hybrid-index-2026-07-10.json` | @ $k{=}50$; hybrid $\approx$ vector |
 | Provenance conflict (50 cases, isolated) | 2026-07-10 | `provenance-conflict-2026-07-10.json` | Agent lane; 100% top-1 |
 | Provenance conflict (50 cases, shared brain) | 2026-07-10 | `provenance-conflict-shared-2026-07-10.json` | 18% top-1; cross-case contamination |

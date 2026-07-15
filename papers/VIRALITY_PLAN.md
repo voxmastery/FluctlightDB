@@ -17,8 +17,11 @@ The three shareable artifacts, in priority order:
 2. **The Recall Fabric** — nine brain-native mechanisms (photon/lattice/phase/relation/
    crystallize/forgetting/chronos/confidence/consensus), each with a crisp neuroscience anchor.
    This is the "serious systems" credibility layer for HN / researchers.
-3. **The numbers** — 99.0% LoCoMo evidence recall, 97.6% LongMemEval session@8, reproducible
-   from a script. This is the "it's real" proof for skeptics.
+3. **The numbers** — 96.8% raw LoCoMo evidence recall @k=150 (MiniLM-384; 97.0% mpnet-768),
+   no neighbor expansion, from the native Rust CHORUS stack; 97.6% LongMemEval session@8,
+   reproducible from a script. This is the "it's real" proof for skeptics.
+   (Do not headline the old 99% — it was a ±3 `expand_session_neighbors` scoring artifact,
+   not the engine; a trivial BM25 baseline also scored ~99% under it.)
 
 ## Assets to prepare (before launch day)
 

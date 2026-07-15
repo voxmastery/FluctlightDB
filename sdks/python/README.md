@@ -37,13 +37,13 @@ HTTP-only (no Rust extension): `pip install fluctlightdb`
 
 | Benchmark | Metric | Result |
 |-----------|--------|--------|
-| **LoCoMo** (10 conv) | Mean evidence recall @ k=150 | **99.0%** |
+| **LoCoMo** (10 conv, 1,982 q) | Mean evidence recall @ k=150 | **96.8%** MiniLM / **97.0%** mpnet (no expansion; @5=72.6%/75.1%) |
 | **BEIR SciFact** | nDCG@10 (index mode) | **0.645** (ties Chroma + MiniLM) |
 | **FAMB** | Macro (index / agent) | **98%** / **97%** |
 
 Frozen JSON: [benchmarks/results/paper-2026-07-09.json](https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/paper-2026-07-09.json)
 
-> LoCoMo **evidence recall** ≠ Mem0 **LLM-as-judge QA** — different metrics; compare only when labeled.
+> LoCoMo **evidence recall** ≠ Mem0 **LLM-as-judge QA** — different metrics; compare only when labeled. (The old 99.0% headline was ±3 neighbor-expansion inflation, now deprecated.)
 
 ## Docs
 

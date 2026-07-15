@@ -1,0 +1,20 @@
+{
+  "benchmark": "locomo",
+  "protocol": "honest-raw-no-expansion",
+  "lane": "chorus_engine",
+  "embedder": "sentence-transformers/multi-qa-mpnet-base-dot-v1 (768d, token-level)",
+  "note": "First-principles invented stack (salience-gated MaxSim + conjunctive surprisal + evidence-integration fusion) running natively in the Rust CHORUS engine on mpnet token vectors. The engine's chorus_imprint_maxsim/recall_maxsim path is embedder-agnostic — mpnet needed zero engine changes, just different token_vectors. Honest raw: a gold dia_id counts only if that exact turn is retrieved into top-k. No neighbor expansion.",
+  "conversations": 10,
+  "questions": 1982,
+  "w_lex": 0.4,
+  "recall_at_k": {
+    "5": 75.1,
+    "10": 82.55,
+    "20": 87.17,
+    "50": 92.42,
+    "150": 97.02
+  },
+  "comparison_minilm_engine": {
+    "5": 72.58, "10": 79.96, "20": 85.58, "50": 91.81, "150": 96.8
+  }
+}

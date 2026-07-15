@@ -6,11 +6,13 @@ This document tracks the **adoption layer** (integrations, DX, proof) on top of 
 
 | Benchmark | Metric | Result | Artifact |
 |-----------|--------|--------|----------|
-| LoCoMo | Evidence recall | **99.0%** | `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
+| LoCoMo | Evidence recall (honest raw, no expansion) | **96.8% @150 (MiniLM) / 97.0% (mpnet)**, @5=72.6%/75.1% tight-k | `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet) |
 | LongMemEval-S | Session@8 retrieval | **97.6%** | `benchmarks/results/longmemeval-muon-final-2026-07-06.json` |
 | BEIR SciFact | nDCG@10 | **0.645** (CHORUS/PRISM parity) | `benchmarks/results/beir-prism-prod-2026-07-08.json` |
 | FAMB | Macro accuracy | **97–98%** | `benchmarks/results/famb-*-2026-07-06.json` |
 | LongMemEval E2E | QA accuracy | Run `benchmarks/e2e_certify.sh` | Requires API key |
+
+> LoCoMo note: the historical **99.0%** headline was ±3 neighbor-expansion inflation (`expand_session_neighbors`), not the engine — deprecated, not the number. The honest figures above are native Rust CHORUS invented-stack, evidence recall with no expansion. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15, retrieval-bound).
 
 ## Tier 1 — Framework drop-in (shipped)
 

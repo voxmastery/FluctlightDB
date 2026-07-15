@@ -11,20 +11,22 @@ FluctlightDB publishes benchmark numbers in the paper, README, and frozen JSON u
 | **Differentiation** | Honest `REPRODUCIBILITY.md` + open harness vs competitors’ self-reported leaderboard percentages |
 | **Co-maintainers** | External reproducers are the best pipeline for triage contributors and named reviewers |
 | **Head-to-head posts** | Mem0/Zep comparisons stay **blocked until** the first external LoCoMo match — then a protocol-identical post is credible, not more noise |
-| **Paper & press** | “Independently reproduced by X” is citable; self-reported 99% alone is not |
+| **Paper & press** | “Independently reproduced by X” is citable; a self-reported number alone is not |
 
 We welcome independent reproductions and list **public credit** in this doc (no cash bounty — maintainer-funded rewards are not offered).
 
 ## Will you get the same %?
 
-**LoCoMo (CHORUS @ k=150): yes — when you follow the pinned protocol.**
+> **Honest LoCoMo headline:** **96.8% @150 (MiniLM) / 97.0% (mpnet)** raw evidence recall, **no expansion** — tight-k @5=72.6%/75.1%, @10=80.0%/82.6%, @20=85.6%/87.2%, @50=91.8%/92.4%. Native Rust CHORUS first-principles invented stack; bench `benchmarks/locomo_engine_maxsim.py`, frozen `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM) / `locomo-mpnet-engine-2026-07-15.json` (mpnet). The legacy `make reproduce-locomo` protocol below reproduces the **deprecated ±3-expansion cert** (the old 99.0%), kept for historical parity only. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15).
+
+**Legacy expansion cert (deprecated) — CHORUS @ k=150: yes — when you follow the pinned protocol.**
 
 `make reproduce-locomo` exits **0** only if your output JSON matches the frozen cert **exactly** on:
 
 - `evidence_hits` (string, e.g. `"1970/1982"`)
 - `mean_evidence_recall` (float, e.g. `0.990201277587756`)
 
-That is the same headline **99.0%** (1970/1982), not a rounded approximation.
+That is the legacy **99.0%** (1970/1982) ±3-expansion cert — **deprecated, not the headline** (the honest number is 96.8% @150 no-expansion, above).
 
 | Requirement | Why it matters |
 |-------------|----------------|
@@ -33,7 +35,7 @@ That is the same headline **99.0%** (1970/1982), not a rounded approximation.
 | **`benchmarks/requirements-reproduce.txt`** | Pins Chroma / eval deps (embeddings) |
 | **`--mode chorus --top-k 150`** | Default in `reproduce-locomo.sh` |
 | **`FLUCTLIGHT_FABRIC=1`** | Paper-profile Recall Fabric on (set by `reproduce-locomo.sh`; also via `configure_ir_env()` in `locomo_eval.py`) |
-| **Frozen cert** | `benchmarks/results/locomo-chorus-fabric-2026-07-09.json` |
+| **Frozen cert** (honest raw, no expansion) | `benchmarks/results/locomo-lateinteraction-2026-07-13.json` (self-contained); engine: `locomo-invented-stack-engine-2026-07-13.json` (MiniLM) / `locomo-mpnet-engine-2026-07-15.json` (mpnet) |
 | **Official `locomo10.json`** | Auto-downloaded from snap-research/locomo |
 
 **What can still differ (without changing the pass/fail check):** `wall_s`, embed cache hit counts, absolute paths in JSON metadata.
@@ -96,7 +98,7 @@ LongMemEval E2E is **excluded** (locked maintainer run; OpenAI cost).
 
 | Benchmark | Frozen artifact | Open harness | Maintainer self-reported | Independent third-party reproduction |
 |-----------|-----------------|--------------|--------------------------|-------------------------------------|
-| LoCoMo evidence recall @150 | `locomo-chorus-fabric-2026-07-09.json` | `make reproduce-locomo` | Yes — **99.0%** | **None published** |
+| LoCoMo evidence recall @150 (honest raw, no expansion) | `locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet) | `benchmarks/locomo_engine_maxsim.py` | Yes — **96.8% @150 (MiniLM) / 97.0% (mpnet)**, @5=72.6%/75.1% tight-k | **None published** |
 | LongMemEval-S session@8 | `paper-2026-07-09.json` | Colab + local scripts | Yes — **97.6%** | **None published** |
 | LongMemEval E2E QA | `e2e-cert-paper-v2-2026-07-07.json` | `benchmarks/e2e_certify.sh` (OpenAI) | Yes — **97.4%** | **None** — run locked |
 | BEIR SciFact nDCG@10 / R@10 | `paper-2026-07-09.json` | `benchmarks/beir_bench.py` | Yes — **0.646 / 0.792** (Fabric on) | **None published** |
@@ -112,7 +114,7 @@ git checkout v0.5.6   # or tag matching the frozen cert you compare against
 make reproduce-locomo
 ```
 
-This downloads LoCoMo data, runs CHORUS + Fabric eval (`FLUCTLIGHT_FABRIC=1`), and compares against the frozen cert (`locomo-chorus-fabric-2026-07-09.json`). Expected: **1970/1982** evidence hits at k=150.
+This downloads LoCoMo data, runs the honest self-contained recipe (`benchmarks/locomo_lateinteraction.py` — token-population MaxSim ⊕ BM25, no neighbor expansion), and compares raw recall@150 against `locomo-lateinteraction-2026-07-13.json`. The native-engine invented-stack headline (**96.8% @150 MiniLM / 97.0% mpnet, no expansion**) reproduces via `benchmarks/locomo_engine_maxsim.py` after a source build, comparing against `locomo-invented-stack-engine-2026-07-13.json` / `locomo-mpnet-engine-2026-07-15.json`. The old ±3-expansion 99.0% is deprecated (a trivial BM25 baseline also scored ~99% under it).
 
 Options:
 

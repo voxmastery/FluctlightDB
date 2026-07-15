@@ -56,7 +56,7 @@ Co-maintainers get: triage, merge rights, PyPI trusted publishing (by invitation
 
 | Claim type | Verified by maintainer only? | Independent third party? |
 |------------|------------------------------|---------------------------|
-| LoCoMo 99.0% evidence recall | Yes (frozen cert JSON) | **No published independent reproduction yet** |
+| LoCoMo 96.8% @150 (MiniLM) / 97.0% (mpnet) evidence recall, honest raw no expansion (@5=72.6%/75.1% tight-k); old 99.0% was ±3-expansion inflation, deprecated | Yes (frozen cert JSON) | **No published independent reproduction yet** |
 | LongMemEval session@8 97.6% | Yes | **No published independent reproduction yet** |
 | LongMemEval E2E 97.4% | Yes (locked run, OpenAI cost) | **No** — locked artifact only |
 | BEIR SciFact nDCG@10 | Yes | **No published independent reproduction yet** |
