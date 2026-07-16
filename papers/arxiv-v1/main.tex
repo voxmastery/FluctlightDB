@@ -97,6 +97,17 @@ comes before neuroscience-flavored rerank modules.
   \item \textbf{An embedded engine.} FluctlightDB ships as a Rust library (like SQLite:
   no server process) exposing \texttt{experience()} / \texttt{activate()} /
   \texttt{checkpoint()}---one durable brain directory per agent.
+  \item \textbf{A first-principles late-interaction retrieval stack.} On the CHORUS
+  lane (Section~\ref{sec:maxsim}), retrieval matches the query's \emph{token
+  population} against stored per-token vectors---salience-gated MaxSim, which
+  recovers the discriminative signal mean-pooling discards---fuses a
+  conjunctive-surprisal lexical channel (replacing Okapi BM25) by
+  reliability-weighted evidence integration (replacing reciprocal-rank fusion),
+  over episodically context- and date-bound memories. Each component is derived
+  from an information-theoretic / neuro-inspired first principle and validated by
+  ablation; the path is embedder-agnostic (MiniLM-384 or mpnet-768 with no engine
+  change), and lifts LoCoMo end-to-end QA from 77.5\% to 85\% once turns carry
+  their session dates.
   \item \textbf{Evidence.} Typed by metric: \textbf{96.8\%} LoCoMo evidence
   \emph{retrieval} (native-Rust CHORUS stack, MiniLM-384, $k{=}150$, raw / no expansion;
   \textbf{97.0\%} mpnet-768; Table~\ref{tab:locomo-k}) vs.\ $\approx$\textbf{85\%} LoCoMo end-to-end
@@ -214,8 +225,11 @@ BM25 lexical seeds and HNSW semantic neighbors form a candidate set (default cap
 128--512). The engine spreads activation through the memory graph (up to four hops in
 full mode), fuses lexical, semantic, graph, and provenance scores, and returns ranked
 engrams. Vector-fast mode (\texttt{FLUCTLIGHT\_VECTOR\_FAST=1}) skips graph spread for
-Chroma-class IR latency. Optional Recall Fabric rerank (Appendix~\ref{app:fabric})
-applies on the CHORUS lane after shortlisting when \texttt{FLUCTLIGHT\_FABRIC=1}.
+Chroma-class IR latency. For evidence retrieval the CHORUS lane uses the
+late-interaction stack of Section~\ref{sec:maxsim} (token-population MaxSim
+$\oplus$ conjunctive surprisal, evidence-integration fusion) rather than
+mean-pool cosine; optional Recall Fabric rerank (Appendix~\ref{app:fabric})
+applies after shortlisting when \texttt{FLUCTLIGHT\_FABRIC=1}.
 
 \begin{lstlisting}[caption={Read path (\texttt{activate}).},label={alg:read}]
 function activate(cue, cue_vector, top_k):
@@ -232,6 +246,44 @@ function activate(cue, cue_vector, top_k):
 Per-query cost is $O(|C| \log |C|)$ over candidate set $|C|$, plus $O(h \cdot |E|)$
 graph spread for hop depth~$h$ and frontier~$|E|$; hybrid seeding is sublinear in~$n$
 via FTS5 and HNSW rather than full-table scan.
+
+\subsection{Late-interaction retrieval stack}
+\label{sec:maxsim}
+The CHORUS lane's evidence retrieval (\texttt{chorus\_imprint\_maxsim} /
+\texttt{chorus\_recall\_maxsim}) is a first-principles stack in which every
+component replaces a standard IR heuristic with a mechanism derived from an
+information-theoretic or neuro-inspired argument, each validated by ablation. The
+path is \emph{embedder-agnostic}: it consumes caller-supplied per-token vectors,
+so swapping MiniLM-384 for mpnet-768 requires no engine change.
+
+\paragraph{Token-population late interaction (salience-gated MaxSim).} A
+mean-pooled sentence vector collapses a transformer's per-token contextual
+population code into one centroid, discarding most discriminative signal. We
+instead store the per-token \texttt{last\_hidden\_state} vectors (half-precision,
+capped per memory) and score with late interaction,
+$\mathrm{score}(q,d)=\sum_{i} w_i \max_{j} \cos(q_i, d_j)$, where each query token
+$q_i$ is weighted by $w_i$, its divergence from the query centroid---a
+predictive-coding salience gate that suppresses generic tokens (\texttt{[CLS]},
+function words). This is more information from the same encoder, not a re-embedding.
+
+\paragraph{Conjunctive surprisal (replaces BM25).} The lexical channel scores
+information content with a saturating neural response,
+$\sum_t {-}\!\log p(t)\,(1-e^{-\mathrm{tf}/\tau})$ (Weber--Fechner), and adds a
+proximity-bound bonus when rare query terms \emph{co-occur} in a memory
+(conjunctive binding). It carries no ad-hoc $k_1$/$b$ constants and matches or
+beats Okapi BM25 in ablation.
+
+\paragraph{Evidence-integration fusion (replaces RRF).} Channels are combined by
+$z$-scoring each over the candidate set and taking a reliability-weighted sum
+(Ernst--Banks optimal cue combination), preserving score magnitude that
+reciprocal-rank fusion discards---the single largest tight-$k$ gain in ablation.
+
+\paragraph{Episodic binding and temporal anchoring.} Each turn is encoded with a
+$\pm2$ session-neighbor context window (encoding-specificity), and, for temporal
+queries, prefixed with its session date. The latter is a context-assembly fix,
+not a retrieval one: retrieved turns say ``last month,'' but the absolute date
+lives in session metadata; stamping it lifts LoCoMo end-to-end QA from 77.5\% to
+85\% with retrieval unchanged.
 
 \subsection{Two explicit modes}
 \texttt{connect()} is the full episodic engine (separation, graph, provenance) for
