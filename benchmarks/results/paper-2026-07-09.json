@@ -37,13 +37,22 @@
     "lane": "chorus_grg",
     "rag_mode": "all",
     "embedder": "all-MiniLM-L6-v2 ONNX CPU",
-    "mean_evidence_recall": 0.99,
+    "mean_evidence_recall": 0.968,
     "evidence_all_in_context": 0.983,
-    "evidence_hits": "1970/1982",
+    "evidence_hits": "2627/2823",
     "wall_s_warm": 443.1,
     "wall_s_cold": 443.1,
     "memories_ingested": 8422,
-    "frozen_source": "locomo-chorus-fabric-2026-07-09.json"
+    "frozen_source": "locomo-invented-stack-engine-2026-07-13.json (MiniLM) / locomo-mpnet-engine-2026-07-15.json (mpnet)",
+    "mean_evidence_recall_mpnet": 0.97,
+    "scoring": "raw evidence recall @150, NO neighbor expansion (deprecated +/-3 99.0% removed)",
+    "recall_at_k": {
+      "5": 72.6,
+      "10": 80.0,
+      "20": 85.6,
+      "50": 91.8,
+      "150": 96.8
+    }
   },
   "famb": {
     "agent_macro": 1.0,
