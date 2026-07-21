@@ -30,18 +30,26 @@ impl FluctlightBrain {
         } else {
             self.muon.imprint(session_id, date, body, user_keys);
         }
+        // Count the imprint as a write so it participates in normal checkpointing. Without this
+        // the lane is only ever mutated in memory: it is never WAL-logged and never marks the
+        // brain dirty, so persisting the lane in the manifest alone still loses every imprint on
+        // restart. Errors are swallowed deliberately — a checkpoint failure must not make an
+        // imprint look like it failed, and the next checkpoint will retry.
+        let _ = self.maybe_checkpoint();
     }
 
     pub fn muon_imprint_batch(&mut self, sessions: &[MuonImprintInput]) -> usize {
         if !muon_enabled() {
             return 0;
         }
-        if tau_enabled() {
+        let n = if tau_enabled() {
             let (n, _) = self.tau.imprint_batch(sessions);
             n
         } else {
             self.muon.imprint_batch(sessions)
-        }
+        };
+        let _ = self.maybe_checkpoint();
+        n
     }
 
     /// Penetrative recall — Tau episodic fission when `FLUCTLIGHT_TAU=1`, else session Muon hits.
