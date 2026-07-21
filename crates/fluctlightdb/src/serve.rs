@@ -1245,6 +1245,75 @@ fn dispatch(
                 Ok(serde_json::json!({"ok": true, "engram_id": eid.to_string()}))
             })
         }
+        // ── CHORUS lane ──────────────────────────────────────────────────────────────
+        // The MaxSim⊕BM25 late-interaction stack was reachable only through the native/SDK
+        // API, which is unusable while `serve` holds the exclusive brain lock — so any
+        // client talking HTTP could not use it at all. These endpoints expose it.
+        "/api/v1/chorus/imprint" | "/chorus/imprint" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            if !crate::chorus_runtime::chorus_enabled() {
+                return Err(Error::Store(
+                    "FLUCTLIGHT_CHORUS=1 required for CHORUS imprint".into(),
+                ));
+            }
+            let content = api_body
+                .content
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing content".into()))?;
+            let memory_id = api_body
+                .doc_id
+                .as_deref()
+                .or(api_body.key.as_deref())
+                .ok_or_else(|| Error::Store("missing doc_id (memory_id)".into()))?;
+            let input = crate::chorus::ChorusImprintInput {
+                memory_id: memory_id.to_string(),
+                content: content.to_string(),
+                context: api_body.context.clone().unwrap_or_default(),
+                semantic_vector: api_body.semantic_vector.clone(),
+                token_vectors: None,
+                salience: api_body.salience.unwrap_or(0.7),
+                sheath: Default::default(),
+            };
+            server.with_brain_write(tenant_id, |b| {
+                let ok = b.chorus_imprint(&input);
+                Ok(serde_json::json!({
+                    "ok": ok,
+                    "memory_id": memory_id,
+                    "chorus_len": b.chorus_len(),
+                }))
+            })
+        }
+        "/api/v1/chorus/recall" | "/chorus/recall" => {
+            require_role(auth, Role::Read)?;
+            if !crate::chorus_runtime::chorus_enabled() {
+                return Err(Error::Store(
+                    "FLUCTLIGHT_CHORUS=1 required for CHORUS recall".into(),
+                ));
+            }
+            let cue = api_body
+                .cue
+                .as_deref()
+                .or(api_body.content.as_deref())
+                .ok_or_else(|| Error::Store("missing cue".into()))?;
+            let k = api_body.limit.unwrap_or(8).min(64);
+            let cue_vector = api_body.semantic_vector.as_deref();
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "hits": b.chorus_recall(cue, k, cue_vector),
+                    "chorus_len": b.chorus_len(),
+                }))
+            })
+        }
+        "/api/v1/chorus/stats" | "/chorus/stats" => {
+            require_role(auth, Role::Read)?;
+            server.with_brain_read(tenant_id, |b| {
+                Ok(serde_json::json!({
+                    "enabled": crate::chorus_runtime::chorus_enabled(),
+                    "chorus_len": b.chorus_len(),
+                }))
+            })
+        }
         "/api/v1/export-graph-lite" | "/export-graph-lite" => {
             require_role(auth, Role::Read)?;
             server.with_brain_read(tenant_id, |b| {
