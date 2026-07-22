@@ -1,18 +1,40 @@
-//! API key authentication and RBAC for serve.
+//! API key authentication and RBAC for serve (CAB capability mapping).
 
 use std::collections::HashMap;
 use std::env;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Role {
     Read,
     Write,
+    /// Govern bound brain only (compact / death / forget / mark-core).
     Admin,
+    /// Control-plane only (provision / revoke / list). Does not imply brain write.
+    Platform,
 }
 
 impl Role {
+    /// Capability check: Platform only satisfies Platform; others use classic ladder.
     pub fn allows(&self, required: Role) -> bool {
-        *self >= required
+        match (self, required) {
+            (Role::Platform, Role::Platform) => true,
+            (Role::Platform, _) => false,
+            (_, Role::Platform) => false,
+            (Role::Admin, _) => true,
+            (Role::Write, Role::Write | Role::Read) => true,
+            (Role::Read, Role::Read) => true,
+            _ => false,
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Role> {
+        match name {
+            "read" => Some(Role::Read),
+            "write" => Some(Role::Write),
+            "admin" => Some(Role::Admin),
+            "platform" => Some(Role::Platform),
+            _ => None,
+        }
     }
 }
 
@@ -46,11 +68,12 @@ impl AuthConfig {
                 if pieces.len() >= 3 {
                     let tenant = pieces[0].to_string();
                     let key = pieces[1].to_string();
-                    let role = match pieces[2] {
-                        "read" => Role::Read,
-                        "write" => Role::Write,
-                        "admin" => Role::Admin,
-                        _ => Role::Write,
+                    let Some(role) = Role::parse(pieces[2]) else {
+                        eprintln!(
+                            "fluctlight auth: ignoring API key with unknown role {:?}",
+                            pieces[2]
+                        );
+                        continue;
                     };
                     cfg.keys.insert(key, (tenant, role));
                 }
@@ -67,9 +90,11 @@ impl AuthConfig {
         bearer: Option<&str>,
         tenant_hint: Option<&str>,
     ) -> Option<AuthContext> {
+        // Open mode: Admin on BrainId "default" only (CAB realm). Ignore attacker hints.
         if self.keys.is_empty() && !self.require_auth {
+            let _ = tenant_hint;
             return Some(AuthContext {
-                tenant_id: tenant_hint.unwrap_or("default").to_string(),
+                tenant_id: "default".to_string(),
                 role: Role::Admin,
             });
         }
@@ -110,6 +135,7 @@ pub fn role_name(role: Role) -> &'static str {
         Role::Read => "read",
         Role::Write => "write",
         Role::Admin => "admin",
+        Role::Platform => "platform",
     }
 }
 
@@ -117,13 +143,40 @@ pub fn format_key_entry(tenant: &str, key: &str, role: Role) -> String {
     format!("{}:{}:{}", tenant, key, role_name(role))
 }
 
+pub fn hash_api_key(secret: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(secret.as_bytes());
+    let mut out = String::with_capacity(64);
+    for b in digest {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn admin_allows_write() {
+    fn admin_allows_write_platform_does_not() {
         assert!(Role::Admin.allows(Role::Write));
         assert!(!Role::Read.allows(Role::Write));
+        assert!(Role::Platform.allows(Role::Platform));
+        assert!(!Role::Platform.allows(Role::Write));
+        assert!(!Role::Admin.allows(Role::Platform));
+    }
+
+    #[test]
+    fn unknown_role_parse_rejects() {
+        assert!(Role::parse("superuser").is_none());
+        assert_eq!(Role::parse("admin"), Some(Role::Admin));
+    }
+
+    #[test]
+    fn open_mode_pins_default_ignores_hint() {
+        let cfg = AuthConfig::default();
+        let ctx = cfg.authorize(None, Some("../PWNED")).unwrap();
+        assert_eq!(ctx.tenant_id, "default");
+        assert_eq!(ctx.role, Role::Admin);
     }
 }
