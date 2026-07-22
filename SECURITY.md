@@ -54,12 +54,28 @@ Include:
 
 We aim to acknowledge reports within 72 hours and will coordinate disclosure once a fix is available.
 
+## Capability-Addressed Brains (CAB) — serve auth model (July 2026)
+
+See [`docs/superpowers/specs/2026-07-20-cab-security-design.md`](docs/superpowers/specs/2026-07-20-cab-security-design.md).
+
+| Rule | Behavior |
+|------|----------|
+| Tenant locus | Disk path = `tenants/<sha256(brain_id)[:32]>/…` (legacy safe ids dual-resolved) |
+| Roles | `read` / `write` / `admin` (govern **bound** brain only) / `platform` (provision/revoke/list) |
+| Open mode | No keys → Admin on BrainId `default` only (ignores attacker `tenant_id`) |
+| Unknown roles | Rejected (never fail-open to Write/Admin) |
+| API secrets | Stored hashed in `auth.db`; plaintext shown once at issue |
+| Non-localhost bind | Requires `FLUCTLIGHT_API_KEYS` |
+
+Adversarial suite: `cargo test -p fluctlightdb --test zz_security_review -- --test-threads=1`
+
 ## Secrets and deployment hygiene
 
 - Never commit API keys, brain snapshots, or `auth.env` files.
 - Use `/etc/fluctlight/auth.env` (mode `600`) or environment variables in production.
 - Rotate credentials if they were ever exposed in logs, chat, or version control.
 - The example files `systemd/auth.env.example` and `systemd/environment.example` contain placeholders only.
+- Control-plane HTTP: `FLUCTLIGHT_API_KEYS=platform:<secret>:platform` (not `admin`).
 
 ## Scope
 

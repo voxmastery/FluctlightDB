@@ -1467,14 +1467,14 @@ fn dispatch(
             Ok(serde_json::to_value(rep).unwrap())
         }
         "/api/v1/admin/tenants" | "/admin/tenants" => {
-            require_role(auth, Role::Admin)?;
+            require_role(auth, Role::Platform)?;
             let store =
                 crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
             let tenants = store.list_tenants()?;
             Ok(serde_json::json!({"tenants": tenants}))
         }
         "/api/v1/admin/tenant/provision" | "/admin/tenant/provision" => {
-            require_role(auth, Role::Admin)?;
+            require_role(auth, Role::Platform)?;
             let tid = api_body
                 .tenant_id
                 .clone()
@@ -1488,7 +1488,7 @@ fn dispatch(
             Ok(serde_json::to_value(key).unwrap())
         }
         "/api/v1/admin/tenant/revoke" | "/admin/tenant/revoke" => {
-            require_role(auth, Role::Admin)?;
+            require_role(auth, Role::Platform)?;
             let kid = api_body
                 .kid
                 .clone()
@@ -1499,7 +1499,7 @@ fn dispatch(
             Ok(serde_json::json!({"revoked": removed}))
         }
         "/api/v1/admin/metrics/tenants" | "/admin/metrics/tenants" => {
-            require_role(auth, Role::Admin)?;
+            require_role(auth, Role::Platform)?;
             let snap = server.metrics().tenant_snapshot();
             Ok(serde_json::json!({
                 "tenants": serde_json::to_value(&snap).unwrap_or(Value::Null)
@@ -1622,9 +1622,12 @@ fn enforce_bind_auth(addr: &str, auth: &AuthConfig) -> Result<()> {
 }
 
 fn enforce_tenant_access(auth: &AuthContext, tenant_id: &str) -> Result<()> {
-    if auth.role == Role::Admin {
+    // CAB: Platform may name any BrainId on control-plane routes; brain writes still
+    // require encode/govern via require_role (Platform does not allow Write/Admin).
+    if auth.role == Role::Platform {
         return Ok(());
     }
+    // Admin/Write/Read: always bound to key tenant (no ambient cross-tenant Admin).
     if auth.tenant_id != tenant_id {
         return Err(Error::Store("forbidden tenant".into()));
     }
@@ -1666,32 +1669,46 @@ fn rate_limit_allow(tenant_id: &str) -> bool {
     crate::rate_limit::allow(tenant_id)
 }
 
+fn header_name_eq<'a>(line: &'a str, name: &str) -> Option<&'a str> {
+    let (head, rest) = line.split_once(':')?;
+    if head.eq_ignore_ascii_case(name) {
+        Some(rest.trim())
+    } else {
+        None
+    }
+}
+
 fn read_http_request(stream: &mut TcpStream) -> Result<String> {
-    let mut buf = [0u8; 8192];
-    let n = stream.read(&mut buf).map_err(Error::Io)?;
+    // Accumulate raw bytes, then decode once (avoids UTF-8 split corruption).
+    let mut buf = Vec::with_capacity(8192);
+    let mut chunk = [0u8; 8192];
+    let n = stream.read(&mut chunk).map_err(Error::Io)?;
     if n == 0 {
         return Err(Error::Store("empty request".into()));
     }
-    let mut req = String::from_utf8_lossy(&buf[..n]).into_owned();
-    let content_length = parse_content_length(&req);
-    let header_end = req.find("\r\n\r\n").map(|i| i + 4).unwrap_or(req.len());
-    let mut body_len = req.len().saturating_sub(header_end);
-    while body_len < content_length && req.len() < MAX_BODY_BYTES + 8192 {
-        let mut extra = [0u8; 4096];
-        let got = stream.read(&mut extra).map_err(Error::Io)?;
+    buf.extend_from_slice(&chunk[..n]);
+    let header_end = buf
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .map(|i| i + 4)
+        .unwrap_or(buf.len());
+    let header_str = String::from_utf8_lossy(&buf[..header_end.min(buf.len())]);
+    let content_length = parse_content_length(&header_str);
+    while buf.len().saturating_sub(header_end) < content_length && buf.len() < MAX_BODY_BYTES + 8192
+    {
+        let got = stream.read(&mut chunk).map_err(Error::Io)?;
         if got == 0 {
             break;
         }
-        req.push_str(&String::from_utf8_lossy(&extra[..got]));
-        body_len += got;
+        buf.extend_from_slice(&chunk[..got]);
     }
-    Ok(req)
+    String::from_utf8(buf).map_err(|e| Error::Store(format!("invalid utf-8 request: {e}")))
 }
 
 fn parse_content_length(raw: &str) -> usize {
     for line in raw.lines() {
-        if let Some(rest) = line.strip_prefix("Content-Length:") {
-            return rest.trim().parse().unwrap_or(0);
+        if let Some(rest) = header_name_eq(line, "Content-Length") {
+            return rest.parse().unwrap_or(0);
         }
         if line.is_empty() {
             break;
@@ -1719,16 +1736,21 @@ fn parse_http(raw: &str) -> Result<HttpRequest<'_>> {
         if line.is_empty() {
             break;
         }
-        if let Some(rest) = line.strip_prefix("Content-Length:") {
-            content_length = rest.trim().parse().unwrap_or(0);
+        if let Some(rest) = header_name_eq(line, "Content-Length") {
+            content_length = rest.parse().unwrap_or(0);
         }
-        if let Some(rest) = line.strip_prefix("Authorization:") {
-            auth = rest
-                .trim()
-                .strip_prefix("Bearer ")
-                .or_else(|| rest.trim().strip_prefix("bearer "));
+        if let Some(rest) = header_name_eq(line, "Authorization") {
+            let rest = rest.trim();
+            auth = if let Some(tok) = rest.strip_prefix("Bearer ") {
+                Some(tok.trim())
+            } else if rest.len() >= 7 && rest.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("bearer "))
+            {
+                Some(rest[7..].trim())
+            } else {
+                None
+            };
         }
-        if let Some(rest) = line.strip_prefix("X-Idempotency-Key:") {
+        if let Some(rest) = header_name_eq(line, "X-Idempotency-Key") {
             idempotency = Some(rest.trim());
         }
     }
@@ -1755,8 +1777,7 @@ fn request_keep_alive(raw: &str) -> bool {
         http11 = line.contains("HTTP/1.1");
     }
     for line in raw.lines() {
-        if let Some(v) = line.strip_prefix("Connection:") {
-            let v = v.trim();
+        if let Some(v) = header_name_eq(line, "Connection") {
             if v.eq_ignore_ascii_case("close") {
                 return false;
             }
