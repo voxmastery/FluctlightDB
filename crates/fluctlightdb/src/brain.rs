@@ -616,6 +616,25 @@ impl FluctlightBrain {
         self.activate_with_semantic(cue, None)
     }
 
+    /// Opt-in schema lane: episodic `activate` unchanged + matching active schemas.
+    /// Does not alter default `activate()` ranking.
+    pub fn activate_with_schemas(&self, cue: &str) -> crate::schema::SchemaAwareActivation {
+        let episodic = self.activate(cue);
+        let cue_l = cue.to_lowercase();
+        let cue_toks: Vec<&str> = cue_l.split_whitespace().collect();
+        let schemas: Vec<_> = self
+            .cortex
+            .schemas
+            .active()
+            .filter(|s| {
+                let st = s.statement.to_lowercase();
+                cue_toks.iter().any(|t| st.contains(t)) || st.split_whitespace().any(|t| cue_l.contains(t))
+            })
+            .cloned()
+            .collect();
+        crate::schema::SchemaAwareActivation { episodic, schemas }
+    }
+
     pub fn activate_with_semantic(
         &self,
         cue: &str,

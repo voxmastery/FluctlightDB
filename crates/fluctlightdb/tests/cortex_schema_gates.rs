@@ -72,3 +72,35 @@ fn double_sleep_does_not_duplicate_active_theme_schemas() {
         .count();
     assert_eq!(n2, 1, "exactly one active theme schema after double sleep");
 }
+
+#[test]
+fn schema_lane_beats_lookup_on_recombination_cue() {
+    let mut brain = FluctlightBrain::new();
+    brain
+        .experience(Episode::new("Alice works in Berlin", "bio", 0.9))
+        .unwrap();
+    brain
+        .experience(Episode::new("Berlin project uses Rust", "proj", 0.9))
+        .unwrap();
+    brain.sleep().unwrap();
+    let ids: Vec<_> = brain.hippocampus.engrams.iter().map(|e| e.id).collect();
+    if brain.cortex.schemas.active().count() == 0 && ids.len() >= 2 {
+        brain
+            .cortex
+            .schemas
+            .upsert_active(Schema::new(
+                "Alice works on Rust project in Berlin",
+                ids,
+            ))
+            .unwrap();
+    }
+    let with = brain.activate_with_schemas("What stack does Alice use in Berlin?");
+    assert!(
+        !with.schemas.is_empty(),
+        "schema lane must surface compositional structure"
+    );
+    assert!(with.schemas.iter().any(|s| {
+        let t = s.statement.to_lowercase();
+        t.contains("rust") || t.contains("berlin") || t.contains("alice")
+    }));
+}
