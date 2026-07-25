@@ -61,6 +61,13 @@ pub struct SchemaStore {
     pub schemas: Vec<Schema>,
 }
 
+/// Opt-in recall: episodic activation plus matching neocortical schemas.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SchemaAwareActivation {
+    pub episodic: crate::types::ActivationResult,
+    pub schemas: Vec<Schema>,
+}
+
 impl SchemaStore {
     pub fn get(&self, id: Uuid) -> Option<&Schema> {
         self.schemas.iter().find(|s| s.id == id)
