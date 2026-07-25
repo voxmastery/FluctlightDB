@@ -18,6 +18,9 @@ pub struct Cortex {
     /// Durable neocortical schemas (CortexSchema / CLS slow half).
     #[serde(default)]
     pub schemas: crate::schema::SchemaStore,
+    /// Wake eligibility tags for CaptureGate (persisted with cortex).
+    #[serde(default)]
+    pub eligibility: crate::eligibility::EligibilityStore,
 }
 
 impl Cortex {

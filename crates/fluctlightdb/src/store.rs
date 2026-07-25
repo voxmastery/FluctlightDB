@@ -556,6 +556,7 @@ mod legacy_v2 {
                 semantic_centroid: Vec::new(),
                 semantic_strength: 0.0,
                 schemas: crate::schema::SchemaStore::default(),
+                eligibility: crate::eligibility::EligibilityStore::default(),
             };
             let autonomic = AutonomicState {
                 config: AutonomicConfig {
