@@ -3,6 +3,7 @@ use std::io::Write;
 use std::path::Path;
 use std::time::SystemTime;
 
+use crate::brain::BrainStoreLock;
 use crate::brain::FluctlightBrain;
 use crate::error::{Error, Result};
 use crate::semantic::SemanticField;
@@ -32,13 +33,22 @@ fn crc32_ieee(data: &[u8]) -> u32 {
 }
 
 pub fn snapshot_mtime(path: &Path) -> Option<SystemTime> {
-    fs::metadata(storage::snapshot_path(path))
+    let publication = if path.join("CURRENT").exists() {
+        path.join("CURRENT")
+    } else {
+        storage::snapshot_path(path)
+    };
+    fs::metadata(publication)
         .ok()
         .and_then(|m| m.modified().ok())
 }
 
 pub fn save(brain: &FluctlightBrain, path: &Path) -> Result<()> {
     let _lock = StoreLock::acquire(path).map_err(Error::Io)?;
+    save_locked(brain, path)
+}
+
+pub(crate) fn save_locked(brain: &FluctlightBrain, path: &Path) -> Result<()> {
     save_atomic(brain, path)?;
     wal::truncate(path)?;
     wal::flush(path)?;
@@ -133,7 +143,7 @@ fn save_v3_atomic(brain: &FluctlightBrain, path: &Path) -> Result<()> {
     out.extend_from_slice(&encoded);
     let tmp = path.with_extension("flct.tmp");
     {
-        let mut file = fs::File::create(&tmp)?;
+        let mut file = crate::segment::create_private_file(&tmp)?;
         file.write_all(&out)?;
         file.sync_all()?;
     }
@@ -147,6 +157,7 @@ fn save_v3_atomic(brain: &FluctlightBrain, path: &Path) -> Result<()> {
         return Err(Error::Store("pre-commit snapshot verify failed".into()));
     }
     fs::rename(tmp, path)?;
+    crate::segment::sync_parent_dir(path)?;
     Ok(())
 }
 
@@ -221,7 +232,7 @@ fn locate_v3_payload(raw: &[u8]) -> Result<&[u8]> {
 
 fn load_snapshot(path: &Path) -> Result<FluctlightBrain> {
     if storage::is_v4_path(path) {
-        if crate::manifest::manifest_path(path).exists() {
+        if crate::manifest::checkpoint_exists(path) {
             return crate::manifest::load_v4_dir(path);
         }
         return Ok(FluctlightBrain::new());
@@ -347,14 +358,18 @@ fn load_inner(path: &Path, persist_wal_replay: bool) -> Result<FluctlightBrain> 
 }
 
 pub fn load(path: &Path) -> Result<FluctlightBrain> {
-    let _lock = StoreLock::acquire(path).map_err(Error::Io)?;
-    load_inner(path, true)
+    let lock = StoreLock::acquire(path).map_err(Error::Io)?;
+    let mut brain = load_inner(path, true)?;
+    brain.attach_store_lock(BrainStoreLock::Exclusive(lock));
+    Ok(brain)
 }
 
 /// Read-only open — shared flock; replays WAL in memory but does not checkpoint.
 pub fn load_readonly(path: &Path) -> Result<FluctlightBrain> {
-    let _lock = SharedStoreLock::acquire(path).map_err(Error::Io)?;
-    load_inner(path, false)
+    let lock = SharedStoreLock::acquire(path).map_err(Error::Io)?;
+    let mut brain = load_inner(path, false)?;
+    brain.attach_store_lock(BrainStoreLock::Shared(lock));
+    Ok(brain)
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -540,6 +555,7 @@ mod legacy_v2 {
                 token_strength: self.cortex.token_strength,
                 semantic_centroid: Vec::new(),
                 semantic_strength: 0.0,
+                schemas: crate::schema::SchemaStore::default(),
             };
             let autonomic = AutonomicState {
                 config: AutonomicConfig {
@@ -655,11 +671,61 @@ mod tests {
         assert!(!report.ok);
     }
 
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn open_holds_exclusive_store_lock_until_brain_drop() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("locked.flct");
+        let brain = FluctlightBrain::open(&path).unwrap();
+        assert!(StoreLock::try_acquire(&path).is_err());
+        drop(brain);
+        assert!(StoreLock::try_acquire(&path).is_ok());
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn readonly_open_holds_shared_lock_and_rejects_checkpoint() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("readonly.flct");
+        let writer = FluctlightBrain::open(&path).unwrap();
+        writer.checkpoint().unwrap();
+        drop(writer);
+
+        let reader = FluctlightBrain::open_readonly(&path).unwrap();
+        assert!(StoreLock::try_acquire(&path).is_err());
+        let err = reader.checkpoint().unwrap_err();
+        assert!(err.to_string().contains("read-only"), "{err}");
+        drop(reader);
+        assert!(StoreLock::try_acquire(&path).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn v3_snapshot_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("private.flct");
+        let brain = FluctlightBrain::open(&path).unwrap();
+        brain.checkpoint().unwrap();
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+    }
+
+    #[test]
+    fn v4_snapshot_mtime_tracks_current_publication() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("brain");
+        crate::manifest::save_v4_dir(&FluctlightBrain::new(), &path).unwrap();
+        assert!(snapshot_mtime(&path).is_some());
+    }
+
     /// Miri-safe: header magic bytes only (no sqlite open).
     #[test]
     fn miri_store_v31_magic_prefix() {
         const MAGIC: &[u8] = b"FLCT";
-        let mut buf = vec![0u8; 32];
+        let mut buf = [0u8; 32];
         buf[..4].copy_from_slice(MAGIC);
         assert_eq!(&buf[..4], MAGIC);
     }
