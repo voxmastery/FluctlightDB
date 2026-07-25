@@ -40,6 +40,14 @@ hygiene, and agent-prompt token estimates. Agent-lane only:
 into `cortex.schemas`. Default `activate()` unchanged. Opt-in: `activate_with_schemas(cue)`.
 Prove: `cargo test -p fluctlightdb --test cortex_schema_gates --test activate_nonregression`.
 
+**CaptureGate (Phase B — gates green):** eligibility tags on experience; sleep captures only
+tagged engrams with supersede retention (no episode wipe). Prove:
+`cargo test -p fluctlightdb --test capture_gate_gates`.
+
+**Aeterna (Phase C — gates green):** `session_boot_context` / `activate_for_agent_prompt`
+lossless id+gist index + `expand_engrams`. Somnus seals on tick **or** WAL pressure.
+Prove: `cargo test -p fluctlightdb --test aeterna_gates --test somnus_durability`.
+
 **Ops brain path:** backup/replicate/drill scripts resolve
 `serverbrain-v2` before `default` when env is unset (`scripts/resolve-brain.sh`).
 
