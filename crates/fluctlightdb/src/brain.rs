@@ -31,12 +31,13 @@ use crate::semantic::SemanticField;
 use crate::sleep::{separate_and_encode, sleep_cycle};
 use crate::sleep_trigger::SleepTrigger;
 use crate::store;
+use crate::store_lock::{SharedStoreLock, StoreLock};
 use crate::types::Region::HippocampusCa1;
 use crate::types::{
     ActivationResult, DevelopmentViz, Episode, ExperienceReport, ProvenanceKind, SleepReport,
     VizExport,
 };
-use crate::wal::{self, WalEntry};
+use crate::wal::{self, WalEntry, WalIdentity};
 
 const MAX_RECENT_SEPARATIONS: usize = 12;
 const COMPACT_EVERY_N_SLEEPS: u64 = 48;
@@ -66,8 +67,18 @@ pub struct FluctlightBrain {
     pub recent_separations: Vec<SeparationResult>,
     #[serde(skip)]
     checkpoint_policy: CheckpointPolicy,
+    /// Runtime counter for autonomic Somnus durability seals (not semantic sleep).
+    #[serde(skip)]
+    ticks_since_systems_seal: u64,
+    /// Organ health metrics (measurement only).
+    #[serde(skip)]
+    pub(crate) homeostasis: crate::homeostasis::HomeostasisState,
     #[serde(skip)]
     store_path: Option<PathBuf>,
+    #[serde(skip)]
+    wal_identity: Option<WalIdentity>,
+    #[serde(skip)]
+    store_lock: Option<BrainStoreLock>,
     #[serde(skip)]
     recall_index: Option<RecallIndex>,
     #[serde(skip)]
@@ -96,6 +107,11 @@ pub struct FluctlightBrain {
     /// Runtime-only CHORUS phase field (θ–γ wavelet substrate). Never persisted.
     #[serde(skip)]
     pub(crate) chorus: crate::chorus::ChorusField,
+}
+
+pub(crate) enum BrainStoreLock {
+    Exclusive(StoreLock),
+    Shared(SharedStoreLock),
 }
 
 impl Default for FluctlightBrain {
@@ -132,7 +148,11 @@ impl FluctlightBrain {
             semantic: SemanticField::default(),
             recent_separations: Vec::new(),
             checkpoint_policy: CheckpointPolicy::default(),
+            ticks_since_systems_seal: 0,
+            homeostasis: crate::homeostasis::HomeostasisState::default(),
             store_path: None,
+            wal_identity: None,
+            store_lock: None,
             recall_index: None,
             activation_cache: Mutex::new(ActivationCache::new()),
             chronos: crate::chronos::Chronos::default(),
@@ -162,13 +182,38 @@ impl FluctlightBrain {
     }
 
     pub fn checkpoint(&self) -> Result<()> {
+        if self.store_is_readonly() {
+            return Err(Error::Store("cannot checkpoint a read-only brain".into()));
+        }
         if let Some(ref path) = self.store_path {
-            store::save(self, path)?;
+            store::save_locked(self, path)?;
+            if crate::somnus::somnus_enabled() {
+                let _ = crate::manifest::prune_old_generations(path, crate::somnus::somnus_keep())?;
+            }
         }
         Ok(())
     }
 
+    fn store_is_readonly(&self) -> bool {
+        match &self.store_lock {
+            Some(BrainStoreLock::Shared(lock)) => {
+                let _ = lock;
+                true
+            }
+            Some(BrainStoreLock::Exclusive(lock)) => {
+                let _ = lock;
+                false
+            }
+            None => false,
+        }
+    }
+
     pub fn maybe_checkpoint(&mut self) -> Result<()> {
+        // Somnus (default): wake activity is hippocampal WAL/trace only.
+        // Full v4 systems seals happen on sleep / explicit checkpoint().
+        if crate::somnus::somnus_enabled() {
+            return Ok(());
+        }
         self.checkpoint_policy.note_write();
         if self.checkpoint_policy.should_checkpoint() {
             self.checkpoint()?;
@@ -177,10 +222,66 @@ impl FluctlightBrain {
         Ok(())
     }
 
+    /// Systems consolidation seal — immutable generation + prune obsolete seals.
+    ///
+    /// Durability only: does not run semantic `sleep_cycle` (no synapse prune / crystallize).
+    /// Safe for benchmarks — recall ranking is unchanged by this call.
+    pub fn systems_seal(&mut self) -> Result<()> {
+        self.checkpoint()?;
+        self.checkpoint_policy.mark_checkpointed();
+        self.ticks_since_systems_seal = 0;
+        self.homeostasis.note_systems_seal();
+        Ok(())
+    }
+
+    /// Autonomic Somnus durability: seal without semantic sleep when due.
+    ///
+    /// No-op when Somnus is debug-disabled, seal interval is 0, or semantic sleep
+    /// already sealed this tick. Never mutates the recall graph.
+    fn maybe_somnus_autonomic_seal(&mut self, checkpoint: bool, already_sealed: bool) -> Result<bool> {
+        if !checkpoint || already_sealed || !crate::somnus::somnus_enabled() {
+            return Ok(false);
+        }
+        let every = crate::somnus::somnus_seal_every_ticks();
+        if every == 0 {
+            return Ok(false);
+        }
+        self.ticks_since_systems_seal = self.ticks_since_systems_seal.saturating_add(1);
+        if self.ticks_since_systems_seal < every {
+            return Ok(false);
+        }
+        self.systems_seal()?;
+        Ok(true)
+    }
+
     fn wal_append(&mut self, entry: WalEntry) -> Result<()> {
         if let Some(ref path) = self.store_path {
             self.wal_seq += 1;
-            wal::append(path, self.wal_seq, &entry)?;
+            if let Some(identity) = self.wal_identity {
+                wal::append_fenced(path, self.wal_seq, &entry, &identity)?;
+            } else {
+                wal::append(path, self.wal_seq, &entry)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_wal_identity(&mut self, identity: Option<WalIdentity>) {
+        self.wal_identity = identity;
+    }
+
+    pub fn wal_identity(&self) -> Option<WalIdentity> {
+        self.wal_identity
+    }
+
+    #[cfg(feature = "distributed")]
+    pub(crate) fn store_path(&self) -> Option<&Path> {
+        self.store_path.as_deref()
+    }
+
+    pub(crate) fn reject_distributed_mutation(&self, operation: &'static str) -> Result<()> {
+        if self.wal_identity.is_some() {
+            return Err(Error::DistributedMutationDisabled { operation });
         }
         Ok(())
     }
@@ -191,12 +292,14 @@ impl FluctlightBrain {
 
     /// Encode lived experience — DG separate + CA3 wire + store engram.
     pub fn experience(&mut self, episode: Episode) -> Result<ExperienceReport> {
+        let assigned_engram_id = Uuid::new_v4();
         if wal::wal_enabled() {
             self.wal_append(WalEntry::Experience {
                 episode: episode.clone(),
+                assigned_engram_id: Some(assigned_engram_id),
             })?;
         }
-        let report = self.experience_internal(episode, true)?;
+        let report = self.experience_internal_assigned(episode, true, Some(assigned_engram_id))?;
         self.agent_on_experience(report.engram_id);
         Ok(report)
     }
@@ -205,6 +308,15 @@ impl FluctlightBrain {
         &mut self,
         episode: Episode,
         checkpoint: bool,
+    ) -> Result<ExperienceReport> {
+        self.experience_internal_assigned(episode, checkpoint, None)
+    }
+
+    pub(crate) fn experience_internal_assigned(
+        &mut self,
+        episode: Episode,
+        checkpoint: bool,
+        assigned_engram_id: Option<Uuid>,
     ) -> Result<ExperienceReport> {
         if !self.life.alive {
             return Err(Error::LifeEnded);
@@ -233,7 +345,7 @@ impl FluctlightBrain {
             && episode.semantic_vector.is_some()
         {
             let tick = self.development.metrics.ticks;
-            let engram_id = Uuid::new_v4();
+            let engram_id = assigned_engram_id.unwrap_or_else(Uuid::new_v4);
             let rich = crate::tokenize::tokenize_rich(
                 &episode.content,
                 &episode.context,
@@ -304,7 +416,8 @@ impl FluctlightBrain {
         let expected_activation = (self.cortex.fact_boost(&episode.content)
             + self.cortex.fact_boost(&episode.context) * 0.5)
             .clamp(0.0, 1.0);
-        self.neuromodulators.prediction_error(expected_activation, salience);
+        self.neuromodulators
+            .prediction_error(expected_activation, salience);
 
         let verified = episode
             .provenance
@@ -348,6 +461,7 @@ impl FluctlightBrain {
             tick,
             self.development.stage as u8,
             salience,
+            assigned_engram_id.unwrap_or_else(Uuid::new_v4),
         );
 
         // ACh novelty/familiarity signal (Hasselmo 2006):
@@ -466,9 +580,15 @@ impl FluctlightBrain {
             sleep_report = Some(report);
             slept = true;
             let _ = before;
-        } else if checkpoint {
+        } else if checkpoint && !crate::somnus::somnus_enabled() {
+            // Legacy only: ticks must not mint systems seals under Somnus
+            // (brainstem ≠ neocortical reprint).
             self.maybe_checkpoint()?;
         }
+
+        // Somnus autonomic durability: systems seal on its own (no user toggle,
+        // no semantic sleep_cycle). Skipped when semantic sleep already sealed.
+        let _ = self.maybe_somnus_autonomic_seal(checkpoint, slept)?;
 
         Ok(TickReport {
             tick: self.autonomic.total_ticks,
@@ -516,7 +636,7 @@ impl FluctlightBrain {
         agent_id: Option<&str>,
         top_k: usize,
     ) -> ActivationResult {
-        let top_k = top_k.max(1).min(crate::index::MAX_CANDIDATE_CAP);
+        let top_k = top_k.clamp(1, crate::index::MAX_CANDIDATE_CAP);
         if let Some(cached) = self
             .activation_cache
             .lock()
@@ -590,7 +710,11 @@ impl FluctlightBrain {
                 0.07, // 7% Jaccard: loose enough for partial cues, tight enough to avoid noise
             ) {
                 let boost = gain * 0.35;
-                if let Some(r) = result.recalls.iter_mut().find(|r| r.engram_id == completed.id) {
+                if let Some(r) = result
+                    .recalls
+                    .iter_mut()
+                    .find(|r| r.engram_id == completed.id)
+                {
                     // Amplify existing result — CA3 confirms the BM25+dense hit
                     r.activation += boost;
                     r.completion_strength = (r.completion_strength + gain).min(1.0);
@@ -606,7 +730,7 @@ impl FluctlightBrain {
                             .episode
                             .provenance
                             .as_ref()
-                            .map_or(false, |p| p.verified),
+                            .is_some_and(|p| p.verified),
                         trust_note: None,
                     });
                 }
@@ -726,7 +850,12 @@ impl FluctlightBrain {
         // detect_exact_query() identifies these patterns; exact_verified_recall() scans
         // only provenance-backed engrams and injects them at activation 2.0 (guaranteed top).
         if crate::recall_router::detect_exact_query(cue) {
-            exact_verified_recall(cue, &self.hippocampus, self.life.life_id, &mut result.recalls);
+            exact_verified_recall(
+                cue,
+                &self.hippocampus,
+                self.life.life_id,
+                &mut result.recalls,
+            );
         }
 
         annotate_recall_trust(&mut result.recalls);
@@ -738,6 +867,7 @@ impl FluctlightBrain {
     }
 
     /// Batch activate — one brain lock, many cues (production agent hot path).
+    #[allow(clippy::type_complexity)]
     pub fn activate_batch(
         &self,
         items: &[(String, Option<Vec<f32>>, Option<String>)],
@@ -759,6 +889,7 @@ impl FluctlightBrain {
         source_uri: Option<String>,
         confidence: f32,
     ) -> Result<()> {
+        self.reject_distributed_mutation("FluctlightBrain::verify_fact")?;
         let engram = self
             .hippocampus
             .engrams
@@ -833,6 +964,7 @@ impl FluctlightBrain {
 
     /// Adult neurogenesis pulse — seed immature probes, prune weak separators.
     pub fn neurogenesis_pulse(&mut self) -> Result<crate::neurogenesis::NeurogenesisReport> {
+        self.reject_distributed_mutation("FluctlightBrain::neurogenesis_pulse")?;
         let tick = self.development.metrics.ticks;
         let stage = self.development.stage as u8;
         let report =
@@ -882,6 +1014,11 @@ impl FluctlightBrain {
             &self.development,
             16,
         );
+        // CortexSchema crystallize — semantic sleep only (never from Somnus systems_seal).
+        crate::schema::crystallize_from_engrams(
+            &mut self.cortex.schemas,
+            &self.hippocampus.engrams,
+        );
         self.development.on_sleep(report.pruned_synapses);
         self.prefrontal.unlocked = self.development.pfc_unlocked();
         report.stage_after = self.development.stage.as_str().to_string();
@@ -892,14 +1029,24 @@ impl FluctlightBrain {
             SleepTrigger::Manual => {}
         }
 
-        if self.development.metrics.sleep_cycles % COMPACT_EVERY_N_SLEEPS == 0 {
+        if self
+            .development
+            .metrics
+            .sleep_cycles
+            .is_multiple_of(COMPACT_EVERY_N_SLEEPS)
+        {
             let _ = self.compact_internal(false);
         }
 
         self.fabric_on_sleep();
 
         if checkpoint {
-            self.maybe_checkpoint()?;
+            // Sleep = systems consolidation: one seal + decay obsolete generations.
+            if crate::somnus::somnus_enabled() {
+                self.systems_seal()?;
+            } else {
+                self.maybe_checkpoint()?;
+            }
         }
         Ok(report)
     }
@@ -937,6 +1084,7 @@ impl FluctlightBrain {
         semantic_vector: Option<Vec<f32>>,
         supersede_similar: bool,
     ) -> Result<ReconsolidateReport> {
+        self.reject_distributed_mutation("FluctlightBrain::reconsolidate")?;
         let tick = self.development.metrics.ticks;
         let idx = self
             .hippocampus
@@ -1011,6 +1159,7 @@ impl FluctlightBrain {
     /// Executive goal bias (HTTP API — stores goal in working memory; PFC biases recall
     /// toward matching engrams once unlocked).
     pub fn api_set_goal(&mut self, goal: String) -> Result<()> {
+        self.reject_distributed_mutation("FluctlightBrain::api_set_goal")?;
         let goal = goal.chars().take(200).collect::<String>();
         self.prefrontal.add_goal(goal, self.autonomic.total_ticks);
         self.maybe_checkpoint()?;
@@ -1019,6 +1168,7 @@ impl FluctlightBrain {
 
     /// Inhibit recall phrases matching pattern (HTTP API — PFC suppresses matching engrams).
     pub fn api_inhibit(&mut self, action: String) -> Result<()> {
+        self.reject_distributed_mutation("FluctlightBrain::api_inhibit")?;
         let action = action.chars().take(200).collect::<String>();
         self.prefrontal.add_inhibit(action);
         self.maybe_checkpoint()?;
@@ -1050,6 +1200,10 @@ impl FluctlightBrain {
         self.wal_append(WalEntry::Death {
             cause: cause.to_string(),
         })?;
+        self.death_internal(cause, true)
+    }
+
+    pub(crate) fn death_internal(&mut self, cause: &str, checkpoint: bool) -> Result<Uuid> {
         self.core_memories.persist(
             format!("death:{}", self.life.death_count + 1),
             cause.to_string(),
@@ -1061,7 +1215,9 @@ impl FluctlightBrain {
         self.development.metrics.deaths_survived += 1;
         let new_life = self.life.respawn(self.development.metrics.ticks);
         self.development.on_experience(0.9);
-        let _ = self.checkpoint();
+        if checkpoint {
+            self.checkpoint()?;
+        }
         Ok(new_life)
     }
 
@@ -1226,6 +1382,10 @@ impl FluctlightBrain {
             .ok();
     }
 
+    pub(crate) fn attach_store_lock(&mut self, lock: BrainStoreLock) {
+        self.store_lock = Some(lock);
+    }
+
     fn index_engram(&mut self, engram_id: Uuid, content: &str, vector: Option<&[f32]>) {
         if self.recall_index.is_none() {
             self.recall_index = RecallIndex::rebuild(self).ok();
@@ -1243,6 +1403,14 @@ impl FluctlightBrain {
     }
 
     pub fn status(&self) -> BrainStatus {
+        let generation_dirs = self
+            .store_path
+            .as_ref()
+            .and_then(|p| crate::homeostasis::count_generation_dirs(p));
+        let keep = crate::somnus::somnus_keep();
+        let generation_count_ok = generation_dirs.map(|n| n <= keep);
+        let token_budget = crate::homeostasis::agent_prompt_token_budget();
+        let last = self.homeostasis.last_prompt_tokens_est;
         BrainStatus {
             life_id: self.life.life_id,
             stage: self.development.stage.as_str().to_string(),
@@ -1264,9 +1432,26 @@ impl FluctlightBrain {
                 self.development.stage.max_synapses(),
             ),
             wal_seq: self.wal_seq,
+            homeostasis: crate::homeostasis::HomeostasisReport {
+                somnus_enabled: crate::somnus::somnus_enabled(),
+                somnus_keep: keep,
+                somnus_seal_every_ticks: crate::somnus::somnus_seal_every_ticks(),
+                systems_seals_total: self.homeostasis.systems_seals_total,
+                ticks_since_systems_seal: self.ticks_since_systems_seal,
+                generation_dirs,
+                generation_count_ok,
+                agent_prompt_calls: self.homeostasis.agent_prompt_calls,
+                last_prompt_tokens_est: last,
+                median_prompt_tokens_est: self.homeostasis.median_prompt_tokens_est(),
+                agent_prompt_token_budget: token_budget,
+                agent_prompt_max_engrams: crate::homeostasis::agent_prompt_max_engrams(),
+                tokens_within_budget: self.homeostasis.agent_prompt_calls == 0
+                    || (last as usize) <= token_budget,
+            },
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_snapshot(
         wal_seq: u64,
         life: crate::life::LifeState,
@@ -1305,7 +1490,11 @@ impl FluctlightBrain {
             semantic,
             recent_separations,
             checkpoint_policy: CheckpointPolicy::default(),
+            ticks_since_systems_seal: 0,
+            homeostasis: crate::homeostasis::HomeostasisState::default(),
             store_path: None,
+            wal_identity: None,
+            store_lock: None,
             recall_index: None,
             activation_cache: Mutex::new(ActivationCache::new()),
             chronos: crate::chronos::Chronos::default(),
@@ -1350,7 +1539,11 @@ impl Clone for FluctlightBrain {
             semantic: self.semantic.clone(),
             recent_separations: self.recent_separations.clone(),
             checkpoint_policy: self.checkpoint_policy.clone(),
-            store_path: self.store_path.clone(),
+            ticks_since_systems_seal: self.ticks_since_systems_seal,
+            homeostasis: self.homeostasis.clone(),
+            store_path: None,
+            wal_identity: None,
+            store_lock: None,
             recall_index: None,
             activation_cache: Mutex::new(cache),
             chronos: self.chronos.clone(),
@@ -1523,7 +1716,10 @@ fn exact_verified_recall(
             }
             // Score: fraction of cue tokens found in engram content + context
             let text = format!("{} {}", e.episode.content, e.episode.context).to_lowercase();
-            let matched = cue_tokens.iter().filter(|t| text.contains(t.as_str())).count();
+            let matched = cue_tokens
+                .iter()
+                .filter(|t| text.contains(t.as_str()))
+                .count();
             if matched == 0 {
                 return None;
             }
@@ -1542,7 +1738,8 @@ fn exact_verified_recall(
 
     // Sort: tier ASC (verified first), score DESC (best match first)
     matches.sort_by(|a, b| {
-        a.2.cmp(&b.2).then_with(|| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+        a.2.cmp(&b.2)
+            .then_with(|| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
     });
 
     // Inject exact results at activation 10.0 (guaranteed to win over any associative result).
@@ -1635,6 +1832,9 @@ pub struct BrainStatus {
     pub ticks_since_sleep: u64,
     pub synapse_pressure: f32,
     pub wal_seq: u64,
+    /// Organ health (Somnus cadence, prompt token estimates). Measurement only.
+    #[serde(default)]
+    pub homeostasis: crate::homeostasis::HomeostasisReport,
 }
 
 #[cfg(test)]
