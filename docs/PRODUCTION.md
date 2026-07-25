@@ -36,6 +36,10 @@ hygiene, and agent-prompt token estimates. Agent-lane only:
 (`FLUCTLIGHT_AGENT_ACTIVATE_MAX`, `FLUCTLIGHT_AGENT_PROMPT_TOKEN_BUDGET`) without changing
 `activate()` ranking used by benchmarks.
 
+**CortexSchema (Phase A — gates green):** semantic `sleep()` crystallizes durable schemas
+into `cortex.schemas`. Default `activate()` unchanged. Opt-in: `activate_with_schemas(cue)`.
+Prove: `cargo test -p fluctlightdb --test cortex_schema_gates --test activate_nonregression`.
+
 **Ops brain path:** backup/replicate/drill scripts resolve
 `serverbrain-v2` before `default` when env is unset (`scripts/resolve-brain.sh`).
 

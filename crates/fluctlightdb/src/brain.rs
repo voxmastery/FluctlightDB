@@ -70,6 +70,9 @@ pub struct FluctlightBrain {
     /// Runtime counter for autonomic Somnus durability seals (not semantic sleep).
     #[serde(skip)]
     ticks_since_systems_seal: u64,
+    /// Wake WAL records since last systems seal (Somnus pressure trigger).
+    #[serde(skip)]
+    wal_records_since_seal: u64,
     /// Organ health metrics (measurement only).
     #[serde(skip)]
     pub(crate) homeostasis: crate::homeostasis::HomeostasisState,
@@ -149,6 +152,7 @@ impl FluctlightBrain {
             recent_separations: Vec::new(),
             checkpoint_policy: CheckpointPolicy::default(),
             ticks_since_systems_seal: 0,
+            wal_records_since_seal: 0,
             homeostasis: crate::homeostasis::HomeostasisState::default(),
             store_path: None,
             wal_identity: None,
@@ -230,24 +234,25 @@ impl FluctlightBrain {
         self.checkpoint()?;
         self.checkpoint_policy.mark_checkpointed();
         self.ticks_since_systems_seal = 0;
+        self.wal_records_since_seal = 0;
         self.homeostasis.note_systems_seal();
         Ok(())
     }
 
     /// Autonomic Somnus durability: seal without semantic sleep when due.
     ///
-    /// No-op when Somnus is debug-disabled, seal interval is 0, or semantic sleep
-    /// already sealed this tick. Never mutates the recall graph.
+    /// No-op when Somnus is debug-disabled or semantic sleep already sealed this tick.
+    /// Never mutates the recall graph. Seals on earlier of tick cadence or WAL pressure.
     fn maybe_somnus_autonomic_seal(&mut self, checkpoint: bool, already_sealed: bool) -> Result<bool> {
         if !checkpoint || already_sealed || !crate::somnus::somnus_enabled() {
             return Ok(false);
         }
-        let every = crate::somnus::somnus_seal_every_ticks();
-        if every == 0 {
-            return Ok(false);
-        }
+        let every_ticks = crate::somnus::somnus_seal_every_ticks();
+        let every_wal = crate::somnus::somnus_seal_every_wal_records();
         self.ticks_since_systems_seal = self.ticks_since_systems_seal.saturating_add(1);
-        if self.ticks_since_systems_seal < every {
+        let tick_due = every_ticks > 0 && self.ticks_since_systems_seal >= every_ticks;
+        let wal_due = every_wal > 0 && self.wal_records_since_seal >= every_wal;
+        if !tick_due && !wal_due {
             return Ok(false);
         }
         self.systems_seal()?;
@@ -257,6 +262,7 @@ impl FluctlightBrain {
     fn wal_append(&mut self, entry: WalEntry) -> Result<()> {
         if let Some(ref path) = self.store_path {
             self.wal_seq += 1;
+            self.wal_records_since_seal = self.wal_records_since_seal.saturating_add(1);
             if let Some(identity) = self.wal_identity {
                 wal::append_fenced(path, self.wal_seq, &entry, &identity)?;
             } else {
@@ -1522,6 +1528,7 @@ impl FluctlightBrain {
             recent_separations,
             checkpoint_policy: CheckpointPolicy::default(),
             ticks_since_systems_seal: 0,
+            wal_records_since_seal: 0,
             homeostasis: crate::homeostasis::HomeostasisState::default(),
             store_path: None,
             wal_identity: None,
@@ -1571,6 +1578,7 @@ impl Clone for FluctlightBrain {
             recent_separations: self.recent_separations.clone(),
             checkpoint_policy: self.checkpoint_policy.clone(),
             ticks_since_systems_seal: self.ticks_since_systems_seal,
+            wal_records_since_seal: self.wal_records_since_seal,
             homeostasis: self.homeostasis.clone(),
             store_path: None,
             wal_identity: None,
