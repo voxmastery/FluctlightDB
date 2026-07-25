@@ -301,6 +301,9 @@ impl FluctlightBrain {
         }
         let report = self.experience_internal_assigned(episode, true, Some(assigned_engram_id))?;
         self.agent_on_experience(report.engram_id);
+        if !report.gate_rejected && !report.deduplicated {
+            self.cortex.eligibility.tag(report.engram_id);
+        }
         Ok(report)
     }
 
@@ -1033,11 +1036,20 @@ impl FluctlightBrain {
             &self.development,
             16,
         );
-        // CortexSchema crystallize — semantic sleep only (never from Somnus systems_seal).
-        crate::schema::crystallize_from_engrams(
+        // CaptureGate: only eligibility-tagged engrams crystallize schemas (CLS capture).
+        let tagged = self.cortex.eligibility.tags.clone();
+        let cap = crate::capture_gate::capture_schemas(
             &mut self.cortex.schemas,
             &self.hippocampus.engrams,
-        );
+            &tagged,
+            &["theme", "dark", "light"],
+        )?;
+        if !cap.rolled_back {
+            for id in &tagged {
+                self.cortex.eligibility.tags.remove(id);
+            }
+        }
+        let _ = cap;
         self.development.on_sleep(report.pruned_synapses);
         self.prefrontal.unlocked = self.development.pfc_unlocked();
         report.stage_after = self.development.stage.as_str().to_string();

@@ -73,6 +73,8 @@ pub mod recall_router;
 pub mod relation;
 pub mod replicate;
 pub mod retention_policy;
+pub mod capture_gate;
+pub mod eligibility;
 pub mod schema;
 pub mod segment;
 pub mod semantic;
