@@ -15,6 +15,9 @@ pub struct Cortex {
     pub semantic_centroid: Vec<f32>,
     #[serde(default)]
     pub semantic_strength: f32,
+    /// Durable neocortical schemas (CortexSchema / CLS slow half).
+    #[serde(default)]
+    pub schemas: crate::schema::SchemaStore,
 }
 
 impl Cortex {
