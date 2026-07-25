@@ -102,6 +102,40 @@ impl SchemaStore {
     }
 }
 
+/// Deterministic CLS crystallize: group engrams by `schema_key`; require enough supports.
+pub fn crystallize_from_engrams(store: &mut SchemaStore, engrams: &[crate::engram::Engram]) {
+    use std::collections::HashMap;
+
+    let mut groups: HashMap<String, Vec<Uuid>> = HashMap::new();
+    let mut statements: HashMap<String, String> = HashMap::new();
+    for e in engrams {
+        let key = schema_key(&e.episode.content);
+        groups.entry(key.clone()).or_default().push(e.id);
+        statements
+            .entry(key)
+            .or_insert_with(|| e.episode.content.clone());
+    }
+    for (key, ids) in groups {
+        if ids.len() < 2 {
+            continue;
+        }
+        // Theme cues crystallize at 2+; other keys need 3+ (conservative).
+        if key != "theme" && ids.len() < 3 {
+            continue;
+        }
+        let statement = statements
+            .get(&key)
+            .cloned()
+            .unwrap_or_else(|| key.clone());
+        let mut schema = Schema::new(statement, ids);
+        schema.key = key;
+        if let Some(prev) = store.active_head_for_key(&schema.key) {
+            schema = schema.superseding(prev.id);
+        }
+        let _ = store.upsert_active(schema);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,5 +169,30 @@ mod tests {
             .unwrap();
         assert_eq!(store.active_head_for_key("theme").unwrap().id, new);
         assert!(store.get(old).unwrap().status == SchemaStatus::Superseded);
+    }
+
+    #[test]
+    fn crystallize_theme_from_two_engrams() {
+        use crate::engram::Engram;
+        use crate::types::Episode;
+        let mut store = SchemaStore::default();
+        #[allow(deprecated)]
+        let e1 = Engram::new(
+            Uuid::nil(),
+            Episode::new("User prefers dark mode theme v0", "p", 0.8),
+            0.8,
+            1,
+            0,
+        );
+        #[allow(deprecated)]
+        let e2 = Engram::new(
+            Uuid::nil(),
+            Episode::new("User prefers dark mode theme v1", "p", 0.8),
+            0.8,
+            2,
+            0,
+        );
+        crystallize_from_engrams(&mut store, &[e1, e2]);
+        assert_eq!(store.active().count(), 1);
     }
 }
