@@ -176,21 +176,6 @@ fn merge_neurons(dst: &mut Vec<NeuronId>, src: &[NeuronId]) {
     }
 }
 
-fn jaccard(a: &[crate::id::NeuronId], b: &[crate::id::NeuronId]) -> f32 {
-    if a.is_empty() && b.is_empty() {
-        return 1.0;
-    }
-    let sa: HashSet<_> = a.iter().copied().collect();
-    let sb: HashSet<_> = b.iter().copied().collect();
-    let inter = sa.intersection(&sb).count() as f32;
-    let union = sa.union(&sb).count() as f32;
-    if union <= 0.0 {
-        0.0
-    } else {
-        inter / union
-    }
-}
-
 fn dedupe_synapses(graph: &mut BrainGraph) -> u32 {
     let mut seen: HashSet<(u64, u64)> = HashSet::new();
     let mut deduped = 0u32;

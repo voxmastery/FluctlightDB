@@ -104,6 +104,12 @@ pub struct FluctlightBrain {
     /// it is recomputed from the probe comparison on every open, so it never needs a segment.
     #[serde(skip)]
     pub rekey_pending: Vec<Uuid>,
+    /// Recall constants resolved from the environment once, when this brain was opened.
+    ///
+    /// Previously re-read (and re-parsed from a string) on every `activate_scoped` call, and
+    /// shared process-wide, so opening a second brain silently retuned the first.
+    #[serde(skip)]
+    pub(crate) tuning: crate::config::RecallTuning,
 }
 
 impl Default for FluctlightBrain {
@@ -152,6 +158,7 @@ impl FluctlightBrain {
             tau: crate::tau_runtime::new_tau_lane(),
             chorus: crate::chorus_runtime::new_chorus_field(),
             rekey_pending: Vec::new(),
+            tuning: crate::config::RecallTuning::from_env(),
         };
         brain.development.on_tick();
         brain.prefrontal.unlocked = brain.development.pfc_unlocked();
@@ -608,10 +615,10 @@ impl FluctlightBrain {
         let field_boost = cue_vector
             .map(|v| self.semantic.centroid_boost(v))
             .unwrap_or(0.0);
-        let cortex_w = std::env::var("FLUCTLIGHT_CORTEX_WEIGHT")
-            .ok()
-            .and_then(|v| v.parse::<f32>().ok())
-            .unwrap_or(0.1);
+        // Was `std::env::var("FLUCTLIGHT_CORTEX_WEIGHT").parse::<f32>()` — an environment
+        // lookup and a string-to-float parse on every single recall, for a value shared by
+        // every brain in the process. Now resolved once when this brain was opened.
+        let cortex_w = self.tuning.cortex_weight;
         for recall in &mut result.recalls {
             recall.activation += (cortex_boost + field_boost) * cortex_w;
             if recall.verified {
@@ -1385,6 +1392,7 @@ impl FluctlightBrain {
             tau: crate::tau_runtime::new_tau_lane(),
             chorus: crate::chorus_runtime::new_chorus_field(),
             rekey_pending: Vec::new(),
+            tuning: crate::config::RecallTuning::from_env(),
         }
     }
 }
@@ -1431,6 +1439,7 @@ impl Clone for FluctlightBrain {
             tau: self.tau.clone(),
             chorus: self.chorus.clone(),
             rekey_pending: self.rekey_pending.clone(),
+            tuning: self.tuning,
         }
     }
 }
