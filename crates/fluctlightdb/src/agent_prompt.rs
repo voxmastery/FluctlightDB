@@ -163,18 +163,15 @@ pub fn pack_lossless(
     for idx in order {
         let content = &recalls[idx].episode.content;
         let extra = estimate_tokens(content).saturating_sub(estimate_tokens(&lines[idx].gist));
-        if used.saturating_add(extra) > token_budget && lines[idx].full_content.is_none() {
-            // Keep gist-only; do not drop.
-            continue;
-        }
-        // Always allow at least one full text if nothing full yet and content is huge:
-        if lines.iter().all(|l| l.full_content.is_none()) && full_recalls.is_empty() {
-            lines[idx].full_content = Some(content.clone());
-            used = used.saturating_add(extra);
-            full_recalls.push(recalls[idx].clone());
-            continue;
-        }
-        if used.saturating_add(extra) > token_budget {
+        let would_exceed = used.saturating_add(extra) > token_budget;
+        if would_exceed {
+            // Always allow at least one full text (verified-first via `order`) even when
+            // the residual budget is too tight for the expansion cost.
+            if lines.iter().all(|l| l.full_content.is_none()) && full_recalls.is_empty() {
+                lines[idx].full_content = Some(content.clone());
+                used = used.saturating_add(extra);
+                full_recalls.push(recalls[idx].clone());
+            }
             continue;
         }
         lines[idx].full_content = Some(content.clone());

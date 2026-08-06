@@ -33,8 +33,9 @@ pub fn preplay_forward(
     hippocampus: &Hippocampus,
     life_id: Uuid,
     myelination: f32,
+    codec: u8,
 ) -> PreplayResult {
-    let cue_neurons = cue_to_dg_neurons(goal, life_id);
+    let cue_neurons = cue_to_dg_neurons(goal, life_id, codec);
     let mut activation: HashMap<NeuronId, f32> = HashMap::new();
     for n in cue_neurons {
         activation.insert(n, 1.0);

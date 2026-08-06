@@ -109,6 +109,11 @@ pub fn sleep_cycle(
 }
 
 /// Pattern separation (DG) + wiring (CA3/CA1) — Marr trisynaptic path.
+// Argument count grew when the neuron codec became per-brain state. The codec must be
+// threaded explicitly rather than read from a global: `serve.rs` pools many brains and
+// serves them from a thread per connection, so a process-wide codec would let a
+// legacy-pinned tenant and a migrated one derive each other's neuron ids mid-request.
+#[allow(clippy::too_many_arguments)]
 pub fn separate_and_encode(
     graph: &mut BrainGraph,
     hippocampus: &Hippocampus,
@@ -117,14 +122,16 @@ pub fn separate_and_encode(
     tick: u64,
     stage: u8,
     salience: f32,
+    assigned_engram_id: uuid::Uuid,
+    codec: u8,
 ) -> (Engram, SeparationResult) {
     let dev_stage = DevStage::from_u8(stage);
     let budget = WiringBudget::for_stage(dev_stage);
-    let engram_id = uuid::Uuid::new_v4();
+    let engram_id = assigned_engram_id;
     let window = separation_gate::overlap_window();
     let existing = hippocampus.tail_for_life(life_id, window);
 
-    let sep = separate_episode(episode, life_id, engram_id, tick, &existing);
+    let sep = separate_episode(episode, life_id, engram_id, tick, &existing, codec);
     let mut engram = Engram::from_separation(life_id, episode.clone(), salience, tick, stage, &sep);
     engram.id = engram_id;
 

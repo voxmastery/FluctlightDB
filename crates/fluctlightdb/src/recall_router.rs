@@ -40,39 +40,88 @@ pub fn detect_exact_query(cue: &str) -> bool {
     if any_substr(
         &low,
         &[
-            "exactly", "precisely", "exact value", "exact number", "confirm the",
-            "what is the exact", "tell me the exact", "what exactly is",
+            "exactly",
+            "precisely",
+            "exact value",
+            "exact number",
+            "confirm the",
+            "what is the exact",
+            "tell me the exact",
+            "what exactly is",
         ],
     ) {
         return true;
     }
 
     // Reference ID patterns: #123, ID:, invoice, order, trip, case, ticket
-    if any_substr(&low, &["invoice #", "order #", "trip #", "case #", "ticket #", "id:"]) {
+    if any_substr(
+        &low,
+        &[
+            "invoice #",
+            "order #",
+            "trip #",
+            "case #",
+            "ticket #",
+            "id:",
+        ],
+    ) {
         return true;
     }
 
     // Regex-free ID detection: # followed by digits
     if low.contains('#') {
         let after_hash = low.split('#').nth(1).unwrap_or("");
-        if after_hash.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+        if after_hash
+            .chars()
+            .next()
+            .map(|c| c.is_ascii_digit())
+            .unwrap_or(false)
+        {
             return true;
         }
     }
 
     // Phone number queries
-    if any_substr(&low, &["phone number", "phone no", "mobile number", "contact number"]) {
+    if any_substr(
+        &low,
+        &[
+            "phone number",
+            "phone no",
+            "mobile number",
+            "contact number",
+        ],
+    ) {
         return true;
     }
 
     // Amount / financial precision
-    if any_substr(&low, &["₹", "inr", "rupee", "the amount", "total amount", "exact amount"]) {
+    if any_substr(
+        &low,
+        &[
+            "₹",
+            "inr",
+            "rupee",
+            "the amount",
+            "total amount",
+            "exact amount",
+        ],
+    ) {
         return true;
     }
 
     // Status / boolean queries
     if low.starts_with("is ") || low.starts_with("was ") || low.starts_with("did ") {
-        if any_substr(&low, &["pending", "completed", "cancelled", "confirmed", "approved", "rejected"]) {
+        if any_substr(
+            &low,
+            &[
+                "pending",
+                "completed",
+                "cancelled",
+                "confirmed",
+                "approved",
+                "rejected",
+            ],
+        ) {
             return true;
         }
     }

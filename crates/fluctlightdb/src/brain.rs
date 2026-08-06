@@ -110,6 +110,20 @@ pub struct FluctlightBrain {
     /// Runtime-only CHORUS phase field (θ–γ wavelet substrate). Never persisted.
     #[serde(skip)]
     pub(crate) chorus: crate::chorus::ChorusField,
+    /// Engrams whose neuron ids were derived under a stale codec and must be re-keyed.
+    ///
+    /// Populated at load when the recorded codec probes disagree with what the current
+    /// binary computes — i.e. the identity function moved underneath stored data. Drained
+    /// incrementally by sleep and ingest, or all at once via `rekey_now()`. Runtime-only:
+    /// it is recomputed from the probe comparison on every open, so it never needs a segment.
+    #[serde(skip)]
+    pub rekey_pending: Vec<Uuid>,
+    /// Recall constants resolved from the environment once, when this brain was opened.
+    ///
+    /// Previously re-read (and re-parsed from a string) on every `activate_scoped` call, and
+    /// shared process-wide, so opening a second brain silently retuned the first.
+    #[serde(skip)]
+    pub(crate) tuning: crate::config::RecallTuning,
 }
 
 pub(crate) enum BrainStoreLock {
@@ -167,6 +181,8 @@ impl FluctlightBrain {
             muon: crate::muon_runtime::new_muon_lane(),
             tau: crate::tau_runtime::new_tau_lane(),
             chorus: crate::chorus_runtime::new_chorus_field(),
+            rekey_pending: Vec::new(),
+            tuning: crate::config::RecallTuning::from_env(),
         };
         brain.development.on_tick();
         brain.prefrontal.unlocked = brain.development.pfc_unlocked();
@@ -336,6 +352,7 @@ impl FluctlightBrain {
             return Err(Error::EmbryonicOnlyReflex);
         }
 
+        let codec = self.life.neuron_codec;
         if let Some(ref rag) = episode.rag {
             if let (Some(doc), Some(chunk)) = (&rag.doc_id, &rag.chunk_id) {
                 if let Some(existing) = self.hippocampus.find_rag_chunk(doc, chunk) {
@@ -362,7 +379,7 @@ impl FluctlightBrain {
             );
             let ec_neurons: Vec<crate::id::NeuronId> = rich
                 .iter()
-                .map(|t| crate::id::NeuronId::from_seeds(&["ec", &t.surface]))
+                .map(|t| crate::id::NeuronId::from_seeds_with(codec, &["ec", &t.surface]))
                 .collect();
             let separation = SeparationResult {
                 ec_neurons: ec_neurons.clone(),
@@ -389,9 +406,12 @@ impl FluctlightBrain {
                 is_core: false,
             };
             if let Some(ref vector) = episode.semantic_vector {
-                let ec_sem =
-                    self.semantic
-                        .register_engram(engram_id, self.life.life_id, vector.clone());
+                let ec_sem = self.semantic.register_engram(
+                    engram_id,
+                    self.life.life_id,
+                    vector.clone(),
+                    codec,
+                );
                 engram.ec_neurons.extend(ec_sem);
             }
             self.amygdala.tag(engram_id, salience);
@@ -437,8 +457,12 @@ impl FluctlightBrain {
             && !verified
             && !episode.context.starts_with("ledger:")
         {
-            let gate =
-                crate::separation_gate::assess(&self.hippocampus, &episode, self.life.life_id);
+            let gate = crate::separation_gate::assess(
+                &self.hippocampus,
+                &episode,
+                self.life.life_id,
+                codec,
+            );
             if !gate.allowed {
                 return Ok(ExperienceReport {
                     engram_id: Uuid::nil(),
@@ -471,6 +495,7 @@ impl FluctlightBrain {
             self.development.stage as u8,
             salience,
             assigned_engram_id.unwrap_or_else(Uuid::new_v4),
+            codec,
         );
 
         // ACh novelty/familiarity signal (Hasselmo 2006):
@@ -487,7 +512,7 @@ impl FluctlightBrain {
         if let Some(ref vector) = episode.semantic_vector {
             let ec_sem =
                 self.semantic
-                    .register_engram(engram.id, self.life.life_id, vector.clone());
+                    .register_engram(engram.id, self.life.life_id, vector.clone(), codec);
             for &n in &ec_sem {
                 engram.ec_neurons.push(n);
                 self.graph.register_neuron(n, HippocampusCa1);
@@ -514,6 +539,9 @@ impl FluctlightBrain {
         if pressure >= PRESSURE_COMPACT_THRESHOLD {
             let _ = self.compact_internal(false);
         }
+        // Bleed the re-key queue a little on every write so an active brain migrates itself
+        // without an operator noticing. Sleep drains it in much larger batches.
+        crate::derive::drain(self, 4);
 
         let engram_id = engram.id;
         self.amygdala.tag(engram_id, salience);
@@ -552,6 +580,29 @@ impl FluctlightBrain {
             self.maybe_checkpoint()?;
         }
         Ok(ExperienceReport::ok(engram_id, separation, false))
+    }
+
+    /// Re-key every engram still queued after a codec change, immediately.
+    ///
+    /// The queue is otherwise drained a few engrams at a time by ingest and in larger
+    /// batches by sleep, so a brain in normal use migrates itself. This exists for
+    /// operators and for a brain that neither sleeps nor experiences, which would
+    /// otherwise stay partially re-keyed indefinitely.
+    pub fn rekey_now(&mut self) -> u64 {
+        let mut total = 0u64;
+        while !self.rekey_pending.is_empty() {
+            let done = crate::derive::drain(self, 256);
+            if done == 0 {
+                break;
+            }
+            total += done;
+        }
+        total
+    }
+
+    /// How many engrams are still waiting to be re-keyed.
+    pub fn rekey_pending_count(&self) -> usize {
+        self.rekey_pending.len()
     }
 
     /// Background heartbeat — auto-sleep when due (brainstem / autonomic).
@@ -705,15 +756,16 @@ impl FluctlightBrain {
             self.development.stage.myelination(),
             top_k,
             candidate_set.as_ref(),
+            self.life.neuron_codec,
         );
         let cortex_boost = self.cortex.fact_boost(cue) + self.cortex.semantic_boost(cue_vector);
         let field_boost = cue_vector
             .map(|v| self.semantic.centroid_boost(v))
             .unwrap_or(0.0);
-        let cortex_w = std::env::var("FLUCTLIGHT_CORTEX_WEIGHT")
-            .ok()
-            .and_then(|v| v.parse::<f32>().ok())
-            .unwrap_or(0.1);
+        // Was `std::env::var("FLUCTLIGHT_CORTEX_WEIGHT").parse::<f32>()` — an environment
+        // lookup and a string-to-float parse on every single recall, for a value shared by
+        // every brain in the process. Now resolved once when this brain was opened.
+        let cortex_w = self.tuning.cortex_weight;
         for recall in &mut result.recalls {
             recall.activation += (cortex_boost + field_boost) * cortex_w;
             if recall.verified {
@@ -726,10 +778,11 @@ impl FluctlightBrain {
         // This rescues recalls that BM25+dense missed because the surface tokens didn't overlap.
         if !self.neuromodulators.is_encoding() {
             let gain = self.neuromodulators.ca3_recurrent_gain();
+            let codec = self.life.neuron_codec;
             let rich = crate::tokenize::tokenize_rich(cue, "", None);
             let cue_neurons: Vec<crate::id::NeuronId> = rich
                 .iter()
-                .map(|t| crate::id::NeuronId::from_seeds(&["ec", &t.surface]))
+                .map(|t| crate::id::NeuronId::from_seeds_with(codec, &["ec", &t.surface]))
                 .collect();
             if let Some(completed) = self.hippocampus.ca3_attractor_complete(
                 &cue_neurons,
@@ -987,6 +1040,7 @@ impl FluctlightBrain {
             &self.hippocampus,
             self.life.life_id,
             self.development.stage.myelination(),
+            self.life.neuron_codec,
         )
     }
 
@@ -1012,7 +1066,12 @@ impl FluctlightBrain {
     }
 
     pub fn complete(&self, cue: &str) -> Option<Engram> {
-        complete(cue, &self.hippocampus, self.life.life_id)
+        complete(
+            cue,
+            &self.hippocampus,
+            self.life.life_id,
+            self.life.neuron_codec,
+        )
     }
 
     /// Neocortical fact readout for cue (post-sleep consolidation).
@@ -1030,6 +1089,9 @@ impl FluctlightBrain {
         checkpoint: bool,
         trigger: SleepTrigger,
     ) -> Result<SleepReport> {
+        // Sleep is where bulk repair belongs: consolidation already walks replay_sequence
+        // oldest-first, which is the same order the re-key drain requires.
+        crate::derive::drain(self, 128);
         let stage_before = self.development.stage.as_str().to_string();
         let mut report = sleep_cycle(
             &mut self.hippocampus,
@@ -1150,7 +1212,8 @@ impl FluctlightBrain {
         {
             let eid = self.hippocampus.engrams[idx].id;
             let lid = self.hippocampus.engrams[idx].life_id;
-            self.semantic.register_engram(eid, lid, v);
+            let codec = self.life.neuron_codec;
+            self.semantic.register_engram(eid, lid, v, codec);
         }
         let report_content = self.hippocampus.engrams[idx].episode.content.clone();
         let revision = self.hippocampus.engrams[idx].replay_count;
@@ -1464,6 +1527,8 @@ impl FluctlightBrain {
             alive: self.life.alive,
             autonomic_ticks: self.autonomic.total_ticks,
             ticks_since_sleep: self.autonomic.ticks_since_sleep,
+            neuron_codec: self.life.neuron_codec,
+            rekey_pending: self.rekey_pending.len() as u64,
             synapse_pressure: self.autonomic.synapse_pressure(
                 self.graph.synapse_count(),
                 self.development.stage.max_synapses(),
@@ -1543,6 +1608,8 @@ impl FluctlightBrain {
             muon: crate::muon_runtime::new_muon_lane(),
             tau: crate::tau_runtime::new_tau_lane(),
             chorus: crate::chorus_runtime::new_chorus_field(),
+            rekey_pending: Vec::new(),
+            tuning: crate::config::RecallTuning::from_env(),
         }
     }
 }
@@ -1593,6 +1660,8 @@ impl Clone for FluctlightBrain {
             muon: self.muon.clone(),
             tau: self.tau.clone(),
             chorus: self.chorus.clone(),
+            rekey_pending: self.rekey_pending.clone(),
+            tuning: self.tuning,
         }
     }
 }
@@ -1874,6 +1943,14 @@ pub struct BrainStatus {
     /// Organ health (Somnus cadence, prompt token estimates). Measurement only.
     #[serde(default)]
     pub homeostasis: crate::homeostasis::HomeostasisReport,
+    /// Which neuron-identity codec this brain's stored ids were derived under.
+    #[serde(default)]
+    pub neuron_codec: u8,
+    /// Engrams still awaiting re-key after a codec change. Non-zero means recall is
+    /// degraded for the un-migrated remainder — this is what makes the failure visible
+    /// instead of silent.
+    #[serde(default)]
+    pub rekey_pending: u64,
 }
 
 #[cfg(test)]
