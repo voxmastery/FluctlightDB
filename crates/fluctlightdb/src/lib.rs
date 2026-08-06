@@ -26,6 +26,7 @@ pub mod consensus;
 pub mod cortex;
 pub mod crystallize;
 pub mod dentate;
+pub mod derive;
 pub mod development;
 pub mod engram;
 pub mod error;
