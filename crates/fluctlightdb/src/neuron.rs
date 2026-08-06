@@ -191,7 +191,7 @@ mod tests {
         // I_threshold = (V_thresh - V_rest) / R_m = 15/100 = 0.15 nA
         // With dt=1ms and sufficient current, should spike
         let fired = n.integrate(0.20, 1.0, 1); // 0.20 nA > 0.15 nA threshold
-        // May not fire in one step (leaky integration), try a sustained pulse
+                                               // May not fire in one step (leaky integration), try a sustained pulse
         let mut spiked = fired;
         for t in 2..100u64 {
             if n.integrate(0.20, 1.0, t) {
@@ -199,7 +199,10 @@ mod tests {
                 break;
             }
         }
-        assert!(spiked, "neuron should fire with sustained suprathreshold current");
+        assert!(
+            spiked,
+            "neuron should fire with sustained suprathreshold current"
+        );
     }
 
     #[test]
@@ -229,8 +232,14 @@ mod tests {
         }
         assert!(first_spike > 0, "should have spiked");
         // Immediately after: should be refractory
-        assert!(n.is_refractory(first_spike + 1), "should be refractory immediately after spike");
-        assert!(!n.is_refractory(first_spike + TAU_REF_TICKS + 1), "should exit refractory after τ_ref");
+        assert!(
+            n.is_refractory(first_spike + 1),
+            "should be refractory immediately after spike"
+        );
+        assert!(
+            !n.is_refractory(first_spike + TAU_REF_TICKS + 1),
+            "should exit refractory after τ_ref"
+        );
     }
 
     #[test]

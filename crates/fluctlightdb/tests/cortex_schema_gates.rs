@@ -26,13 +26,14 @@ fn cortex_schemas_survive_checkpoint() {
 #[test]
 fn sleep_crystallizes_theme_schema_from_supports() {
     let mut brain = FluctlightBrain::new();
-    for i in 0..3 {
+    let episodes = [
+        "User prefers dark mode theme for night coding sessions",
+        "Operator chose dark mode theme after eye strain complaints",
+        "Preference recorded: dark mode theme across all IDE windows",
+    ];
+    for ep in episodes {
         brain
-            .experience(Episode::new(
-                format!("User prefers dark mode theme variant {i}"),
-                "prefs",
-                0.8,
-            ))
+            .experience(Episode::new(ep, "prefs", 0.8))
             .unwrap();
     }
     assert!(
@@ -53,13 +54,14 @@ fn sleep_crystallizes_theme_schema_from_supports() {
 #[test]
 fn double_sleep_does_not_duplicate_active_theme_schemas() {
     let mut brain = FluctlightBrain::new();
-    for i in 0..3 {
+    let episodes = [
+        "User prefers dark mode theme for night coding sessions",
+        "Operator chose dark mode theme after eye strain complaints",
+        "Preference recorded: dark mode theme across all IDE windows",
+    ];
+    for ep in episodes {
         brain
-            .experience(Episode::new(
-                format!("User prefers dark mode theme variant {i}"),
-                "prefs",
-                0.8,
-            ))
+            .experience(Episode::new(ep, "prefs", 0.8))
             .unwrap();
     }
     brain.sleep().unwrap();
@@ -68,7 +70,7 @@ fn double_sleep_does_not_duplicate_active_theme_schemas() {
         .cortex
         .schemas
         .active()
-        .filter(|s| s.key == "theme")
+        .filter(|s| s.key == "theme" || s.key.starts_with("theme:"))
         .count();
     assert_eq!(n2, 1, "exactly one active theme schema after double sleep");
 }

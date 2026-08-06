@@ -509,17 +509,45 @@ struct HttpRequest<'a> {
     idempotency: Option<&'a str>,
 }
 
+/// A request split at the header/body boundary **before** any text decoding.
+///
+/// The head is ASCII by RFC 9110 and is validated as UTF-8 once. The body stays raw
+/// bytes until the whole entity has arrived, so a multi-byte character spanning two
+/// socket reads is never decoded in halves.
+struct RawRequest {
+    head: String,
+    body: Vec<u8>,
+}
+
 fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> {
     stream
         .set_read_timeout(Some(Duration::from_secs(30)))
         .map_err(Error::Io)?;
     loop {
-        let req_text = match read_http_request(&mut stream) {
-            Ok(t) => t,
+        let raw = match read_http_request(&mut stream) {
+            Ok(r) => r,
             Err(_) => break,
         };
-        let keep_alive = request_keep_alive(&req_text);
-        if !serve_one_request(&mut stream, server, &req_text, keep_alive)? {
+        let keep_alive = request_keep_alive(&raw.head);
+        // Decode the body exactly once, on the complete entity. Invalid UTF-8 is a client
+        // error: storing it would mean writing characters the client never sent into
+        // durable memory, which is strictly worse than refusing the write.
+        let body = match std::str::from_utf8(&raw.body) {
+            Ok(b) => b,
+            Err(e) => {
+                write_json_conn(
+                    &mut stream,
+                    400,
+                    &serde_json::json!({
+                        "error": "invalid utf-8 body",
+                        "valid_up_to": e.valid_up_to(),
+                    }),
+                    false,
+                )?;
+                break;
+            }
+        };
+        if !serve_one_request(&mut stream, server, &raw.head, body, keep_alive)? {
             break;
         }
         if !keep_alive {
@@ -532,10 +560,11 @@ fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> 
 fn serve_one_request(
     stream: &mut TcpStream,
     server: &BrainServer,
-    req_text: &str,
+    head: &str,
+    body: &str,
     keep_alive: bool,
 ) -> Result<bool> {
-    let parsed = parse_http(req_text)?;
+    let parsed = parse_http(head, body)?;
 
     if parsed.body.len() > MAX_BODY_BYTES {
         write_json_conn(
@@ -1419,7 +1448,8 @@ fn dispatch(
                 .ok_or_else(|| Error::Store("missing goal".into()))?;
             server.with_brain_write(tenant_id, |b| {
                 b.api_set_goal(goal)?;
-                let goal_texts: Vec<&str> = b.prefrontal.goals.iter().map(|g| g.text.as_str()).collect();
+                let goal_texts: Vec<&str> =
+                    b.prefrontal.goals.iter().map(|g| g.text.as_str()).collect();
                 Ok(serde_json::json!({
                     "ok": true,
                     "goals": goal_texts,
@@ -1435,7 +1465,12 @@ fn dispatch(
                 .ok_or_else(|| Error::Store("missing action".into()))?;
             server.with_brain_write(tenant_id, |b| {
                 b.api_inhibit(action)?;
-                let inhibit_patterns: Vec<&str> = b.prefrontal.inhibit_patterns.iter().map(|i| i.pattern.as_str()).collect();
+                let inhibit_patterns: Vec<&str> = b
+                    .prefrontal
+                    .inhibit_patterns
+                    .iter()
+                    .map(|i| i.pattern.as_str())
+                    .collect();
                 Ok(serde_json::json!({
                     "ok": true,
                     "inhibit_actions": inhibit_patterns,
@@ -1669,57 +1704,95 @@ fn rate_limit_allow(tenant_id: &str) -> bool {
     crate::rate_limit::allow(tenant_id)
 }
 
-fn header_name_eq<'a>(line: &'a str, name: &str) -> Option<&'a str> {
-    let (head, rest) = line.split_once(':')?;
-    if head.eq_ignore_ascii_case(name) {
-        Some(rest.trim())
-    } else {
-        None
-    }
-}
-
-fn read_http_request(stream: &mut TcpStream) -> Result<String> {
-    // Accumulate raw bytes, then decode once (avoids UTF-8 split corruption).
-    let mut buf = Vec::with_capacity(8192);
-    let mut chunk = [0u8; 8192];
-    let n = stream.read(&mut chunk).map_err(Error::Io)?;
-    if n == 0 {
-        return Err(Error::Store("empty request".into()));
-    }
-    buf.extend_from_slice(&chunk[..n]);
-    let header_end = buf
-        .windows(4)
-        .position(|w| w == b"\r\n\r\n")
-        .map(|i| i + 4)
-        .unwrap_or(buf.len());
-    let header_str = String::from_utf8_lossy(&buf[..header_end.min(buf.len())]);
-    let content_length = parse_content_length(&header_str);
-    while buf.len().saturating_sub(header_end) < content_length && buf.len() < MAX_BODY_BYTES + 8192
-    {
-        let got = stream.read(&mut chunk).map_err(Error::Io)?;
-        if got == 0 {
-            break;
-        }
-        buf.extend_from_slice(&chunk[..got]);
-    }
-    String::from_utf8(buf).map_err(|e| Error::Store(format!("invalid utf-8 request: {e}")))
-}
-
-fn parse_content_length(raw: &str) -> usize {
-    for line in raw.lines() {
-        if let Some(rest) = header_name_eq(line, "Content-Length") {
-            return rest.parse().unwrap_or(0);
-        }
+/// Case-insensitive header lookup over an already-split head.
+///
+/// RFC 9110 §5.1 makes field names case-insensitive, and HTTP/2 requires them lowercase —
+/// so any HTTP/2-fronted proxy emits `authorization:`, not `Authorization:`. These lookups
+/// used to be case-sensitive `strip_prefix` calls, which meant a lowercase `authorization:`
+/// was dropped (silently downgrading the caller to the default tenant), a lowercase
+/// `content-length:` parsed as zero (truncating the body), and a lowercase
+/// `x-idempotency-key:` disabled duplicate suppression.
+fn header_value<'a>(head: &'a str, name: &str) -> Option<&'a str> {
+    for line in head.split("\r\n").skip(1) {
         if line.is_empty() {
             break;
         }
+        let (k, v) = line.split_once(':')?;
+        if k.trim().eq_ignore_ascii_case(name) {
+            return Some(v.trim());
+        }
     }
-    0
+    None
 }
 
-fn parse_http(raw: &str) -> Result<HttpRequest<'_>> {
-    let mut lines = raw.split("\r\n");
-    let request_line = lines
+fn parse_content_length(head: &str) -> usize {
+    header_value(head, "content-length")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0)
+}
+
+/// Read one request, framing on bytes rather than on decoded text.
+///
+/// Previously this called `String::from_utf8_lossy` on the first 8192-byte read and again
+/// on every 4096-byte continuation, so a character straddling a chunk boundary was mangled
+/// into replacement characters on both sides — and the inflated `String` length then broke
+/// the `&raw[body_start..body_start + content_length]` slice in `parse_http`, dropping the
+/// socket with no response.
+fn read_http_request(stream: &mut TcpStream) -> Result<RawRequest> {
+    let mut buf: Vec<u8> = Vec::with_capacity(8192);
+    let mut chunk = [0u8; 8192];
+
+    // Phase 1: read until the header terminator is present.
+    let header_end = loop {
+        if let Some(i) = find_subslice(&buf, b"\r\n\r\n") {
+            break i + 4;
+        }
+        if buf.len() > MAX_BODY_BYTES {
+            return Err(Error::Store("header too large".into()));
+        }
+        let n = stream.read(&mut chunk).map_err(Error::Io)?;
+        if n == 0 {
+            if buf.is_empty() {
+                return Err(Error::Store("empty request".into()));
+            }
+            return Err(Error::Store("truncated request head".into()));
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    };
+
+    let head = std::str::from_utf8(&buf[..header_end])
+        .map_err(|_| Error::Store("non-utf8 request head".into()))?
+        .to_string();
+    let content_length = parse_content_length(&head).min(MAX_BODY_BYTES + 1);
+
+    // Phase 2: read until the whole body has arrived. The target is an absolute buffer
+    // length, so body bytes already present in the first read are counted exactly once —
+    // reading `content_length` *further* bytes would hang on every request whose body
+    // arrived alongside its headers, which is the common case.
+    let target = header_end.saturating_add(content_length);
+    while buf.len() < target {
+        let n = stream.read(&mut chunk).map_err(Error::Io)?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    }
+
+    let end = target.min(buf.len());
+    let body = buf[header_end.min(end)..end].to_vec();
+    Ok(RawRequest { head, body })
+}
+
+fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return None;
+    }
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+fn parse_http<'a>(head: &'a str, body: &'a str) -> Result<HttpRequest<'a>> {
+    let request_line = head
+        .split("\r\n")
         .next()
         .ok_or_else(|| Error::Store("empty request".into()))?;
     let mut parts = request_line.split_whitespace();
@@ -1729,39 +1802,13 @@ fn parse_http(raw: &str) -> Result<HttpRequest<'_>> {
     let path = parts.next().ok_or_else(|| Error::Store("no path".into()))?;
     let path = path.split('?').next().unwrap_or(path);
 
-    let mut content_length = 0usize;
-    let mut auth = None;
-    let mut idempotency = None;
-    for line in lines.by_ref() {
-        if line.is_empty() {
-            break;
-        }
-        if let Some(rest) = header_name_eq(line, "Content-Length") {
-            content_length = rest.parse().unwrap_or(0);
-        }
-        if let Some(rest) = header_name_eq(line, "Authorization") {
-            let rest = rest.trim();
-            auth = if let Some(tok) = rest.strip_prefix("Bearer ") {
-                Some(tok.trim())
-            } else if rest.len() >= 7 && rest.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("bearer "))
-            {
-                Some(rest[7..].trim())
-            } else {
-                None
-            };
-        }
-        if let Some(rest) = header_name_eq(line, "X-Idempotency-Key") {
-            idempotency = Some(rest.trim());
-        }
-    }
-    let body_start = raw.find("\r\n\r\n").map(|i| i + 4).unwrap_or(raw.len());
-    let body = if content_length > 0 && body_start + content_length <= raw.len() {
-        &raw[body_start..body_start + content_length]
-    } else if body_start < raw.len() {
-        &raw[body_start..]
-    } else {
-        ""
-    };
+    let auth = header_value(head, "authorization").and_then(|v| {
+        // The scheme token is case-insensitive per RFC 9110 §11.1.
+        let (scheme, token) = v.split_once(' ')?;
+        scheme.eq_ignore_ascii_case("bearer").then(|| token.trim())
+    });
+    let idempotency = header_value(head, "x-idempotency-key");
+
     Ok(HttpRequest {
         method,
         path,
@@ -1771,25 +1818,19 @@ fn parse_http(raw: &str) -> Result<HttpRequest<'_>> {
     })
 }
 
-fn request_keep_alive(raw: &str) -> bool {
-    let mut http11 = false;
-    if let Some(line) = raw.lines().next() {
-        http11 = line.contains("HTTP/1.1");
-    }
-    for line in raw.lines() {
-        if let Some(v) = header_name_eq(line, "Connection") {
-            if v.eq_ignore_ascii_case("close") {
-                return false;
-            }
-            if v.eq_ignore_ascii_case("keep-alive") {
-                return true;
-            }
+fn request_keep_alive(head: &str) -> bool {
+    if let Some(v) = header_value(head, "connection") {
+        if v.eq_ignore_ascii_case("close") {
+            return false;
         }
-        if line.is_empty() {
-            break;
+        if v.eq_ignore_ascii_case("keep-alive") {
+            return true;
         }
     }
-    http11
+    head.split("\r\n")
+        .next()
+        .map(|l| l.contains("HTTP/1.1"))
+        .unwrap_or(false)
 }
 
 fn write_json_conn(

@@ -8,7 +8,9 @@ use std::time::{Duration, Instant};
 use fs2::FileExt;
 
 pub fn lock_path(brain_path: &Path) -> PathBuf {
-    crate::storage::lock_path(brain_path)
+    let mut name = brain_path.as_os_str().to_os_string();
+    name.push(".lock");
+    PathBuf::from(name)
 }
 
 pub struct StoreLock {
@@ -25,11 +27,32 @@ fn open_lock_file(brain_path: &Path) -> io::Result<File> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .open(&path)
+    let mut options = OpenOptions::new();
+    options.create(true).read(true).write(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+        let file = options.open(&path)?;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+        Ok(file)
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+        let file = options.open(&path)?;
+        if file.metadata()?.file_type().is_symlink() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "brain lock path is a reparse point",
+            ));
+        }
+        return Ok(file);
+    }
+    #[cfg(not(any(unix, windows)))]
+    options.open(&path)
 }
 
 fn lock_contended(err: &io::Error) -> bool {
@@ -141,6 +164,32 @@ mod tests {
     }
 
     #[test]
+    fn lock_path_is_stable_when_brain_directory_appears() {
+        let dir = tempdir().unwrap();
+        let brain = dir.path().join("brain");
+        let before = lock_path(&brain);
+        std::fs::create_dir_all(&brain).unwrap();
+        let after = lock_path(&brain);
+        assert_eq!(before, after);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn lock_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let brain = dir.path().join("brain");
+        let _lock = StoreLock::try_acquire(&brain).unwrap();
+        let mode = std::fs::metadata(lock_path(&brain))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600);
+    }
+
+    #[test]
     fn lock_released_after_drop() {
         let dir = tempdir().unwrap();
         let brain = dir.path().join("brain");
@@ -173,5 +222,40 @@ mod tests {
         assert!(StoreLock::try_acquire(&brain).is_err());
         holder.join().unwrap();
         assert!(StoreLock::try_acquire(&brain).is_ok());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_symlink_race_cannot_redirect_lock_open_to_victim() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let dir = tempdir().unwrap();
+        let brain = dir.path().join("brain");
+        let victim = dir.path().join("victim");
+        std::fs::write(&victim, b"do-not-touch").unwrap();
+        std::fs::set_permissions(&victim, std::fs::Permissions::from_mode(0o644)).unwrap();
+        symlink(&victim, lock_path(&brain)).unwrap();
+
+        assert!(StoreLock::try_acquire(&brain).is_err());
+        assert_eq!(std::fs::read(&victim).unwrap(), b"do-not-touch");
+        assert_eq!(
+            std::fs::metadata(&victim).unwrap().permissions().mode() & 0o777,
+            0o644
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_reparse_point_cannot_redirect_lock_open_to_victim() {
+        use std::os::windows::fs::symlink_file;
+
+        let dir = tempdir().unwrap();
+        let brain = dir.path().join("brain");
+        let victim = dir.path().join("victim");
+        std::fs::write(&victim, b"do-not-touch").unwrap();
+        symlink_file(&victim, lock_path(&brain)).unwrap();
+
+        assert!(StoreLock::try_acquire(&brain).is_err());
+        assert_eq!(std::fs::read(&victim).unwrap(), b"do-not-touch");
     }
 }

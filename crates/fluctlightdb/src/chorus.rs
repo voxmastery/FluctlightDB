@@ -447,10 +447,7 @@ impl ChorusField {
         // Pooled-photon dedup collapses traces whose mean-pooled centroids collide —
         // but token-level (MaxSim) traces stay distinct even at close centroids, so
         // skip the dedup gate when per-token vectors are provided.
-        let has_tokens = input
-            .token_vectors
-            .as_ref()
-            .is_some_and(|t| !t.is_empty());
+        let has_tokens = input.token_vectors.as_ref().is_some_and(|t| !t.is_empty());
         if !has_tokens {
             if let Some((_, nearest)) = self.photon.nearest(&code) {
                 if nearest.hamming(&code) < self.config.dedup_hamming {
@@ -673,21 +670,20 @@ impl ChorusField {
             return Vec::new();
         }
         // 1. Prefilter candidates: full readout if it fits, else photon shortlist.
-        let candidate_ids: Vec<String> = if self.traces.len()
-            <= self.config.spectrum_full_readout_max
-        {
-            self.trace_order.clone()
-        } else if let Some(v) = cue_vector.filter(|v| !v.is_empty()) {
-            let qcode = self.encode_vector(&as_unit_vector(v));
-            let gate_k = self
-                .config
-                .grg_shortlist_k
-                .max(k.saturating_mul(32))
-                .min(self.photon.len().max(1));
-            self.grg_shortlist(&qcode, gate_k)
-        } else {
-            self.trace_order.clone()
-        };
+        let candidate_ids: Vec<String> =
+            if self.traces.len() <= self.config.spectrum_full_readout_max {
+                self.trace_order.clone()
+            } else if let Some(v) = cue_vector.filter(|v| !v.is_empty()) {
+                let qcode = self.encode_vector(&as_unit_vector(v));
+                let gate_k = self
+                    .config
+                    .grg_shortlist_k
+                    .max(k.saturating_mul(32))
+                    .min(self.photon.len().max(1));
+                self.grg_shortlist(&qcode, gate_k)
+            } else {
+                self.trace_order.clone()
+            };
 
         let q: Vec<Vec<f32>> = query_tokens
             .iter()
@@ -1281,7 +1277,10 @@ mod tests {
         let qtok = vec![vec![1.0, 0.0, 0.0]];
         let hits = field.recall_maxsim("caroline lgbtq", 2, &qtok, Some(&[1.0, 0.0, 0.0]), 0.7);
         assert!(!hits.is_empty());
-        assert_eq!(hits[0].memory_id, "doc-a", "invented stack should rank doc-a first");
+        assert_eq!(
+            hits[0].memory_id, "doc-a",
+            "invented stack should rank doc-a first"
+        );
         assert_eq!(hits[0].lane, "grg-salience-conjunctive-evidence");
     }
 

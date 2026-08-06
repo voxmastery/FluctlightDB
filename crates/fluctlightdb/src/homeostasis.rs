@@ -129,6 +129,8 @@ mod tests {
 
     #[test]
     fn estimate_tokens_splits_words() {
-        assert_eq!(estimate_tokens("one two three"), 3);
+        // max(word_count, ceil(chars/4)) — short words can make chars/4 dominate.
+        assert_eq!(estimate_tokens("one two three"), 4);
+        assert_eq!(estimate_tokens("abcdefghij klmnopqrst"), 6);
     }
 }

@@ -307,7 +307,10 @@ mod tests {
         let clean = pfc.inhibit_score("the modern supported path");
 
         assert!(suppressed < 0.0, "inhibited content is suppressed");
-        assert!(suppressed >= MIN_INHIBIT_SCORE, "suppression capped at -0.8");
+        assert!(
+            suppressed >= MIN_INHIBIT_SCORE,
+            "suppression capped at -0.8"
+        );
         assert_eq!(clean, 0.0, "clean content is untouched");
     }
 
@@ -320,7 +323,10 @@ mod tests {
         for t in 0..1000 {
             pfc.tick_decay(t);
         }
-        assert!(pfc.goals.is_empty(), "goal should decay away and be dropped");
+        assert!(
+            pfc.goals.is_empty(),
+            "goal should decay away and be dropped"
+        );
         assert_eq!(
             pfc.goal_bias_score("temporary goal content", "temporary goal"),
             0.0
@@ -331,7 +337,10 @@ mod tests {
     fn matching_rules_returns_correct_rules() {
         let mut pfc = unlocked();
         pfc.add_rule("pricing", RuleAction::BoostVerified);
-        pfc.add_rule("weather forecast", RuleAction::InjectContext("meteo".into()));
+        pfc.add_rule(
+            "weather forecast",
+            RuleAction::InjectContext("meteo".into()),
+        );
 
         let hits = pfc.matching_rules("what is the pricing for enterprise");
         assert_eq!(hits.len(), 1);
@@ -339,9 +348,7 @@ mod tests {
 
         // Rule with two condition tokens only fires when both are present.
         assert!(pfc.matching_rules("pricing only").len() == 1);
-        assert!(pfc
-            .matching_rules("weather is nice")
-            .is_empty());
+        assert!(pfc.matching_rules("weather is nice").is_empty());
         assert_eq!(pfc.matching_rules("weather forecast today").len(), 1);
     }
 
@@ -352,7 +359,10 @@ mod tests {
         pfc.add_inhibit("deprecated".into());
         pfc.add_rule("pricing", RuleAction::BoostVerified);
 
-        assert_eq!(pfc.goal_bias_score("pricing strategy notes", "pricing"), 0.0);
+        assert_eq!(
+            pfc.goal_bias_score("pricing strategy notes", "pricing"),
+            0.0
+        );
         assert_eq!(pfc.inhibit_score("deprecated legacy path"), 0.0);
         assert!(pfc.matching_rules("pricing question").is_empty());
     }

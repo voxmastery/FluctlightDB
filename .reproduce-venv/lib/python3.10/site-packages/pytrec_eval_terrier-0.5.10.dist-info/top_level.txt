@@ -1,2 +1,0 @@
-pytrec_eval
-pytrec_eval_ext
