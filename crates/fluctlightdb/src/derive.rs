@@ -74,6 +74,104 @@ pub fn neuron_jaccard(a: &[NeuronId], b: &[NeuronId]) -> f32 {
     }
 }
 
+/// Re-derive one engram's whole neuron ensemble under `codec`, in place.
+///
+/// Every input is already persisted, so this needs no extra state and no new segment.
+/// The peer window is cloned before the mutable borrow because `tail_for_life` hands back
+/// references into the hippocampus we are about to write to.
+pub fn rekey_engram(brain: &mut crate::brain::FluctlightBrain, engram_id: uuid::Uuid) -> bool {
+    let codec = crate::id::CURRENT_CODEC;
+    let Some(idx) = brain
+        .hippocampus
+        .engrams
+        .iter()
+        .position(|e| e.id == engram_id)
+    else {
+        return false;
+    };
+    let (episode, life_id, tick, stage) = {
+        let e = &brain.hippocampus.engrams[idx];
+        (
+            e.episode.clone(),
+            e.life_id,
+            e.encoded_at_tick,
+            e.encoded_at_stage,
+        )
+    };
+
+    // Exclude the engram being re-keyed from its own peer window, or it inflates its
+    // separator count against its own stale code.
+    let window = crate::separation_gate::overlap_window();
+    let peers: Vec<Engram> = brain
+        .hippocampus
+        .tail_for_life(life_id, window)
+        .into_iter()
+        .filter(|e| e.id != engram_id)
+        .cloned()
+        .collect();
+    let peer_refs: Vec<&Engram> = peers.iter().collect();
+
+    let sep =
+        crate::dentate::separate_episode(&episode, life_id, engram_id, tick, &peer_refs, codec);
+
+    {
+        let e = &mut brain.hippocampus.engrams[idx];
+        e.ec_neurons = sep.ec_neurons.clone();
+        e.dg_neurons = sep.dg_neurons.clone();
+        e.neurons = sep.ca3_neurons.clone();
+        e.separation_index = sep.separation_index;
+    }
+
+    // Re-wire at the engram's ORIGINAL developmental budget, not today's — an engram encoded
+    // as a newborn should not acquire an adult's fan-out just because it was re-keyed.
+    let budget =
+        crate::budget::WiringBudget::for_stage(crate::development::DevStage::from_u8(stage));
+    crate::budget::wire_chain(
+        &mut brain.graph,
+        &sep.dg_neurons,
+        crate::types::Region::HippocampusDg,
+        0.3,
+        budget.max_dg_chain_links,
+    );
+    crate::budget::wire_dg_to_ec(
+        &mut brain.graph,
+        &sep.dg_neurons,
+        &sep.ec_neurons,
+        budget.max_dg_to_ec_links,
+    );
+
+    if let Some(v) = brain.semantic.engram_vectors.get(&engram_id).cloned() {
+        brain.semantic.register_engram(engram_id, life_id, v, codec);
+    }
+    true
+}
+
+/// Re-key up to `limit` pending engrams, oldest first, and return how many were done.
+pub fn drain(brain: &mut crate::brain::FluctlightBrain, limit: usize) -> u64 {
+    if brain.rekey_pending.is_empty() || limit == 0 {
+        return 0;
+    }
+    let batch: Vec<uuid::Uuid> = brain.rekey_pending.iter().take(limit).copied().collect();
+    let mut done = 0u64;
+    for id in batch {
+        // Order is CORRECTNESS, not throughput. `separate_episode`'s separator loop reads a
+        // live `tail_for_life` window, so engram N's derived code depends on engrams 0..N-1
+        // as they stood at encode time. Re-keying out of order yields a different separator
+        // count and a different separation_index. A generic REINDEX has no analogue: a
+        // Postgres row's index entry does not depend on the previous row's.
+        if rekey_engram(brain, id) {
+            done += 1;
+        }
+        brain.rekey_pending.retain(|p| *p != id);
+    }
+    if done > 0 {
+        brain.life.neuron_codec = crate::id::CURRENT_CODEC;
+        brain.life.codec_probes = crate::life::codec_probes_for(crate::id::CURRENT_CODEC);
+        brain.invalidate_activation_cache();
+    }
+    done
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

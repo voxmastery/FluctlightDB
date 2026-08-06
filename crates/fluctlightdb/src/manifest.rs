@@ -130,7 +130,50 @@ pub fn load_v4_dir(dir: &Path) -> Result<FluctlightBrain> {
     brain.tau = segment::read_segment(dir, "tau").unwrap_or_default();
     brain.agent = segment::read_segment(dir, "agent").unwrap_or_default();
     brain.governance = segment::read_segment(dir, "governance").unwrap_or_default();
+    detect_codec_drift(&mut brain);
     Ok(brain)
+}
+
+/// Flag every engram for re-keying when this brain's stored neuron ids can no longer be
+/// reproduced by the running binary.
+///
+/// Two triggers, both cheap and both checked on every open:
+///
+/// 1. **Codec drift.** The brain recorded known-answer probes under its own codec. If
+///    recomputing them now yields something different, the identity function moved
+///    underneath stored data — the exact silent-total-recall-loss failure that motivated
+///    freezing the codec. Historically this produced no error, no crash and no log line;
+///    recall simply returned empty forever.
+/// 2. **Legacy codec.** A brain written before the freeze is on `CODEC_LEGACY_STD`. It still
+///    recalls correctly (its ids and its cues agree), so this is not urgent — but it is
+///    still riding an unstable hash, so it is queued for migration to FLCT1.
+///
+/// Detection is a probe comparison, not a digest, a manifest field, or a WAL entry.
+fn detect_codec_drift(brain: &mut FluctlightBrain) {
+    let codec = brain.life.neuron_codec;
+    let expected = crate::life::codec_probes_for(codec);
+    let drifted = !brain.life.codec_probes.is_empty() && brain.life.codec_probes != expected;
+    let legacy = codec != crate::id::CURRENT_CODEC;
+    if !drifted && !legacy {
+        return;
+    }
+    let mut pending: Vec<(u64, uuid::Uuid)> = brain
+        .hippocampus
+        .engrams
+        .iter()
+        .map(|e| (e.encoded_at_tick, e.id))
+        .collect();
+    // Oldest first — see the ordering note in `derive::drain`.
+    pending.sort_unstable();
+    brain.rekey_pending = pending.into_iter().map(|(_, id)| id).collect();
+    if drifted {
+        eprintln!(
+            "fluctlight: neuron codec drift detected ({} engrams queued for re-key) — \
+             stored ids no longer match freshly derived cues; run `rekey_now()` or let \
+             sleep drain the queue",
+            brain.rekey_pending.len()
+        );
+    }
 }
 
 pub fn migrate_v3_file_to_v4(v3_path: &Path, v4_dir: &Path) -> Result<()> {
