@@ -43,6 +43,26 @@ enum IndexBackend {
     Memory(Mutex<LexicalIndex>),
 }
 
+/// Merge two rank-ordered hit lists into one, preserving rank: take the best remaining
+/// from each lane in turn, skip ids already taken, stop at `cap`. The `HashSet` is used
+/// only for membership — never for ordering.
+fn interleave_by_rank(lexical: &[Uuid], semantic: &[Uuid], cap: usize) -> Vec<Uuid> {
+    let mut seen: HashSet<Uuid> = HashSet::with_capacity(cap);
+    let mut out: Vec<Uuid> = Vec::with_capacity(cap.min(lexical.len() + semantic.len()));
+    let rounds = lexical.len().max(semantic.len());
+    for i in 0..rounds {
+        for id in [lexical.get(i), semantic.get(i)].into_iter().flatten() {
+            if out.len() >= cap {
+                return out;
+            }
+            if seen.insert(*id) {
+                out.push(*id);
+            }
+        }
+    }
+    out
+}
+
 pub struct RecallIndex {
     backend: Mutex<IndexBackend>,
     path: Option<PathBuf>,
@@ -166,7 +186,13 @@ impl RecallIndex {
         }
     }
 
-    /// Union of FTS hits and HNSW / semantic top-k, capped.
+    /// Union of FTS hits and HNSW / semantic top-k, **in rank order**, capped.
+    ///
+    /// Both source lanes return their hits best-first. Interleaving them round-robin and
+    /// truncating by rank means an overflowing candidate set drops its *weakest* members.
+    /// This used to collect into a `HashSet` and `truncate(cap)`, which dropped members in
+    /// hash order — and with `lexical_seed_limit`/`semantic_seed_limit` each reaching 512
+    /// against a `DEFAULT_CANDIDATE_CAP` of 128, overflow is the normal case, not the edge.
     pub fn hybrid_candidates(
         &self,
         cue: &str,
@@ -179,44 +205,36 @@ impl RecallIndex {
         let cap = cap.max(1).min(MAX_CANDIDATE_CAP);
         let lex_limit = lexical_seed_limit(cap);
         let sem_limit = semantic_seed_limit(cap);
-        let mut set = HashSet::new();
 
         let guard = self
             .backend
             .lock()
             .map_err(|e| crate::error::Error::Store(format!("recall index lock: {e}")))?;
-        match &*guard {
+        let (lexical, semantic_hits) = match &*guard {
             IndexBackend::Sidecar(s) => {
-                for id in s.fts_search(cue, lex_limit)? {
-                    set.insert(id);
-                }
-                if let Some(vec) = cue_vector {
-                    for id in s.semantic_search(vec, sem_limit)? {
-                        set.insert(id);
-                    }
-                }
+                let lex = s.fts_search(cue, lex_limit)?;
+                let sem = match cue_vector {
+                    Some(vec) => s.semantic_search(vec, sem_limit)?,
+                    None => Vec::new(),
+                };
+                (lex, sem)
             }
             IndexBackend::Memory(lex) => {
-                let lex = lex
+                let lex_guard = lex
                     .lock()
                     .map_err(|e| crate::error::Error::Store(format!("lexical lock: {e}")))?;
-                for id in lex.search(cue, lex_limit)? {
-                    set.insert(id);
-                }
-                if let Some(vec) = cue_vector {
-                    for id in semantic_top_k(semantic, vec, sem_limit) {
-                        set.insert(id);
-                    }
-                }
+                let lex_hits = lex_guard.search(cue, lex_limit)?;
+                drop(lex_guard);
+                let sem = match cue_vector {
+                    Some(vec) => semantic_top_k(semantic, vec, sem_limit),
+                    None => Vec::new(),
+                };
+                (lex_hits, sem)
             }
-        }
+        };
         drop(guard);
 
-        let mut out: Vec<Uuid> = set.into_iter().collect();
-        if out.len() > cap {
-            out.truncate(cap);
-        }
-        Ok(out)
+        Ok(interleave_by_rank(&lexical, &semantic_hits, cap))
     }
 
     pub fn semantic_sims_for_candidates(

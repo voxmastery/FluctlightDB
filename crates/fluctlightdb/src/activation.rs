@@ -51,6 +51,7 @@ pub fn activate_from(
     max_hops: u32,
     myelination: f32,
     top_k: usize,
+    codec: u8,
 ) -> ActivationResult {
     activate_from_hybrid(
         cue,
@@ -63,6 +64,7 @@ pub fn activate_from(
         myelination,
         top_k,
         None,
+        codec,
     )
 }
 
@@ -77,8 +79,9 @@ pub fn activate_from_hybrid(
     myelination: f32,
     top_k: usize,
     candidate_ids: Option<&HashSet<Uuid>>,
+    codec: u8,
 ) -> ActivationResult {
-    let cue_neurons = cue_to_dg_neurons(cue, life_id);
+    let cue_neurons = cue_to_dg_neurons(cue, life_id, codec);
 
     let engram_refs: Vec<&Engram> = if let Some(ids) = candidate_ids {
         hippocampus
@@ -110,7 +113,7 @@ pub fn activate_from_hybrid(
 
     if let Some(vec) = cue_vector {
         let cue_id = Uuid::new_v4();
-        for n in semantic.cue_ec_neurons(vec, life_id, cue_id) {
+        for n in semantic.cue_ec_neurons(vec, life_id, cue_id, codec) {
             activation.insert(n, 0.85);
         }
         for (engram_id, sim) in &semantic_sims {
@@ -185,7 +188,12 @@ pub fn activate_from_hybrid(
     }
 }
 
-/// Cap candidate set size when index returns too many IDs.
+/// Cap candidate set size when the index returns too many IDs.
+///
+/// `ids` arrives in rank order from [`crate::index::RecallIndex::hybrid_candidates`], so
+/// truncation drops the weakest candidates. The `HashSet` is built *after* truncation and
+/// is only used for membership testing in `activate_from_hybrid` — building it first would
+/// re-randomize the order and put us back where we started.
 pub fn cap_candidates(mut ids: Vec<Uuid>, cap: usize) -> HashSet<Uuid> {
     if ids.len() > cap {
         ids.truncate(cap);
@@ -201,8 +209,13 @@ pub fn default_candidate_cap() -> usize {
 }
 
 /// Pattern completion — retrieve full engram from partial cue (CA3 analog).
-pub fn complete(cue: &str, hippocampus: &Hippocampus, life_id: uuid::Uuid) -> Option<Engram> {
-    let cue_neurons = cue_to_dg_neurons(cue, life_id);
+pub fn complete(
+    cue: &str,
+    hippocampus: &Hippocampus,
+    life_id: uuid::Uuid,
+    codec: u8,
+) -> Option<Engram> {
+    let cue_neurons = cue_to_dg_neurons(cue, life_id, codec);
     hippocampus
         .engrams_for_life(life_id)
         .max_by(|a, b| {
@@ -280,7 +293,7 @@ mod tests {
         hippocampus.encode(engram);
 
         let mut semantic = SemanticField::default();
-        semantic.register_engram(id, life, v);
+        semantic.register_engram(id, life, v, crate::id::CURRENT_CODEC);
 
         let cue = vec![0.95, 0.05, 0.0];
         let mut candidates = HashSet::new();
@@ -296,6 +309,7 @@ mod tests {
             0.5,
             4,
             Some(&candidates),
+            crate::id::CURRENT_CODEC,
         );
         assert!(!result.recalls.is_empty());
         assert!(result.recalls[0].activation > 0.1);

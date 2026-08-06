@@ -215,6 +215,7 @@ impl FluctlightBrain {
             return Err(Error::EmbryonicOnlyReflex);
         }
 
+        let codec = self.life.neuron_codec;
         if let Some(ref rag) = episode.rag {
             if let (Some(doc), Some(chunk)) = (&rag.doc_id, &rag.chunk_id) {
                 if let Some(existing) = self.hippocampus.find_rag_chunk(doc, chunk) {
@@ -241,7 +242,7 @@ impl FluctlightBrain {
             );
             let ec_neurons: Vec<crate::id::NeuronId> = rich
                 .iter()
-                .map(|t| crate::id::NeuronId::from_seeds(&["ec", &t.surface]))
+                .map(|t| crate::id::NeuronId::from_seeds_with(codec, &["ec", &t.surface]))
                 .collect();
             let separation = SeparationResult {
                 ec_neurons: ec_neurons.clone(),
@@ -268,9 +269,12 @@ impl FluctlightBrain {
                 is_core: false,
             };
             if let Some(ref vector) = episode.semantic_vector {
-                let ec_sem =
-                    self.semantic
-                        .register_engram(engram_id, self.life.life_id, vector.clone());
+                let ec_sem = self.semantic.register_engram(
+                    engram_id,
+                    self.life.life_id,
+                    vector.clone(),
+                    codec,
+                );
                 engram.ec_neurons.extend(ec_sem);
             }
             self.amygdala.tag(engram_id, salience);
@@ -304,7 +308,8 @@ impl FluctlightBrain {
         let expected_activation = (self.cortex.fact_boost(&episode.content)
             + self.cortex.fact_boost(&episode.context) * 0.5)
             .clamp(0.0, 1.0);
-        self.neuromodulators.prediction_error(expected_activation, salience);
+        self.neuromodulators
+            .prediction_error(expected_activation, salience);
 
         let verified = episode
             .provenance
@@ -348,6 +353,7 @@ impl FluctlightBrain {
             tick,
             self.development.stage as u8,
             salience,
+            codec,
         );
 
         // ACh novelty/familiarity signal (Hasselmo 2006):
@@ -364,7 +370,7 @@ impl FluctlightBrain {
         if let Some(ref vector) = episode.semantic_vector {
             let ec_sem =
                 self.semantic
-                    .register_engram(engram.id, self.life.life_id, vector.clone());
+                    .register_engram(engram.id, self.life.life_id, vector.clone(), codec);
             for &n in &ec_sem {
                 engram.ec_neurons.push(n);
                 self.graph.register_neuron(n, HippocampusCa1);
@@ -557,6 +563,7 @@ impl FluctlightBrain {
             self.development.stage.myelination(),
             top_k,
             candidate_set.as_ref(),
+            self.life.neuron_codec,
         );
         let cortex_boost = self.cortex.fact_boost(cue) + self.cortex.semantic_boost(cue_vector);
         let field_boost = cue_vector
@@ -578,10 +585,11 @@ impl FluctlightBrain {
         // This rescues recalls that BM25+dense missed because the surface tokens didn't overlap.
         if !self.neuromodulators.is_encoding() {
             let gain = self.neuromodulators.ca3_recurrent_gain();
+            let codec = self.life.neuron_codec;
             let rich = crate::tokenize::tokenize_rich(cue, "", None);
             let cue_neurons: Vec<crate::id::NeuronId> = rich
                 .iter()
-                .map(|t| crate::id::NeuronId::from_seeds(&["ec", &t.surface]))
+                .map(|t| crate::id::NeuronId::from_seeds_with(codec, &["ec", &t.surface]))
                 .collect();
             if let Some(completed) = self.hippocampus.ca3_attractor_complete(
                 &cue_neurons,
@@ -590,7 +598,11 @@ impl FluctlightBrain {
                 0.07, // 7% Jaccard: loose enough for partial cues, tight enough to avoid noise
             ) {
                 let boost = gain * 0.35;
-                if let Some(r) = result.recalls.iter_mut().find(|r| r.engram_id == completed.id) {
+                if let Some(r) = result
+                    .recalls
+                    .iter_mut()
+                    .find(|r| r.engram_id == completed.id)
+                {
                     // Amplify existing result — CA3 confirms the BM25+dense hit
                     r.activation += boost;
                     r.completion_strength = (r.completion_strength + gain).min(1.0);
@@ -726,7 +738,12 @@ impl FluctlightBrain {
         // detect_exact_query() identifies these patterns; exact_verified_recall() scans
         // only provenance-backed engrams and injects them at activation 2.0 (guaranteed top).
         if crate::recall_router::detect_exact_query(cue) {
-            exact_verified_recall(cue, &self.hippocampus, self.life.life_id, &mut result.recalls);
+            exact_verified_recall(
+                cue,
+                &self.hippocampus,
+                self.life.life_id,
+                &mut result.recalls,
+            );
         }
 
         annotate_recall_trust(&mut result.recalls);
@@ -828,6 +845,7 @@ impl FluctlightBrain {
             &self.hippocampus,
             self.life.life_id,
             self.development.stage.myelination(),
+            self.life.neuron_codec,
         )
     }
 
@@ -852,7 +870,12 @@ impl FluctlightBrain {
     }
 
     pub fn complete(&self, cue: &str) -> Option<Engram> {
-        complete(cue, &self.hippocampus, self.life.life_id)
+        complete(
+            cue,
+            &self.hippocampus,
+            self.life.life_id,
+            self.life.neuron_codec,
+        )
     }
 
     /// Neocortical fact readout for cue (post-sleep consolidation).
@@ -965,7 +988,8 @@ impl FluctlightBrain {
         {
             let eid = self.hippocampus.engrams[idx].id;
             let lid = self.hippocampus.engrams[idx].life_id;
-            self.semantic.register_engram(eid, lid, v);
+            let codec = self.life.neuron_codec;
+            self.semantic.register_engram(eid, lid, v, codec);
         }
         let report_content = self.hippocampus.engrams[idx].episode.content.clone();
         let revision = self.hippocampus.engrams[idx].replay_count;
@@ -1523,7 +1547,10 @@ fn exact_verified_recall(
             }
             // Score: fraction of cue tokens found in engram content + context
             let text = format!("{} {}", e.episode.content, e.episode.context).to_lowercase();
-            let matched = cue_tokens.iter().filter(|t| text.contains(t.as_str())).count();
+            let matched = cue_tokens
+                .iter()
+                .filter(|t| text.contains(t.as_str()))
+                .count();
             if matched == 0 {
                 return None;
             }
@@ -1542,7 +1569,8 @@ fn exact_verified_recall(
 
     // Sort: tier ASC (verified first), score DESC (best match first)
     matches.sort_by(|a, b| {
-        a.2.cmp(&b.2).then_with(|| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
+        a.2.cmp(&b.2)
+            .then_with(|| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal))
     });
 
     // Inject exact results at activation 10.0 (guaranteed to win over any associative result).

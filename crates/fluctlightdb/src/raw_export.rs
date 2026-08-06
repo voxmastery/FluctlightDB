@@ -141,7 +141,10 @@ fn import_raw_parts(
     }
     for e in &brain.hippocampus.engrams {
         if let Some(ref v) = e.episode.semantic_vector {
-            brain.semantic.register_engram(e.id, e.life_id, v.clone());
+            let codec = brain.life.neuron_codec;
+            brain
+                .semantic
+                .register_engram(e.id, e.life_id, v.clone(), codec);
         }
     }
     Ok(RawImportReport {

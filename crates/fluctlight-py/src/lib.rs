@@ -519,9 +519,9 @@ impl PyBrain {
                 }
                 Some(m)
             };
-            let hits =
-                self.inner
-                    .chorus_recall_maxsim(cue, k, &toks, pooled.as_deref(), w_bm);
+            let hits = self
+                .inner
+                .chorus_recall_maxsim(cue, k, &toks, pooled.as_deref(), w_bm);
             batch.push(hits);
         }
         chorus_batch_to_py(py, &batch, true)
