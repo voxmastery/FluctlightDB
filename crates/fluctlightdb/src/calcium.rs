@@ -302,8 +302,8 @@ pub fn calcium_stdp_fast(delta_t_ms: f32, da_gate: f32) -> f32 {
 /// Used in the test suite to verify our model matches the empirical STDP curve.
 pub fn predict_stdp_outcome(delta_t_ms: f32) -> StdpOutcome {
     let mut spine = CalciumSpine::default();
-    let dt = 0.1_f32;             // 0.1ms simulation step
-    let sim_ms = 200.0_f32;       // 200ms window — enough for all intervals tested
+    let dt = 0.1_f32; // 0.1ms simulation step
+    let sim_ms = 200.0_f32; // 200ms window — enough for all intervals tested
     let steps = (sim_ms / dt) as u32;
 
     // Ensure both spikes always fire at positive times within the window.
@@ -312,7 +312,7 @@ pub fn predict_stdp_outcome(delta_t_ms: f32) -> StdpOutcome {
     let (pre_at_ms, post_at_ms): (f32, f32) = if delta_t_ms >= 0.0 {
         (10.0_f32, 10.0 + delta_t_ms)
     } else {
-        (10.0 - delta_t_ms, 10.0_f32)  // post at 10ms, pre fires later
+        (10.0 - delta_t_ms, 10.0_f32) // post at 10ms, pre fires later
     };
 
     // Spike peak membrane potential (mV) — NMDA Mg²⁺ fully relieved here
@@ -442,14 +442,18 @@ mod tests {
         let mut spine = CalciumSpine::default();
         let mut w = 0.5_f32;
         spine.on_pre_spike(); // pre fires
-        // tick for 50ms — Ca²⁺ should decay without crossing θ_p
+                              // tick for 50ms — Ca²⁺ should decay without crossing θ_p
         for _ in 0..500 {
             spine.tick(&mut w, 0.1);
         }
         let dw = w - 0.5;
         // Pre alone should cause at most mild LTD (ca between θ_d and θ_p briefly)
         // But definitely NOT LTP
-        assert!(dw <= 0.01, "pre-spike alone should not cause LTP, got ΔW={:.4}", dw);
+        assert!(
+            dw <= 0.01,
+            "pre-spike alone should not cause LTP, got ΔW={:.4}",
+            dw
+        );
     }
 
     // ── STDP curve tests (Bi & Poo 1998) ─────────────────────────────────────

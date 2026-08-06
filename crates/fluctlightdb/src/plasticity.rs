@@ -67,7 +67,7 @@ pub fn stdp_update(synapse: &mut Synapse, pre_tick: u64, post_tick: u64) -> f32 
 pub fn stdp_update_da(synapse: &mut Synapse, pre_tick: u64, post_tick: u64, da_gate: f32) -> f32 {
     const A_PLUS: f32 = 0.005;
     const A_MINUS: f32 = 0.005;
-    const TAU_PLUS: f32 = 20.0;  // ms
+    const TAU_PLUS: f32 = 20.0; // ms
     const TAU_MINUS: f32 = 20.0; // ms
     const WINDOW_MS: f32 = 20.0;
 

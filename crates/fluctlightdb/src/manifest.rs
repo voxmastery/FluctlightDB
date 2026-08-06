@@ -41,6 +41,8 @@ impl Default for BrainManifest {
                 "semantic".into(),
                 "muon".into(),
                 "tau".into(),
+                "agent".into(),
+                "governance".into(),
             ],
         }
     }
@@ -70,6 +72,15 @@ pub fn save_v4_dir(brain: &FluctlightBrain, dir: &Path) -> Result<()> {
     // Serialize/Deserialize; they just were never written.
     segment::write_segment(dir, "muon", &brain.muon)?;
     segment::write_segment(dir, "tau", &brain.tau)?;
+    // Agent + governance: same omission as the muon/tau lanes above, one layer up.
+    // `agent` carries the WM ring, the retention policy and the auto-consolidate flag —
+    // `connect_embedded()` sets the latter two on every open, so their loss was masked,
+    // but unflushed working memory was silently dropped on every restart.
+    // `governance` carries the compliance audit log; an audit trail that does not survive
+    // a restart is worse than none, because `audit_log()` still returns 200 with an
+    // empty list and no client can tell the difference.
+    segment::write_segment(dir, "agent", &brain.agent)?;
+    segment::write_segment(dir, "governance", &brain.governance)?;
 
     let manifest = BrainManifest {
         format_version: V4_VERSION,
@@ -99,7 +110,7 @@ pub fn load_v4_dir(dir: &Path) -> Result<FluctlightBrain> {
     }
     let mut brain = FluctlightBrain::from_snapshot(
         manifest.wal_seq,
-        segment::read_segment(dir, "life")?,
+        crate::life::read_life_segment(dir)?,
         segment::read_segment(dir, "development")?,
         segment::read_segment(dir, "neuromodulators")?,
         segment::read_segment(dir, "graph")?,
@@ -117,6 +128,8 @@ pub fn load_v4_dir(dir: &Path) -> Result<FluctlightBrain> {
     // older brain directories readable and matches the previous (always-empty) behaviour.
     brain.muon = segment::read_segment(dir, "muon").unwrap_or_default();
     brain.tau = segment::read_segment(dir, "tau").unwrap_or_default();
+    brain.agent = segment::read_segment(dir, "agent").unwrap_or_default();
+    brain.governance = segment::read_segment(dir, "governance").unwrap_or_default();
     Ok(brain)
 }
 
@@ -164,7 +177,12 @@ mod tests {
         let dir = tempdir().unwrap();
         let v4 = dir.path().join("brain_v4");
         let mut brain = FluctlightBrain::new();
-        brain.muon_imprint("sess-1", "2026-07-21", "the quick brown fox", "quick brown fox");
+        brain.muon_imprint(
+            "sess-1",
+            "2026-07-21",
+            "the quick brown fox",
+            "quick brown fox",
+        );
         assert_eq!(brain.muon_len(), 1, "imprint should land in the lane");
 
         save_v4_dir(&brain, &v4).unwrap();
@@ -178,6 +196,85 @@ mod tests {
         assert!(
             !loaded.muon_recall("quick brown fox", 4).is_empty(),
             "a reloaded imprint must still be recallable"
+        );
+    }
+
+    /// The compliance audit log must survive a restart. `governance` was in neither the
+    /// write list nor the read list, so `scrub_pii` / `delete_by_subject` / `forget_before`
+    /// recorded entries that vanished at the next open while `audit_log()` kept returning
+    /// 200 with an empty list — the same undetectable-loss shape as the muon/tau bug.
+    #[test]
+    fn v4_roundtrip_preserves_governance_audit_log() {
+        let dir = tempdir().unwrap();
+        let v4 = dir.path().join("brain_v4");
+        let mut brain = FluctlightBrain::new();
+        brain
+            .experience(Episode::new(
+                "reach bob@example.com for the invoice",
+                "test",
+                0.6,
+            ))
+            .unwrap();
+        let scrub = brain.scrub_pii().unwrap();
+        assert_eq!(
+            scrub.engrams_scrubbed, 1,
+            "precondition: something was scrubbed"
+        );
+        let before = brain.governance_state().audit_log.len();
+        assert!(before > 0, "precondition: an audit entry was recorded");
+
+        save_v4_dir(&brain, &v4).unwrap();
+        let loaded = load_v4_dir(&v4).unwrap();
+        assert_eq!(
+            loaded.governance_state().audit_log.len(),
+            before,
+            "compliance audit entries must survive a restart"
+        );
+    }
+
+    /// Working memory that has not yet been flushed to the hippocampus must survive a
+    /// checkpoint. `agent` (AgentState) holds the WM ring, retention policy and the
+    /// auto-consolidate flag, and was never written to disk.
+    #[test]
+    fn v4_roundtrip_preserves_agent_state() {
+        let dir = tempdir().unwrap();
+        let v4 = dir.path().join("brain_v4");
+        let mut brain = FluctlightBrain::new();
+        brain.turn_begin();
+        brain.wm_push("user prefers dark mode", "settings", 0.8, None);
+        let before = brain.wm_len();
+        assert!(before > 0, "precondition: WM holds a slot");
+
+        save_v4_dir(&brain, &v4).unwrap();
+        let loaded = load_v4_dir(&v4).unwrap();
+        assert_eq!(
+            loaded.wm_len(),
+            before,
+            "unflushed working memory must survive a checkpoint"
+        );
+    }
+
+    /// Guard against the whole bug class: every segment the manifest claims to persist must
+    /// actually be written to disk. `BrainManifest::default().segments` is the declared
+    /// contract; this asserts the writer honours it. Adding a field to `FluctlightBrain`
+    /// and listing it here without a `write_segment` call now fails loudly instead of
+    /// silently dropping that state at the next restart.
+    #[test]
+    fn every_declared_segment_is_actually_written() {
+        let dir = tempdir().unwrap();
+        let v4 = dir.path().join("brain_v4");
+        let brain = FluctlightBrain::new();
+        save_v4_dir(&brain, &v4).unwrap();
+
+        let declared = BrainManifest::default().segments;
+        let missing: Vec<&str> = declared
+            .iter()
+            .filter(|name| !crate::segment::segment_exists(&v4, name))
+            .map(|s| s.as_str())
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "manifest declares segments that save_v4_dir never writes: {missing:?}"
         );
     }
 
