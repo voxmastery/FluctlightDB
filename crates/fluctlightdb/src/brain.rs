@@ -320,8 +320,12 @@ impl FluctlightBrain {
             && !verified
             && !episode.context.starts_with("ledger:")
         {
-            let gate =
-                crate::separation_gate::assess(&self.hippocampus, &episode, self.life.life_id);
+            let gate = crate::separation_gate::assess(
+                &self.hippocampus,
+                &episode,
+                self.life.life_id,
+                codec,
+            );
             if !gate.allowed {
                 return Ok(ExperienceReport {
                     engram_id: Uuid::nil(),

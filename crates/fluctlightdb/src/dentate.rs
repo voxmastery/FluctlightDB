@@ -11,7 +11,10 @@ use crate::types::Episode;
 /// Granule cells per EC token — sparse expansion (~2–4% of pool in biology).
 const GRANULES_PER_TOKEN: u32 = 2;
 const OVERLAP_THRESHOLD: f32 = 0.28;
-const MAX_SEPARATOR_ATTEMPTS: u32 = 6;
+/// Upper bound on artificial separator neurons the DG will append to push a new
+/// engram's code away from an existing one. `derive::content_dg` recomputes exactly this
+/// many candidate seeds to subtract them back out.
+pub const MAX_SEPARATOR_ATTEMPTS: u32 = 6;
 
 /// Result of dentate gyrus pattern separation (Marr DG → CA3).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
