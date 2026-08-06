@@ -109,6 +109,11 @@ pub fn sleep_cycle(
 }
 
 /// Pattern separation (DG) + wiring (CA3/CA1) — Marr trisynaptic path.
+// Argument count grew when the neuron codec became per-brain state. The codec must be
+// threaded explicitly rather than read from a global: `serve.rs` pools many brains and
+// serves them from a thread per connection, so a process-wide codec would let a
+// legacy-pinned tenant and a migrated one derive each other's neuron ids mid-request.
+#[allow(clippy::too_many_arguments)]
 pub fn separate_and_encode(
     graph: &mut BrainGraph,
     hippocampus: &Hippocampus,

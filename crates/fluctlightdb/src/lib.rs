@@ -21,6 +21,7 @@ pub mod chorus_runtime;
 pub mod chronos;
 pub mod compact;
 pub mod confidence;
+pub mod config;
 pub mod conflict_lattice;
 pub mod consensus;
 pub mod cortex;

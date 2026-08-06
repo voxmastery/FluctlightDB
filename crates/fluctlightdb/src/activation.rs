@@ -7,7 +7,6 @@ use crate::engram::Engram;
 use crate::graph::BrainGraph;
 use crate::hippocampus::Hippocampus;
 use crate::id::NeuronId;
-use crate::index::DEFAULT_CANDIDATE_CAP;
 use crate::semantic::SemanticField;
 use crate::types::{ActivationResult, RecallResult};
 
@@ -18,6 +17,10 @@ fn env_truthy(key: &str) -> bool {
 }
 
 /// Index / vector-only recall: skip graph spreading (Chroma-class latency).
+///
+/// Still read from the environment on demand: the Python SDK's `connect_*()` helpers set
+/// these flags at runtime and expect the very next `experience()` to observe them, so
+/// memoizing them process-wide would silently break documented mode switching.
 pub fn vector_fast_mode() -> bool {
     env_truthy("FLUCTLIGHT_VECTOR_FAST")
 }
@@ -43,6 +46,11 @@ pub fn activation_max_hops() -> u32 {
 }
 
 /// Spreading activation recall — graph propagation, optionally seeded by entorhinal semantic vectors.
+// Argument count grew when the neuron codec became per-brain state. The codec must be
+// threaded explicitly rather than read from a global: `serve.rs` pools many brains and
+// serves them from a thread per connection, so a process-wide codec would let a
+// legacy-pinned tenant and a migrated one derive each other's neuron ids mid-request.
+#[allow(clippy::too_many_arguments)]
 pub fn activate_from(
     cue: &str,
     graph: &BrainGraph,
@@ -68,6 +76,11 @@ pub fn activate_from(
     )
 }
 
+// Argument count grew when the neuron codec became per-brain state. The codec must be
+// threaded explicitly rather than read from a global: `serve.rs` pools many brains and
+// serves them from a thread per connection, so a process-wide codec would let a
+// legacy-pinned tenant and a migrated one derive each other's neuron ids mid-request.
+#[allow(clippy::too_many_arguments)]
 pub fn activate_from_hybrid(
     cue: &str,
     cue_vector: Option<&[f32]>,
@@ -205,7 +218,7 @@ pub fn default_candidate_cap() -> usize {
     std::env::var("FLUCTLIGHT_CANDIDATE_CAP")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_CANDIDATE_CAP)
+        .unwrap_or(crate::index::DEFAULT_CANDIDATE_CAP)
 }
 
 /// Pattern completion — retrieve full engram from partial cue (CA3 analog).
