@@ -96,6 +96,14 @@ pub struct FluctlightBrain {
     /// Runtime-only CHORUS phase field (θ–γ wavelet substrate). Never persisted.
     #[serde(skip)]
     pub(crate) chorus: crate::chorus::ChorusField,
+    /// Engrams whose neuron ids were derived under a stale codec and must be re-keyed.
+    ///
+    /// Populated at load when the recorded codec probes disagree with what the current
+    /// binary computes — i.e. the identity function moved underneath stored data. Drained
+    /// incrementally by sleep and ingest, or all at once via `rekey_now()`. Runtime-only:
+    /// it is recomputed from the probe comparison on every open, so it never needs a segment.
+    #[serde(skip)]
+    pub rekey_pending: Vec<Uuid>,
 }
 
 impl Default for FluctlightBrain {
@@ -143,6 +151,7 @@ impl FluctlightBrain {
             muon: crate::muon_runtime::new_muon_lane(),
             tau: crate::tau_runtime::new_tau_lane(),
             chorus: crate::chorus_runtime::new_chorus_field(),
+            rekey_pending: Vec::new(),
         };
         brain.development.on_tick();
         brain.prefrontal.unlocked = brain.development.pfc_unlocked();
@@ -401,6 +410,9 @@ impl FluctlightBrain {
         if pressure >= PRESSURE_COMPACT_THRESHOLD {
             let _ = self.compact_internal(false);
         }
+        // Bleed the re-key queue a little on every write so an active brain migrates itself
+        // without an operator noticing. Sleep drains it in much larger batches.
+        crate::derive::drain(self, 4);
 
         let engram_id = engram.id;
         self.amygdala.tag(engram_id, salience);
@@ -439,6 +451,29 @@ impl FluctlightBrain {
             self.maybe_checkpoint()?;
         }
         Ok(ExperienceReport::ok(engram_id, separation, false))
+    }
+
+    /// Re-key every engram still queued after a codec change, immediately.
+    ///
+    /// The queue is otherwise drained a few engrams at a time by ingest and in larger
+    /// batches by sleep, so a brain in normal use migrates itself. This exists for
+    /// operators and for a brain that neither sleeps nor experiences, which would
+    /// otherwise stay partially re-keyed indefinitely.
+    pub fn rekey_now(&mut self) -> u64 {
+        let mut total = 0u64;
+        while !self.rekey_pending.is_empty() {
+            let done = crate::derive::drain(self, 256);
+            if done == 0 {
+                break;
+            }
+            total += done;
+        }
+        total
+    }
+
+    /// How many engrams are still waiting to be re-keyed.
+    pub fn rekey_pending_count(&self) -> usize {
+        self.rekey_pending.len()
     }
 
     /// Background heartbeat — auto-sleep when due (brainstem / autonomic).
@@ -897,6 +932,9 @@ impl FluctlightBrain {
         checkpoint: bool,
         trigger: SleepTrigger,
     ) -> Result<SleepReport> {
+        // Sleep is where bulk repair belongs: consolidation already walks replay_sequence
+        // oldest-first, which is the same order the re-key drain requires.
+        crate::derive::drain(self, 128);
         let stage_before = self.development.stage.as_str().to_string();
         let mut report = sleep_cycle(
             &mut self.hippocampus,
@@ -1287,6 +1325,8 @@ impl FluctlightBrain {
             alive: self.life.alive,
             autonomic_ticks: self.autonomic.total_ticks,
             ticks_since_sleep: self.autonomic.ticks_since_sleep,
+            neuron_codec: self.life.neuron_codec,
+            rekey_pending: self.rekey_pending.len() as u64,
             synapse_pressure: self.autonomic.synapse_pressure(
                 self.graph.synapse_count(),
                 self.development.stage.max_synapses(),
@@ -1344,6 +1384,7 @@ impl FluctlightBrain {
             muon: crate::muon_runtime::new_muon_lane(),
             tau: crate::tau_runtime::new_tau_lane(),
             chorus: crate::chorus_runtime::new_chorus_field(),
+            rekey_pending: Vec::new(),
         }
     }
 }
@@ -1389,6 +1430,7 @@ impl Clone for FluctlightBrain {
             muon: self.muon.clone(),
             tau: self.tau.clone(),
             chorus: self.chorus.clone(),
+            rekey_pending: self.rekey_pending.clone(),
         }
     }
 }
@@ -1667,6 +1709,14 @@ pub struct BrainStatus {
     pub ticks_since_sleep: u64,
     pub synapse_pressure: f32,
     pub wal_seq: u64,
+    /// Which neuron-identity codec this brain's stored ids were derived under.
+    #[serde(default)]
+    pub neuron_codec: u8,
+    /// Engrams still awaiting re-key after a codec change. Non-zero means recall is
+    /// degraded for the un-migrated remainder — this is what makes the failure visible
+    /// instead of silent.
+    #[serde(default)]
+    pub rekey_pending: u64,
 }
 
 #[cfg(test)]

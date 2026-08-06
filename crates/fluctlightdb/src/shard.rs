@@ -1,8 +1,5 @@
 //! Tenant → shard routing for horizontal scale-out.
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
 #[derive(Debug, Clone)]
 pub struct ShardRouter {
     pub shard_count: u32,
