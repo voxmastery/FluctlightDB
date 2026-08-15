@@ -4,6 +4,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB) · [Paper DOI](https://doi.org/10.5281/zenodo.20949890)
 
+> **Codex Community Hackathon:** [Fluctlight Swarm Memory — problem, architecture, and one-command demo](HACKATHON.md)
+
 ## Install
 
 ```bash
