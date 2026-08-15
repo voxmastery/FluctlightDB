@@ -16,6 +16,8 @@ Fluctlight Swarm Memory is a Codex plugin backed by FluctlightDB. It gives a par
 
 Prerequisites: Rust/Cargo and Python 3.9+.
 
+[Watch the 61-second captioned demo](docs/demo/fluctlight-swarm-memory-demo.mp4) or run the same verified flow yourself:
+
 ```bash
 python3 scripts/demo_codex_swarm.py
 ```

@@ -11,7 +11,10 @@ use crate::types::Episode;
 /// Granule cells per EC token — sparse expansion (~2–4% of pool in biology).
 const GRANULES_PER_TOKEN: u32 = 2;
 const OVERLAP_THRESHOLD: f32 = 0.28;
-const MAX_SEPARATOR_ATTEMPTS: u32 = 6;
+/// Upper bound on artificial separator neurons the DG will append to push a new
+/// engram's code away from an existing one. `derive::content_dg` recomputes exactly this
+/// many candidate seeds to subtract them back out.
+pub const MAX_SEPARATOR_ATTEMPTS: u32 = 6;
 
 /// Result of dentate gyrus pattern separation (Marr DG → CA3).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -33,6 +36,7 @@ pub fn separate_episode(
     engram_id: Uuid,
     tick: u64,
     existing: &[&Engram],
+    codec: u8,
 ) -> SeparationResult {
     let rich = tokenize_rich(
         &episode.content,
@@ -42,10 +46,10 @@ pub fn separate_episode(
 
     let ec_neurons: Vec<NeuronId> = rich
         .iter()
-        .map(|t| NeuronId::from_seeds(&["ec", &t.surface]))
+        .map(|t| NeuronId::from_seeds_with(codec, &["ec", &t.surface]))
         .collect();
 
-    let mut dg_neurons = expand_granules(&rich, life_id);
+    let mut dg_neurons = expand_granules(&rich, life_id, codec);
 
     let max_overlap_before = max_jaccard(&dg_neurons, existing);
 
@@ -54,12 +58,15 @@ pub fn separate_episode(
     while max_jaccard_single(&dg_neurons, existing) > OVERLAP_THRESHOLD
         && attempt < MAX_SEPARATOR_ATTEMPTS
     {
-        let sep = NeuronId::from_seeds(&[
-            "sep",
-            &engram_id.to_string(),
-            &attempt.to_string(),
-            &tick.to_string(),
-        ]);
+        let sep = NeuronId::from_seeds_with(
+            codec,
+            &[
+                "sep",
+                &engram_id.to_string(),
+                &attempt.to_string(),
+                &tick.to_string(),
+            ],
+        );
         dg_neurons.push(sep);
         separators_added += 1;
         attempt += 1;
@@ -71,10 +78,18 @@ pub fn separate_episode(
     let mut ca3_neurons = dg_neurons.clone();
     // CA3 recurrent binding — pairwise within sparse code
     for i in 0..dg_neurons.len().saturating_sub(1) {
-        ca3_neurons.push(NeuronId::from_pair(dg_neurons[i], dg_neurons[i + 1]));
+        ca3_neurons.push(NeuronId::from_pair_with(
+            codec,
+            dg_neurons[i],
+            dg_neurons[i + 1],
+        ));
     }
     if ec_neurons.len() >= 2 {
-        ca3_neurons.push(NeuronId::from_pair(ec_neurons[0], ec_neurons[1]));
+        ca3_neurons.push(NeuronId::from_pair_with(
+            codec,
+            ec_neurons[0],
+            ec_neurons[1],
+        ));
     }
 
     ca3_neurons.sort_unstable();
@@ -93,22 +108,20 @@ pub fn separate_episode(
 }
 
 /// Cue neurons using same DG expansion as encoding (for ACTIVATE).
-pub fn cue_to_dg_neurons(cue: &str, life_id: Uuid) -> Vec<NeuronId> {
+pub fn cue_to_dg_neurons(cue: &str, life_id: Uuid, codec: u8) -> Vec<NeuronId> {
     let rich = tokenize_rich(cue, "", None);
-    expand_granules(&rich, life_id)
+    expand_granules(&rich, life_id, codec)
 }
 
-fn expand_granules(tokens: &[RichToken], life_id: Uuid) -> Vec<NeuronId> {
+pub(crate) fn expand_granules(tokens: &[RichToken], life_id: Uuid, codec: u8) -> Vec<NeuronId> {
     let life = life_id.to_string();
     let mut out = Vec::new();
     for t in tokens {
         for g in 0..GRANULES_PER_TOKEN {
-            out.push(NeuronId::from_seeds(&[
-                "dg",
-                &life,
-                &t.surface,
-                &g.to_string(),
-            ]));
+            out.push(NeuronId::from_seeds_with(
+                codec,
+                &["dg", &life, &t.surface, &g.to_string()],
+            ));
         }
     }
     out.sort_unstable();
@@ -170,7 +183,7 @@ mod tests {
             provenance: None,
         };
         let id1 = Uuid::new_v4();
-        let r1 = separate_episode(&e1, life, id1, 1, &[]);
+        let r1 = separate_episode(&e1, life, id1, 1, &[], crate::id::CURRENT_CODEC);
         let mut engram1 = Engram::from_separation(life, e1.clone(), 0.5, 1, 1, &r1);
         engram1.id = id1;
 
@@ -185,7 +198,14 @@ mod tests {
             rag: None,
             provenance: None,
         };
-        let r2 = separate_episode(&e2, life, Uuid::new_v4(), 2, &[&engram1]);
+        let r2 = separate_episode(
+            &e2,
+            life,
+            Uuid::new_v4(),
+            2,
+            &[&engram1],
+            crate::id::CURRENT_CODEC,
+        );
 
         assert!(r2.max_overlap_before > 0.15);
         assert!(r2.separators_added > 0 || r2.max_overlap_after < r2.max_overlap_before);

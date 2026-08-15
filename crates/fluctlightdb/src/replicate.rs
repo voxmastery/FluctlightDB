@@ -39,8 +39,12 @@ pub fn sync_once(primary: &Path, replica_dir: &Path) -> Result<ReplicaStatus> {
     let mut snapshot_copied = false;
     let mut wal_bytes_copied = 0u64;
 
-    let manifest = primary.join("manifest.json");
-    let manifest_mtime = file_mtime_secs(&manifest).unwrap_or(0);
+    let publication = if primary.join("CURRENT").exists() {
+        primary.join("CURRENT")
+    } else {
+        primary.join("manifest.json")
+    };
+    let manifest_mtime = file_mtime_secs(&publication).unwrap_or(0);
     let brain_dst = replica_dir.join("brain");
 
     if storage::is_v4_path(primary) {
@@ -109,8 +113,11 @@ pub fn sync_once(primary: &Path, replica_dir: &Path) -> Result<ReplicaStatus> {
 }
 
 pub fn open_replica_brain(replica_dir: &Path) -> Result<FluctlightBrain> {
-    let brain_path = if replica_dir.join("brain").join("manifest.json").exists() {
-        replica_dir.join("brain")
+    let v4_brain = replica_dir.join("brain");
+    let brain_path = if v4_brain.join("CURRENT").exists()
+        || v4_brain.join("manifest.json").exists()
+    {
+        v4_brain
     } else {
         replica_dir.join("brain.flct")
     };

@@ -4,6 +4,7 @@
 __pycache__/
 .venv/
 .bench-venv/
+.reproduce-venv/
 embed-server/.venv/
 embed-server/__pycache__/
 *.egg-info/
@@ -61,3 +62,6 @@ papers/arxiv-v1/figures/04-longmemeval-e2e-by-type.pdf
 .fluctlight/**/.brain.lock
 .fluctlight/.handoffs.lock
 .beam-venv/
+
+# Prebuilt release binaries — fetch from GitHub Releases, do not commit.
+fluctlight-0.5.*

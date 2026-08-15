@@ -15,6 +15,29 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("store error: {0}")]
     Store(String),
+    #[error(
+        "not primary at placement generation {generation}; primary={primary:?}, api={api_addr:?}"
+    )]
+    NotPrimary {
+        primary: Option<u64>,
+        generation: u64,
+        api_addr: Option<String>,
+    },
+    #[error("placement unavailable: {0}")]
+    PlacementUnavailable(String),
+    #[error("read consistency unavailable: {0}")]
+    ReadConsistencyUnavailable(String),
+    #[error(
+        "durability unavailable for {policy} write at watermark {watermark}: required {required} durable copies, received {received}"
+    )]
+    DurabilityUnavailable {
+        policy: String,
+        watermark: u64,
+        required: usize,
+        received: usize,
+    },
+    #[error("durable mutation {operation} is disabled in distributed production")]
+    DistributedMutationDisabled { operation: &'static str },
     #[error("serialization error: {0}")]
     Serde(String),
     #[error(transparent)]

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # WAL + snapshot replication loop (Phase 5).
 set -euo pipefail
-PRIMARY="${FLUCTLIGHT_PRIMARY_BRAIN:-$HOME/.fluctlight/tenants/default/brain}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=resolve-brain.sh
+source "$SCRIPT_DIR/resolve-brain.sh"
+PRIMARY="${FLUCTLIGHT_PRIMARY_BRAIN:-$(resolve_fluctlight_brain)}"
 REPLICA="${FLUCTLIGHT_REPLICA_DIR:-$HOME/.fluctlight/replica}"
 INTERVAL="${FLUCTLIGHT_REPLICA_INTERVAL_SEC:-2}"
-FLUCTLIGHT="$("$(dirname "$0")/fluctlight-bin.sh")"
+FLUCTLIGHT="$("$SCRIPT_DIR/fluctlight-bin.sh")"
 
-if [[ -x "$FLUCTLIGHT" && -f "$PRIMARY" ]]; then
+if [[ -x "$FLUCTLIGHT" && ( -f "$PRIMARY" || -d "$PRIMARY" ) ]]; then
   exec "$FLUCTLIGHT" replicate --primary "$PRIMARY" --replica "$REPLICA" --interval "$INTERVAL"
 fi
 

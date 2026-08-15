@@ -7,7 +7,6 @@ use crate::engram::Engram;
 use crate::graph::BrainGraph;
 use crate::hippocampus::Hippocampus;
 use crate::id::NeuronId;
-use crate::index::DEFAULT_CANDIDATE_CAP;
 use crate::semantic::SemanticField;
 use crate::types::{ActivationResult, RecallResult};
 
@@ -18,6 +17,10 @@ fn env_truthy(key: &str) -> bool {
 }
 
 /// Index / vector-only recall: skip graph spreading (Chroma-class latency).
+///
+/// Still read from the environment on demand: the Python SDK's `connect_*()` helpers set
+/// these flags at runtime and expect the very next `experience()` to observe them, so
+/// memoizing them process-wide would silently break documented mode switching.
 pub fn vector_fast_mode() -> bool {
     env_truthy("FLUCTLIGHT_VECTOR_FAST")
 }
@@ -43,6 +46,11 @@ pub fn activation_max_hops() -> u32 {
 }
 
 /// Spreading activation recall — graph propagation, optionally seeded by entorhinal semantic vectors.
+// Argument count grew when the neuron codec became per-brain state. The codec must be
+// threaded explicitly rather than read from a global: `serve.rs` pools many brains and
+// serves them from a thread per connection, so a process-wide codec would let a
+// legacy-pinned tenant and a migrated one derive each other's neuron ids mid-request.
+#[allow(clippy::too_many_arguments)]
 pub fn activate_from(
     cue: &str,
     graph: &BrainGraph,
@@ -51,6 +59,7 @@ pub fn activate_from(
     max_hops: u32,
     myelination: f32,
     top_k: usize,
+    codec: u8,
 ) -> ActivationResult {
     activate_from_hybrid(
         cue,
@@ -63,9 +72,15 @@ pub fn activate_from(
         myelination,
         top_k,
         None,
+        codec,
     )
 }
 
+// Argument count grew when the neuron codec became per-brain state. The codec must be
+// threaded explicitly rather than read from a global: `serve.rs` pools many brains and
+// serves them from a thread per connection, so a process-wide codec would let a
+// legacy-pinned tenant and a migrated one derive each other's neuron ids mid-request.
+#[allow(clippy::too_many_arguments)]
 pub fn activate_from_hybrid(
     cue: &str,
     cue_vector: Option<&[f32]>,
@@ -77,8 +92,9 @@ pub fn activate_from_hybrid(
     myelination: f32,
     top_k: usize,
     candidate_ids: Option<&HashSet<Uuid>>,
+    codec: u8,
 ) -> ActivationResult {
-    let cue_neurons = cue_to_dg_neurons(cue, life_id);
+    let cue_neurons = cue_to_dg_neurons(cue, life_id, codec);
 
     let engram_refs: Vec<&Engram> = if let Some(ids) = candidate_ids {
         hippocampus
@@ -110,7 +126,7 @@ pub fn activate_from_hybrid(
 
     if let Some(vec) = cue_vector {
         let cue_id = Uuid::new_v4();
-        for n in semantic.cue_ec_neurons(vec, life_id, cue_id) {
+        for n in semantic.cue_ec_neurons(vec, life_id, cue_id, codec) {
             activation.insert(n, 0.85);
         }
         for (engram_id, sim) in &semantic_sims {
@@ -185,7 +201,12 @@ pub fn activate_from_hybrid(
     }
 }
 
-/// Cap candidate set size when index returns too many IDs.
+/// Cap candidate set size when the index returns too many IDs.
+///
+/// `ids` arrives in rank order from [`crate::index::RecallIndex::hybrid_candidates`], so
+/// truncation drops the weakest candidates. The `HashSet` is built *after* truncation and
+/// is only used for membership testing in `activate_from_hybrid` — building it first would
+/// re-randomize the order and put us back where we started.
 pub fn cap_candidates(mut ids: Vec<Uuid>, cap: usize) -> HashSet<Uuid> {
     if ids.len() > cap {
         ids.truncate(cap);
@@ -197,12 +218,17 @@ pub fn default_candidate_cap() -> usize {
     std::env::var("FLUCTLIGHT_CANDIDATE_CAP")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_CANDIDATE_CAP)
+        .unwrap_or(crate::index::DEFAULT_CANDIDATE_CAP)
 }
 
 /// Pattern completion — retrieve full engram from partial cue (CA3 analog).
-pub fn complete(cue: &str, hippocampus: &Hippocampus, life_id: uuid::Uuid) -> Option<Engram> {
-    let cue_neurons = cue_to_dg_neurons(cue, life_id);
+pub fn complete(
+    cue: &str,
+    hippocampus: &Hippocampus,
+    life_id: uuid::Uuid,
+    codec: u8,
+) -> Option<Engram> {
+    let cue_neurons = cue_to_dg_neurons(cue, life_id, codec);
     hippocampus
         .engrams_for_life(life_id)
         .max_by(|a, b| {
@@ -280,7 +306,7 @@ mod tests {
         hippocampus.encode(engram);
 
         let mut semantic = SemanticField::default();
-        semantic.register_engram(id, life, v);
+        semantic.register_engram(id, life, v, crate::id::CURRENT_CODEC);
 
         let cue = vec![0.95, 0.05, 0.0];
         let mut candidates = HashSet::new();
@@ -296,6 +322,7 @@ mod tests {
             0.5,
             4,
             Some(&candidates),
+            crate::id::CURRENT_CODEC,
         );
         assert!(!result.recalls.is_empty());
         assert!(result.recalls[0].activation > 0.1);

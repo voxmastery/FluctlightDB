@@ -403,7 +403,10 @@ pub fn evidence_fuse(
         let sd = var.sqrt() + 1e-9;
         vals.iter().map(|x| (x - mean) / sd).collect()
     };
-    let dvals: Vec<f32> = ids.iter().map(|id| *dense.get(id).unwrap_or(&0.0)).collect();
+    let dvals: Vec<f32> = ids
+        .iter()
+        .map(|id| *dense.get(id).unwrap_or(&0.0))
+        .collect();
     let lvals: Vec<f32> = ids.iter().map(|id| *lex.get(id).unwrap_or(&0.0)).collect();
     let dz = zscore(&dvals);
     let lz = zscore(&lvals);
@@ -452,7 +455,11 @@ mod tests {
     fn maxsim_identical_vectors_scores_token_count() {
         // Two query tokens, each exactly matching a distinct doc token => score ~2.0
         let q = vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]];
-        let d = pack_tokens(&[vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0], vec![0.0, 0.0, 1.0]]);
+        let d = pack_tokens(&[
+            vec![1.0, 0.0, 0.0],
+            vec![0.0, 1.0, 0.0],
+            vec![0.0, 0.0, 1.0],
+        ]);
         assert!(approx(maxsim(&q, &d), 2.0), "got {}", maxsim(&q, &d));
     }
 
@@ -556,7 +563,7 @@ mod tests {
         let mut ix = Bm25Index::new();
         ix.add("near", "alpha beta gamma delta"); // rare terms adjacent-ish
         ix.add("far", "alpha zzz yyy xxx www vvv uuu ttt beta"); // rare terms far apart
-        // pad corpus so alpha/beta are rare
+                                                                 // pad corpus so alpha/beta are rare
         for i in 0..20 {
             ix.add(&format!("pad{i}"), "common common common");
         }

@@ -28,6 +28,7 @@ fn append_experience(path: &std::path::Path, seq: u64, content: &str) {
         seq,
         &WalEntry::Experience {
             episode: sample_episode(content),
+            assigned_engram_id: None,
         },
     )
     .expect("wal append");
@@ -51,7 +52,7 @@ fn crash_recovery_replays_wal_after_checkpoint() {
 }
 
 #[test]
-fn crash_recovery_skips_corrupt_wal_line() {
+fn crash_recovery_rejects_interior_corrupt_wal_line() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("brain.flct");
     let mut brain = FluctlightBrain::open(&path).unwrap();
@@ -68,8 +69,11 @@ fn crash_recovery_skips_corrupt_wal_line() {
     drop(brain);
     append_experience(&path, 1, "after corrupt line");
 
-    let loaded = FluctlightBrain::open(&path).unwrap();
-    assert!(loaded.activate("after corrupt").recalls.len() >= 1);
+    let error = match FluctlightBrain::open(&path) {
+        Ok(_) => panic!("interior WAL corruption must not be silently skipped"),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("interior WAL corruption"));
 }
 
 #[test]

@@ -11,7 +11,41 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`semantic_top_k` returned the k *worst* candidates.** `BinaryHeap` is a max-heap, so `peek()` yields the largest element; the eviction branch bound it as `min` and popped it, discarding the best candidate on every improvement. Survivors were then sorted by `id.to_string()`, throwing away the ranking. `hybrid_candidates` compounded it by truncating a `HashSet` in hash order — and with seed limits reaching 512 against a cap of 128, that overflow is the normal case. Candidate selection is now rank-ordered end to end. Affects the in-memory index backend (path-less brains); the SQLite sidecar path uses HNSW and was unaffected.
+- **HTTP intake corrupted non-ASCII bodies.** `read_http_request` called `String::from_utf8_lossy` on each socket chunk independently, so a multi-byte character spanning a read boundary became replacement characters — silent corruption on the primary ingest path. Framing is now done on bytes and the body decoded once. **Invalid UTF-8 now returns 400** instead of being stored as characters the client never sent.
+- **HTTP header names are matched case-insensitively** per RFC 9110 (HTTP/2 requires lowercase). A lowercase `authorization:` was previously dropped — silently downgrading the caller to the default tenant — and a lowercase `content-length:` truncated the body.
+- **`agent` and `governance` were dropped on every restart.** `save_v4_dir` wrote 14 segments while `FluctlightBrain` has 17 persistable fields, so unflushed working memory and the compliance audit log silently reset at each open while `audit_log()` kept returning 200 with an empty list. Same bug class as the muon/tau lanes. A new test asserts every segment the manifest declares is actually written.
+- **`compact_brain` was under-merging.** `should_merge` scored raw `dg_neurons`, which carry up to six per-engram-unique separator neurons the dentate gyrus fabricates on encode. They can never match, so near-duplicates were capped below the 0.85 threshold. Measured on 120 near-identical engrams: **1 merge before, 7 after.**
+- **The separation gate credited fabricated distinctness.** It scored candidates with `peer.separation_index.max(1.0 - jaccard)`; `separation_index` records how well the DG orthogonalised that peer *at its own encode time*, so a peer written while novel carried ~1.0 and donated it to any later near-duplicate. Both consumers now score the clean content code via `derive::content_dg`.
+
+### Added
+
+- **Frozen neuron codec (`FLCT1`).** `NeuronId` used `DefaultHasher`, whose algorithm std explicitly declines to guarantee across releases — yet those ids are written to disk *and* recomputed from token text at query time, so a Rust upgrade would have silently emptied recall on every stored brain. FLCT1 (FNV-1a-64 + fmix64) is pinned by golden vectors and recorded **per brain**, because `serve.rs` pools many brains across threads. The same latent bug is frozen in `semantic::hash_mix` and `shard::shard_for`.
+- **Codec drift detection and repair.** Loading a brain re-checks eight known-answer probes. A mismatch means the identity function moved underneath stored data; every engram is queued for re-key, oldest first, and reported on `BrainStatus { neuron_codec, rekey_pending }`. The queue drains during ingest and sleep, or all at once via `rekey_now()`. Drain order is a correctness requirement — `separate_episode` reads a live peer window, so engram *N*'s code depends on 0..*N*-1 as they stood at encode time.
+- `SeparationGateResult::best_peer` — a rejection now names the engram it collided with, so a client can repair it via `/api/v1/reconsolidate` instead of receiving an opaque 200 with a nil id.
+
 ### Changed
+
+- **Ingest is stricter.** Near-duplicates that previously slipped the gate by inheriting a peer's prior novelty are now rejected (`gate_rejected: true`). Set `FLUCTLIGHT_SEPARATION_GATE=0` to restore the old admission behaviour.
+- **`FLUCTLIGHT_CORTEX_WEIGHT` is resolved once per brain at open**, not re-parsed from the environment on every recall. Two brains opened under different settings now keep their own. The mode flags (`FLUCTLIGHT_VECTOR_FAST`, `FLUCTLIGHT_FAST_INGEST`, `FLUCTLIGHT_AGENT_FAST`) deliberately still read the environment on demand, because the SDK sets them at runtime and expects the next call to observe the change.
+- `.reproduce-venv/` (11,817 files) and three prebuilt release binaries are no longer tracked; `scripts/reproduce-locomo.sh` recreates the venv from `benchmarks/requirements-reproduce.txt`. Tracked files: 12,272 → 456. Note this does **not** shrink `.git`, which keeps the blobs in history.
+- `tests/generated_matrix.rs`: 250 tests that reduced to 17 distinct bodies replaced by 6 parameterized ones covering every `DevStage` and `Region`, plus budget-monotonicity and synapse-downgrade properties the originals never checked.
+
+### Known / unchanged
+
+- Two recall stages are **unreachable at the default neuromodulator posture** and are now pinned by tests rather than left to be discovered: the DA/NE scoring block (guarded by `da > 0.5 || ne > 0.3` against defaults of exactly 0.5 and 0.3) and CA3 Hopfield completion (guarded by `!is_encoding()` against a default ACh of 0.7 ≥ 0.6). Whether to delete, re-gate or re-tune them is an open design decision.
+- Configuration is still largely process-global: ~56 `FLUCTLIGHT_*` variables remain ambient and the Python SDK still configures the engine by mutating `os.environ`.
+
+### Migration
+
+- **No on-disk format change.** `format_version` stays 4. A brain written before this release loads unchanged and keeps recalling correctly: it is adopted at `CODEC_LEGACY_STD`, which is the codec it was actually written with, and re-keying is queued rather than forced.
+- `life.seg` gained two fields. Because **bincode is not self-describing**, `#[serde(default)]` does *not* backfill a missing trailing field — an explicit legacy reader (`life::read_life_segment`) handles the old four-field shape. Any future segment-shape change needs the same treatment.
+- **One-way door:** a brain re-keyed to FLCT1 and then opened by an *older* binary will recall poorly, because that binary computes `DefaultHasher` cues against FLCT1 neurons. Nothing is corrupted, and re-upgrading re-keys it.
+
+### Benchmarks
+
 - **LoCoMo headline corrected to honest raw evidence recall (no expansion):** **96.8% @150 (MiniLM) / 97.0% (mpnet)**, tight-k @5=72.6%/75.1%, @10=80.0%/82.6%, @20=85.6%/87.2%, @50=91.8%/92.4% — native Rust CHORUS first-principles invented stack (salience-gated MaxSim + conjunctive surprisal + evidence-integration fusion). Bench `benchmarks/locomo_engine_maxsim.py`; frozen `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet). The prior **99.0%** headline was ±3 neighbor-expansion scoring inflation (`expand_session_neighbors`), not the engine — **deprecated**. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15, retrieval-bound).
 
 ---

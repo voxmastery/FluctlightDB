@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::id::NeuronId;
 use crate::calcium::calcium_stdp_fast;
+use crate::id::NeuronId;
 use crate::plasticity::{hebbian_strengthen, ltd_weaken, Synapse};
 use crate::types::Region;
 
