@@ -191,7 +191,7 @@ impl FluctlightBrain {
     pub fn apply_swarm_transaction(
         &mut self,
         transaction: crate::swarm::SwarmTransaction,
-    ) -> Result<crate::swarm::SwarmRun> {
+    ) -> Result<crate::swarm::SwarmApplyResult> {
         if let Some(path) = self.store_path.as_deref() {
             if !crate::storage::should_use_v4(path) {
                 return Err(Error::Store(
@@ -216,7 +216,7 @@ impl FluctlightBrain {
         &mut self,
         transaction: crate::swarm::SwarmTransaction,
         checkpoint: bool,
-    ) -> Result<crate::swarm::SwarmRun> {
+    ) -> Result<crate::swarm::SwarmApplyResult> {
         let run = self.swarm.apply_transaction(transaction)?;
         if checkpoint {
             self.maybe_checkpoint()?;
