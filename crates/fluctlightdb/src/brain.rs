@@ -64,6 +64,8 @@ pub struct FluctlightBrain {
     pub semantic: SemanticField,
     #[serde(default)]
     pub recent_separations: Vec<SeparationResult>,
+    #[serde(default)]
+    pub swarm: crate::swarm::SwarmState,
     #[serde(skip)]
     checkpoint_policy: CheckpointPolicy,
     #[serde(skip)]
@@ -131,6 +133,7 @@ impl FluctlightBrain {
             governance: crate::governance::GovernanceState::default(),
             semantic: SemanticField::default(),
             recent_separations: Vec::new(),
+            swarm: crate::swarm::SwarmState::default(),
             checkpoint_policy: CheckpointPolicy::default(),
             store_path: None,
             recall_index: None,
@@ -183,6 +186,35 @@ impl FluctlightBrain {
             wal::append(path, self.wal_seq, &entry)?;
         }
         Ok(())
+    }
+
+    pub fn apply_swarm_transaction(
+        &mut self,
+        transaction: crate::swarm::SwarmTransaction,
+    ) -> Result<crate::swarm::SwarmRun> {
+        let mut next = self.swarm.clone();
+        let run = next.apply_transaction(transaction.clone())?;
+        if next == self.swarm {
+            return Ok(run);
+        }
+        if wal::wal_enabled() {
+            self.wal_append(WalEntry::SwarmTransaction { transaction })?;
+        }
+        self.swarm = next;
+        self.maybe_checkpoint()?;
+        Ok(run)
+    }
+
+    pub(crate) fn apply_swarm_transaction_internal(
+        &mut self,
+        transaction: crate::swarm::SwarmTransaction,
+        checkpoint: bool,
+    ) -> Result<crate::swarm::SwarmRun> {
+        let run = self.swarm.apply_transaction(transaction)?;
+        if checkpoint {
+            self.maybe_checkpoint()?;
+        }
+        Ok(run)
     }
 
     pub fn stage(&self) -> DevStage {
@@ -1304,6 +1336,7 @@ impl FluctlightBrain {
             governance: crate::governance::GovernanceState::default(),
             semantic,
             recent_separations,
+            swarm: crate::swarm::SwarmState::default(),
             checkpoint_policy: CheckpointPolicy::default(),
             store_path: None,
             recall_index: None,
@@ -1349,6 +1382,7 @@ impl Clone for FluctlightBrain {
             governance: self.governance.clone(),
             semantic: self.semantic.clone(),
             recent_separations: self.recent_separations.clone(),
+            swarm: self.swarm.clone(),
             checkpoint_policy: self.checkpoint_policy.clone(),
             store_path: self.store_path.clone(),
             recall_index: None,
