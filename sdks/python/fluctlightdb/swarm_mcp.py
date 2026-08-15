@@ -34,13 +34,16 @@ def _active() -> str:
     return _ACTIVE_SWARM_ID
 
 
-def run() -> None:
+def build_server() -> Any:
     try:
-        from mcp.server.fastmcp import FastMCP
+        from mcp.server.mcpserver import MCPServer as Server
     except ImportError as exc:
-        raise SystemExit("Install with: pip install 'fluctlightdb[mcp]'") from exc
+        try:
+            from mcp.server.fastmcp import FastMCP as Server
+        except ImportError:
+            raise RuntimeError("Install with: pip install 'fluctlightdb[mcp]'") from exc
 
-    mcp = FastMCP("fluctlight-swarm")
+    mcp = Server("fluctlight-swarm")
 
     @mcp.tool()
     def fluctlight_swarm_begin(
@@ -156,7 +159,16 @@ def run() -> None:
         """Inspect a durable swarm run."""
         return _client().post("/api/v1/swarm/get", {"swarm_id": swarm_id or _active()})
 
-    mcp.run()
+    return mcp
+
+
+def run() -> None:
+    try:
+        build_server().run()
+    except RuntimeError as exc:
+        if str(exc).startswith("Install with:"):
+            raise SystemExit(str(exc)) from exc
+        raise
 
 
 if __name__ == "__main__":
