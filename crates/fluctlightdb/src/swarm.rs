@@ -146,6 +146,20 @@ pub struct BeginSwarm {
     pub roster: Vec<WorkerSlot>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
+pub enum SwarmTransaction {
+    Begin(BeginSwarm),
+}
+
+impl SwarmTransaction {
+    pub fn id(&self) -> Uuid {
+        match self {
+            Self::Begin(request) => request.transaction_id,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SwarmError {
     #[error("worker roster must not be empty")]
@@ -159,6 +173,15 @@ pub enum SwarmError {
 }
 
 impl SwarmState {
+    pub fn apply_transaction(
+        &mut self,
+        transaction: SwarmTransaction,
+    ) -> Result<SwarmRun, SwarmError> {
+        match transaction {
+            SwarmTransaction::Begin(request) => self.begin_run(request),
+        }
+    }
+
     pub fn begin_run(&mut self, request: BeginSwarm) -> Result<SwarmRun, SwarmError> {
         if self.applied_transactions.contains(&request.transaction_id) {
             return self

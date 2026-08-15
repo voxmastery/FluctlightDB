@@ -29,6 +29,9 @@ pub enum WalEntry {
     MarkCore { engram_id: uuid::Uuid, key: String },
     Death { cause: String },
     Compact,
+    SwarmTransaction {
+        transaction: crate::swarm::SwarmTransaction,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,6 +233,9 @@ fn apply_entry(brain: &mut FluctlightBrain, entry: WalEntry) -> Result<()> {
         WalEntry::Compact => {
             brain.compact_internal(false)?;
         }
+        WalEntry::SwarmTransaction { transaction } => {
+            brain.apply_swarm_transaction_internal(transaction, false)?;
+        }
     }
     Ok(())
 }
@@ -237,8 +243,28 @@ fn apply_entry(brain: &mut FluctlightBrain, entry: WalEntry) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::swarm::{BeginSwarm, SwarmTransaction, WorkerSlot, WorkerStatus};
     use crate::types::Episode;
     use tempfile::tempdir;
+
+    fn begin_transaction(transaction_id: uuid::Uuid, swarm_id: uuid::Uuid) -> SwarmTransaction {
+        SwarmTransaction::Begin(BeginSwarm {
+            transaction_id,
+            swarm_id,
+            project_id: "fluctlight".into(),
+            objective_digest: "sha256:objective".into(),
+            repository_identity: "repo".into(),
+            base_commit: "abc123".into(),
+            policy_version: "v1".into(),
+            roster: vec![WorkerSlot {
+                slot_id: "slot-a".into(),
+                role: "worker".into(),
+                agent_id: None,
+                worktree: None,
+                status: WorkerStatus::Declared,
+            }],
+        })
+    }
 
     #[test]
     #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
@@ -378,5 +404,48 @@ mod tests {
         let back: WalRecord = serde_json::from_str(&line).unwrap();
         assert_eq!(back.seq, 42);
         assert!(matches!(back.entry, WalEntry::Experience { .. }));
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn wal_replays_swarm_transaction_after_checkpoint_gap() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("swarm.flct");
+        let brain = FluctlightBrain::open(&path).unwrap();
+        brain.checkpoint().unwrap();
+        drop(brain);
+        let swarm_id = uuid::Uuid::new_v4();
+        let transaction = begin_transaction(uuid::Uuid::new_v4(), swarm_id);
+
+        append(&path, 1, &WalEntry::SwarmTransaction { transaction }).unwrap();
+
+        let loaded = FluctlightBrain::open(&path).unwrap();
+        assert!(loaded.swarm.runs.contains_key(&swarm_id));
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn duplicate_swarm_transactions_replay_once() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("swarm.flct");
+        let brain = FluctlightBrain::open(&path).unwrap();
+        brain.checkpoint().unwrap();
+        drop(brain);
+        let swarm_id = uuid::Uuid::new_v4();
+        let transaction = begin_transaction(uuid::Uuid::new_v4(), swarm_id);
+
+        append(
+            &path,
+            1,
+            &WalEntry::SwarmTransaction {
+                transaction: transaction.clone(),
+            },
+        )
+        .unwrap();
+        append(&path, 2, &WalEntry::SwarmTransaction { transaction }).unwrap();
+
+        let loaded = FluctlightBrain::open(&path).unwrap();
+        assert_eq!(loaded.swarm.runs.len(), 1);
+        assert_eq!(loaded.swarm.applied_transactions.len(), 1);
     }
 }
