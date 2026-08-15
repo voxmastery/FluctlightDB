@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-15  
 **Status:** Approved for planning  
-**Repositories:** FluctlightDB plus an OpenAI Codex fork  
+**Repositories:** FluctlightDB plugin plus an optional OpenAI Codex fork
 **Working branch:** `codex_hackathon`  
 **Product name:** Fluctlight Swarm Memory  
 **Principle:** Parallel agents should share verified truth without inheriting the same search path.
@@ -54,16 +54,21 @@ The system cannot guarantee that agents think differently. It can guarantee that
 Use a **single-owner, Rust-native Fluctlight Swarm Coordinator**. Codex workers never open the underlying brain and never call verification or promotion primitives directly.
 
 ```text
-Codex CLI / App Server
-  parallel-run scheduler
+Stock Codex CLI / App Server
+  plugin Skill + MCP-backed lifecycle hooks
           |
-          | SwarmMemoryProvider lifecycle
+          | SessionStart / SubagentStart / SubagentStop
           v
 Fluctlight Swarm Coordinator (single owner)
   |-- durable swarm transactions and capability validation
   |-- global memory allocation and exposure tracking
   |-- trusted evidence and promotion policy
   `-- FluctlightDB brain: experience, recall, provenance, consolidation
+
+Optional invited Codex change
+  batch roster + scheduler-enforced swarm start
+          |
+          `--------> same coordinator contract
 ```
 
 ### Repository boundary
@@ -72,14 +77,30 @@ The delivery uses two repositories rather than vendoring Codex into FluctlightDB
 
 | Repository | Responsibility |
 |---|---|
-| FluctlightDB, branch `codex_hackathon` | Coordinator, durable swarm state, targeted feedback, allocation policy, APIs, MCP compatibility, Skill, evaluation fixtures |
-| OpenAI Codex fork, branch `fluctlight-swarm-memory` | Provider interface, scheduler hooks, worktree identity binding, evidence callbacks, configuration, integration tests |
+| FluctlightDB, branch `codex_hackathon` | Coordinator, durable swarm state, targeted feedback, allocation policy, MCP server, Codex plugin/Skill/hooks, evaluation fixtures |
+| OpenAI Codex fork, branch `fluctlight-swarm-memory` | Optional batch-roster operation and scheduler-enforced lifecycle after design discussion/invitation |
 
-The Codex patch must remain small enough to review independently. Product policy belongs in FluctlightDB; Codex supplies lifecycle facts and enforces the worker boundary.
+The working product must not depend on an upstream Codex change. The optional Codex patch must remain small enough to review independently. Product policy belongs in FluctlightDB; Codex supplies lifecycle facts and, when the native enhancement exists, enforces the roster boundary.
 
 ## Codex integration contract
 
-Add an asynchronous `SwarmMemoryProvider` boundary to Codex core. Exact file placement will be determined after auditing the current Codex source, but the semantic interface is fixed:
+### Stock Codex plugin
+
+The current Codex source already provides the necessary lifecycle for a functioning release:
+
+- Plugin manifests can package Skills, MCP servers, and hooks.
+- `SubagentStart` supplies session ID, turn ID, agent ID/type, model, and working directory.
+- `SubagentStart` output can inject bounded additional context before the worker runs.
+- `SubagentStop` supplies the agent identity, transcript path, working directory, and final assistant message.
+- MCP-backed hooks expand event fields into tool arguments without shell scripts.
+
+The root Skill must call `fluctlight_swarm_begin` with a complete roster before spawning workers. Each `SubagentStart` hook atomically claims one declared slot and receives its precomputed context bundle. `SubagentStop` records a pending attempt; the coordinator's trusted verifier creates the evidence receipt.
+
+This path guarantees disjoint allocations and durable attribution when the declared protocol is followed. It does not cryptographically force an unmodified Codex orchestrator to declare the roster first, so the plugin fails closed when no active swarm or unclaimed slot exists.
+
+### Native Codex enhancement
+
+The source audit found that Codex currently spawns agents one at a time through `AgentControl`; there is no batch roster API. The smallest useful upstream enhancement is therefore a generic batch-spawn/swarm-start operation that registers all worker slots before any initial turn begins. It may use an asynchronous provider boundary with this semantic contract:
 
 ```rust
 trait SwarmMemoryProvider {
@@ -92,7 +113,7 @@ trait SwarmMemoryProvider {
 }
 ```
 
-### Required scheduler hooks
+### Required native lifecycle
 
 1. **Before workers launch:** Codex supplies the complete immutable worker roster, objective, repository identity, base commit, worktree identities, and policy version.
 2. **Before each worker's first turn:** Codex fetches that slot's typed context bundle.
@@ -101,11 +122,11 @@ trait SwarmMemoryProvider {
 5. **After trusted checks:** Codex submits an evidence receipt produced by its verifier path.
 6. **At swarm completion:** Codex records the accepted result and closes outstanding leases.
 
-Codex must derive worker and worktree identity from internal run state. Request bodies cannot override identity.
+Codex must derive worker and worktree identity from internal run state. Request bodies cannot override identity. This native enhancement is proposed through an issue/design discussion first: the current Codex contribution policy closes unsolicited pull requests without review and accepts code only after a maintainer invitation.
 
 ### Compatibility path
 
-For Codex versions without the native provider interface, FluctlightDB exposes the same contracts through MCP tools and a Skill. This is a compatibility and adoption path, not the strongest security boundary.
+The plugin is the primary shipping path, not a throwaway adapter. If the native batch-roster enhancement is accepted later, the same MCP/coordinator protocol remains available to older Codex versions.
 
 ## Typed context lanes
 
@@ -418,6 +439,10 @@ The presentation must distinguish guarantees from measurements: ID disjointness 
 
 ### Codex integration tests
 
+- Stock Codex plugin loads its Skill, MCP server, and lifecycle hooks
+- `SubagentStart` claims exactly one predeclared slot and injects bounded context
+- `SubagentStop` creates a pending attempt bound to the real agent/worktree identity
+- Missing swarm/roster fails closed without leaking another allocation
 - Complete worker roster registered before launch
 - Worktree/agent identity cannot be spoofed
 - Typed context is injected into the correct worker only
@@ -435,7 +460,7 @@ The presentation must distinguish guarantees from measurements: ID disjointness 
 
 ## Success gates
 
-- [ ] Two or more real Codex worktree workers use the native provider lifecycle
+- [ ] Two or more real Codex worktree workers use the stock plugin lifecycle
 - [ ] Shared verified truth is byte-for-byte identical for every worker in a swarm
 - [ ] Initial episodic allocations have zero memory-ID overlap
 - [ ] Candidate shortage is explicit and deterministic
@@ -444,7 +469,8 @@ The presentation must distinguish guarantees from measurements: ID disjointness 
 - [ ] Reproduced failures are recalled as warnings, never ordinary advice
 - [ ] Swarm state and feedback survive restart through WAL replay
 - [ ] Legacy FluctlightDB stores remain readable
-- [ ] Provider-disabled Codex behavior has no regression
+- [ ] Plugin-disabled Codex behavior has no regression
+- [ ] Native Codex fork demonstrates scheduler-enforced batch roster separately
 - [ ] Comparative evaluation reports diversity, repeated failure, and verified success
 - [ ] A short live demo completes without manual database editing
 
@@ -455,7 +481,8 @@ Include:
 - One local repository and one machine
 - Two to four fixed Codex workers/worktrees
 - One coordinator process and one embedded FluctlightDB owner
-- Native Codex provider plus MCP/Skill compatibility
+- Stock Codex plugin with MCP-backed hooks and Skill
+- Optional Codex fork proving a generic batch-roster enhancement
 - One initial and one follow-up allocation epoch
 - Trusted Git/tree and allowlisted-test evidence
 - Persistent targeted feedback and truth revisions
@@ -476,7 +503,8 @@ Defer:
 
 | Risk | Mitigation |
 |---|---|
-| Codex fork becomes too large for a hackathon | Keep the provider contract thin; put policy and persistence in FluctlightDB |
+| Codex fork becomes too large for a hackathon | The working product uses stock Codex hooks; keep the optional fork to one generic batch-roster enhancement |
+| OpenAI will not review an unsolicited PR | Publish evidence and open an issue first; submit a PR only after maintainer invitation |
 | Rust persistence migration regresses existing stores | Optional versioned segment, legacy fixtures, crash/replay tests |
 | The demo looks like ordinary RAG | Show scheduler hooks, global allocation transaction, citations, evidence, targeted feedback, and restart recovery |
 | Agents ignore assigned memories | Require citations for credit; measure behavior rather than claiming compliance |
@@ -495,6 +523,6 @@ Defer:
 - Truth: shared and pinned; strategies: diverse; warnings: shared when mandatory.
 - Feedback: targeted, evidence-bound, and citation-dependent.
 - Promotion: append-only revisions, never worker self-verification.
-- Delivery: native Codex provider plus MCP and Skill compatibility.
+- Delivery: stock Codex plugin first; optional native batch-roster enhancement second.
 - Evaluation: guaranteed ID disjointness plus measured semantic/behavioral diversity.
-- Upstream posture: maintain a small reviewable Codex patch suitable for a public PR.
+- Upstream posture: open an evidence-backed issue first; maintain a small reviewable fork patch and submit it only if invited.
