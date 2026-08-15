@@ -154,6 +154,7 @@ mod tests {
                     worktree: None,
                     status: WorkerStatus::Declared,
                 }],
+                allocations: std::collections::HashMap::new(),
             }))
             .unwrap();
         swarm_id

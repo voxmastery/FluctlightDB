@@ -670,6 +670,7 @@ mod tests {
                     worktree: None,
                     status: WorkerStatus::Declared,
                 }],
+                allocations: std::collections::HashMap::new(),
             }));
 
         assert!(result.is_err());

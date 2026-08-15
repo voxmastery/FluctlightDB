@@ -144,9 +144,11 @@ pub use storage::{default_brain_path, default_tenant_brain_dir, StorageFormat};
 pub use store::{verify_path, BrainVerifyReport};
 pub use store_lock::{SharedStoreLock, StoreLock};
 pub use swarm::{
-    allocate_roster, BeginSwarm, EngramFeedback, EvidenceReceipt, EvidenceResult, MemoryBundle,
-    MemoryCandidate, MemoryExposure, SwarmError, SwarmRun, SwarmState, SwarmStatus,
-    SwarmTransaction, TruthRevision, WorkerSlot, WorkerStatus,
+    allocate_roster, BeginSwarm, CitationReceipt, CiteMemories, ClaimSlot, EngramFeedback,
+    EvidenceReceipt, EvidenceResult, FinishSwarm, MemoryBundle, MemoryCandidate, MemoryExposure,
+    PendingAttempt, RecordEvidence, ReportAttempt, SwarmApplyResult, SwarmError, SwarmRun,
+    SwarmState, SwarmStatus, SwarmSummary, SwarmTransaction, TruthRevision, VerifiedOutcome,
+    WorkerSlot, WorkerStatus,
 };
 pub use tau::{TauHit, TauLane, TauShard};
 pub use types::{
