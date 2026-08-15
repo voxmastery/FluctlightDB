@@ -1,0 +1,28 @@
+{
+  "name": "fluctlight-swarm-remotion-demo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
+  "scripts": {
+    "test": "node --test --experimental-strip-types src/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts FluctlightSwarmTerminal ../../docs/demo/fluctlight-swarm-memory-demo.mp4 --codec=h264 --crf=18",
+    "still": "remotion still src/index.ts FluctlightSwarmTerminal ../../docs/demo/fluctlight-swarm-memory-preview.png --frame=1320"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.512",
+    "@remotion/google-fonts": "4.0.512",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "remotion": "4.0.512"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "typescript": "5.9.3"
+  }
+}

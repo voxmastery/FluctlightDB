@@ -1,11 +1,11 @@
-# Fluctlight Swarm Memory — 61-second demo narration
+# Fluctlight Swarm Memory — 54-second terminal demo narration
 
-Parallel coding agents move fast, but their coordination is mostly ephemeral. Workers can receive the same strategy, repeat a failure that another worker already discovered, or promote a success claim without trusted evidence.
+This scripted visualization shows Fluctlight Swarm Memory as a Codex workflow. The root starts one durable coordinator run, and two illustrated workers act against the same project state.
 
-Fluctlight Swarm Memory gives Codex agents one durable coordinator backed by FluctlightDB. Every worker receives verified project truth and known failure warnings, while episodic strategies are allocated without overlap. That means the swarm shares what must be consistent without forcing every agent to think the same way.
+Both workers receive the same verified truth and failure warning, but FluctlightDB assigns each a different episodic strategy. The API worker gets the transaction-boundary memory. The test worker gets the crash-recovery memory. Their allocation overlap is zero.
 
-Each attempt is bound to a real agent and worktree. A worker cannot cite memory assigned to a peer, and it cannot verify its own outcome. Only evidence accepted by a trusted verifier can apply targeted credit—or turn a reproduced failure into a warning.
+When one worker tries to cite its peer’s memory, the coordinator rejects it. A worker also cannot verify its own success. Trusted test evidence applies credit only to the memory actually cited.
 
-The one-command demo proves all four behaviors: disjoint allocation, citation isolation, evidence-gated feedback, and durable recovery after a full restart. The Rust coordinator, Python MCP bridge, Codex plugin, tests, and demo are public and MIT licensed.
+Finally, the public one-command demo proves all four behaviors, stops the coordinator, restarts it, and recovers the completed run from the WAL and version-four checkpoint.
 
-Fluctlight Swarm Memory: parallel Codex agents that remember together without thinking the same way.
+Parallel Codex agents can now remember together without thinking the same way.
