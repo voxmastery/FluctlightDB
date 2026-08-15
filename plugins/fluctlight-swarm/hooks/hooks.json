@@ -1,0 +1,25 @@
+{
+  "description": "Bind Codex subagents to durable Fluctlight swarm slots.",
+  "hooks": {
+    "SubagentStart": [{
+      "hooks": [{
+        "type": "mcp_tool",
+        "server": "fluctlight-swarm",
+        "tool": "fluctlight_swarm_claim_hook",
+        "input": {"agent_id": "${agent_id}", "agent_type": "${agent_type}", "cwd": "${cwd}"},
+        "timeout": 15,
+        "statusMessage": "Assigning diverse Fluctlight memory"
+      }]
+    }],
+    "SubagentStop": [{
+      "hooks": [{
+        "type": "mcp_tool",
+        "server": "fluctlight-swarm",
+        "tool": "fluctlight_swarm_report_hook",
+        "input": {"agent_type": "${agent_type}", "cwd": "${cwd}", "last_assistant_message": "${last_assistant_message}"},
+        "timeout": 15,
+        "statusMessage": "Recording the swarm attempt"
+      }]
+    }]
+  }
+}
