@@ -54,6 +54,7 @@ all = ["fluctlightdb[native,mcp,langchain,llamaindex]"]
 
 [project.scripts]
 fluctlight-project = "fluctlightdb.cli:main"
+fluctlight-swarm-mcp = "fluctlightdb.swarm_mcp:run"
 
 [tool.setuptools.package-data]
 fluctlightdb = ["templates/**/*"]

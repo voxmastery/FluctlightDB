@@ -1,0 +1,17 @@
+{
+  "name": "fluctlight-swarm",
+  "version": "0.1.0",
+  "description": "Diverse, durable memory allocation for parallel Codex agents",
+  "author": {"name": "Ganesh S"},
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Fluctlight Swarm",
+    "shortDescription": "Stop parallel agents repeating the same approach.",
+    "longDescription": "Allocates disjoint episodic memories, shares verified truth and warnings, and learns only from cited memories with trusted evidence.",
+    "developerName": "VoxMastery",
+    "category": "Productivity",
+    "capabilities": ["Parallel agents", "Durable memory", "Evidence tracking"],
+    "defaultPrompt": ["Use Fluctlight Swarm for this task."]
+  }
+}

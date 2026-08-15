@@ -1,0 +1,3 @@
+interface:
+  display_name: "Fluctlight Swarm"
+  short_description: "Give parallel Codex agents diverse durable memories"

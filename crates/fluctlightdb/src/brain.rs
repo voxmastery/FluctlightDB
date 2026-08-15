@@ -65,6 +65,8 @@ pub struct FluctlightBrain {
     pub semantic: SemanticField,
     #[serde(default)]
     pub recent_separations: Vec<SeparationResult>,
+    #[serde(default)]
+    pub swarm: crate::swarm::SwarmState,
     #[serde(skip)]
     checkpoint_policy: CheckpointPolicy,
     /// Runtime counter for autonomic Somnus durability seals (not semantic sleep).
@@ -164,6 +166,7 @@ impl FluctlightBrain {
             governance: crate::governance::GovernanceState::default(),
             semantic: SemanticField::default(),
             recent_separations: Vec::new(),
+            swarm: crate::swarm::SwarmState::default(),
             checkpoint_policy: CheckpointPolicy::default(),
             ticks_since_systems_seal: 0,
             wal_records_since_seal: 0,
@@ -306,6 +309,42 @@ impl FluctlightBrain {
             return Err(Error::DistributedMutationDisabled { operation });
         }
         Ok(())
+    }
+
+    pub fn apply_swarm_transaction(
+        &mut self,
+        transaction: crate::swarm::SwarmTransaction,
+    ) -> Result<crate::swarm::SwarmApplyResult> {
+        if let Some(path) = self.store_path.as_deref() {
+            if !crate::storage::should_use_v4(path) {
+                return Err(Error::Store(
+                    "swarm coordination requires v4 segmented storage".into(),
+                ));
+            }
+        }
+        let mut next = self.swarm.clone();
+        let run = next.apply_transaction(transaction.clone())?;
+        if next == self.swarm {
+            return Ok(run);
+        }
+        if wal::wal_enabled() {
+            self.wal_append(WalEntry::SwarmTransaction { transaction })?;
+        }
+        self.swarm = next;
+        self.maybe_checkpoint()?;
+        Ok(run)
+    }
+
+    pub(crate) fn apply_swarm_transaction_internal(
+        &mut self,
+        transaction: crate::swarm::SwarmTransaction,
+        checkpoint: bool,
+    ) -> Result<crate::swarm::SwarmApplyResult> {
+        let run = self.swarm.apply_transaction(transaction)?;
+        if checkpoint {
+            self.maybe_checkpoint()?;
+        }
+        Ok(run)
     }
 
     pub fn stage(&self) -> DevStage {
@@ -1591,6 +1630,7 @@ impl FluctlightBrain {
             governance: crate::governance::GovernanceState::default(),
             semantic,
             recent_separations,
+            swarm: crate::swarm::SwarmState::default(),
             checkpoint_policy: CheckpointPolicy::default(),
             ticks_since_systems_seal: 0,
             wal_records_since_seal: 0,
@@ -1643,6 +1683,7 @@ impl Clone for FluctlightBrain {
             governance: self.governance.clone(),
             semantic: self.semantic.clone(),
             recent_separations: self.recent_separations.clone(),
+            swarm: self.swarm.clone(),
             checkpoint_policy: self.checkpoint_policy.clone(),
             ticks_since_systems_seal: self.ticks_since_systems_seal,
             wal_records_since_seal: self.wal_records_since_seal,
