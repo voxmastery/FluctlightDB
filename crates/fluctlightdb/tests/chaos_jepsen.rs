@@ -43,6 +43,7 @@ fn wal_append(path: &Path, seq: u64, content: &str) {
         seq,
         &WalEntry::Experience {
             episode: episode(content),
+            assigned_engram_id: None,
         },
     )
     .expect("wal append");
@@ -77,12 +78,13 @@ fn chaos_property_rounds_checkpoint_wal_tear_and_reopen() {
         if round % 2 == 0 {
             brain.checkpoint().unwrap();
         }
+        let next_wal_seq = brain.wal_seq.saturating_add(1);
         drop(brain);
 
         if round % 3 == 0 {
             wal_append(
                 &path,
-                round as u64 + 100,
+                next_wal_seq,
                 &format!("round {round} wal-only"),
             );
         }

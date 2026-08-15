@@ -1,109 +1,124 @@
-//! Batched WAL fsync — group durability flushes for write throughput.
+//! WAL fsync policy — acknowledged writes are durable by default.
 
-use std::collections::HashMap;
 use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::path::Path;
+use std::time::Duration;
 
 use crate::error::{Error, Result};
 
-static WAL_SYNC_STATE: OnceLock<Mutex<HashMap<PathBuf, WalSyncSlot>>> = OnceLock::new();
-
-struct WalSyncSlot {
-    pending_bytes: u64,
-    pending_records: u64,
-    last_sync: Instant,
-}
-
-fn state_map() -> &'static Mutex<HashMap<PathBuf, WalSyncSlot>> {
-    WAL_SYNC_STATE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
 pub fn wal_fsync_mode() -> WalFsyncMode {
-    match std::env::var("FLUCTLIGHT_WAL_FSYNC")
-        .unwrap_or_else(|_| "batched".into())
-        .to_lowercase()
-        .as_str()
-    {
-        "always" | "strict" => WalFsyncMode::Always,
+    let configured = std::env::var("FLUCTLIGHT_WAL_FSYNC").unwrap_or_else(|_| "always".into());
+    wal_fsync_mode_for(&configured)
+}
+
+fn wal_fsync_mode_for(configured: &str) -> WalFsyncMode {
+    match configured.to_lowercase().as_str() {
         "none" | "never" => WalFsyncMode::None,
-        _ => WalFsyncMode::Batched,
+        // Historical "batched" mode could acknowledge before fsync; treat as Always.
+        "always" | "strict" | "batched" | "batch" => WalFsyncMode::Always,
+        _ => WalFsyncMode::Always,
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WalFsyncMode {
     Always,
-    Batched,
     None,
 }
 
-fn batch_bytes_limit() -> u64 {
-    std::env::var("FLUCTLIGHT_WAL_BATCH_BYTES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(256 * 1024)
+fn inject_fsync_fault() -> Result<()> {
+    let enabled = std::env::var("FLUCTLIGHT_ENABLE_FAULT_INJECTION")
+        .map(|value| value == "1")
+        .unwrap_or(false);
+    if !enabled {
+        return Ok(());
+    }
+    if std::env::var("FLUCTLIGHT_FAULT_DISK_FULL").as_deref() == Ok("1") {
+        return Err(Error::Io(std::io::Error::new(
+            std::io::ErrorKind::StorageFull,
+            "injected disk full before durable acknowledgement",
+        )));
+    }
+    if let Ok(delay_ms) = std::env::var("FLUCTLIGHT_FAULT_FSYNC_DELAY_MS") {
+        let delay_ms = delay_ms
+            .parse::<u64>()
+            .map_err(|_| Error::Store("invalid injected fsync delay".into()))?;
+        std::thread::sleep(Duration::from_millis(delay_ms.min(60_000)));
+    }
+    Ok(())
 }
 
-fn batch_records_limit() -> u64 {
-    std::env::var("FLUCTLIGHT_WAL_BATCH_RECORDS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(32)
-}
-
-fn batch_interval() -> Duration {
-    let ms = std::env::var("FLUCTLIGHT_WAL_BATCH_MS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(25);
-    Duration::from_millis(ms)
-}
-
-pub fn append_and_sync(brain_path: &Path, file: &mut File, line_bytes: usize) -> Result<()> {
+pub fn append_and_sync(_brain_path: &Path, file: &mut File, _line_bytes: usize) -> Result<()> {
+    inject_fsync_fault()?;
     match wal_fsync_mode() {
         WalFsyncMode::None => Ok(()),
         WalFsyncMode::Always => file.sync_all().map_err(Error::Io),
-        WalFsyncMode::Batched => {
-            let key = brain_path.to_path_buf();
-            let mut map = state_map()
-                .lock()
-                .map_err(|_| Error::Store("wal sync lock".into()))?;
-            let slot = map.entry(key).or_insert(WalSyncSlot {
-                pending_bytes: 0,
-                pending_records: 0,
-                last_sync: Instant::now(),
-            });
-            slot.pending_bytes += line_bytes as u64;
-            slot.pending_records += 1;
-            let due = slot.pending_bytes >= batch_bytes_limit()
-                || slot.pending_records >= batch_records_limit()
-                || slot.last_sync.elapsed() >= batch_interval();
-            if due {
-                file.sync_all().map_err(Error::Io)?;
-                slot.pending_bytes = 0;
-                slot.pending_records = 0;
-                slot.last_sync = Instant::now();
-            }
-            Ok(())
-        }
     }
 }
 
-pub fn flush_path(brain_path: &Path, file: &mut File) -> Result<()> {
-    file.sync_all().map_err(Error::Io)?;
-    if let Ok(mut map) = state_map().lock() {
-        if let Some(slot) = map.get_mut(&brain_path.to_path_buf()) {
-            slot.pending_bytes = 0;
-            slot.pending_records = 0;
-            slot.last_sync = Instant::now();
-        }
-    }
-    Ok(())
+pub fn flush_path(_brain_path: &Path, file: &mut File) -> Result<()> {
+    inject_fsync_fault()?;
+    file.sync_all().map_err(Error::Io)
 }
 
 pub fn flush_all() -> Result<()> {
-    // Best-effort — callers checkpoint with explicit file handles.
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_env::EnvGuard;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn wal_fsync_defaults_to_always() {
+        let previous = std::env::var_os("FLUCTLIGHT_WAL_FSYNC");
+        std::env::remove_var("FLUCTLIGHT_WAL_FSYNC");
+        assert_eq!(wal_fsync_mode(), WalFsyncMode::Always);
+        match previous {
+            Some(value) => std::env::set_var("FLUCTLIGHT_WAL_FSYNC", value),
+            None => std::env::remove_var("FLUCTLIGHT_WAL_FSYNC"),
+        }
+    }
+
+    #[test]
+    fn explicit_batched_mode_is_a_durable_alias_for_always() {
+        assert_eq!(wal_fsync_mode_for("batched"), WalFsyncMode::Always);
+    }
+
+    #[test]
+    fn injected_disk_full_prevents_durable_ack() {
+        let env = EnvGuard::acquire(&[
+            "FLUCTLIGHT_ENABLE_FAULT_INJECTION",
+            "FLUCTLIGHT_FAULT_DISK_FULL",
+        ]);
+        env.set("FLUCTLIGHT_ENABLE_FAULT_INJECTION", "1");
+        env.set("FLUCTLIGHT_FAULT_DISK_FULL", "1");
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("wal");
+        let mut file = File::create(&path).unwrap();
+        file.write_all(b"record").unwrap();
+
+        let error = append_and_sync(&path, &mut file, 6).unwrap_err();
+        assert!(error.to_string().contains("disk full"), "{error}");
+    }
+
+    #[test]
+    fn injected_fsync_delay_is_observable_and_bounded() {
+        let env = EnvGuard::acquire(&[
+            "FLUCTLIGHT_ENABLE_FAULT_INJECTION",
+            "FLUCTLIGHT_FAULT_FSYNC_DELAY_MS",
+        ]);
+        env.set("FLUCTLIGHT_ENABLE_FAULT_INJECTION", "1");
+        env.set("FLUCTLIGHT_FAULT_FSYNC_DELAY_MS", "20");
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("wal");
+        let mut file = File::create(&path).unwrap();
+        let started = std::time::Instant::now();
+        append_and_sync(&path, &mut file, 0).unwrap();
+        assert!(started.elapsed() >= Duration::from_millis(20));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
 }

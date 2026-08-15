@@ -26,11 +26,13 @@ pub fn compact_brain(brain: &mut FluctlightBrain) -> CompactReport {
     let life_id = brain.life.life_id;
     let threshold = brain.development.stage.prune_threshold();
 
+    let codec = brain.life.neuron_codec;
     let merge_result = merge_similar_engrams(
         &mut brain.hippocampus,
         &mut brain.graph,
         &mut brain.semantic,
         life_id,
+        codec,
     );
     let deduped = dedupe_synapses(&mut brain.graph);
     let pruned = brain.graph.prune_below(threshold);
@@ -72,6 +74,7 @@ fn merge_similar_engrams(
     graph: &mut BrainGraph,
     semantic: &mut crate::semantic::SemanticField,
     life_id: Uuid,
+    codec: u8,
 ) -> MergeResult {
     let mut merged = 0u32;
     let mut removed = 0u32;
@@ -87,7 +90,12 @@ fn merge_similar_engrams(
                 j += 1;
                 continue;
             }
-            if should_merge(&hippocampus.engrams[i], &hippocampus.engrams[j], semantic) {
+            if should_merge(
+                &hippocampus.engrams[i],
+                &hippocampus.engrams[j],
+                semantic,
+                codec,
+            ) {
                 let absorbed = hippocampus.engrams[j].clone();
                 let absorbed_id = absorbed.id;
                 absorb_engram(graph, &mut hippocampus.engrams[i], absorbed);
@@ -105,11 +113,25 @@ fn merge_similar_engrams(
     MergeResult { merged, removed }
 }
 
-fn should_merge(a: &Engram, b: &Engram, semantic: &crate::semantic::SemanticField) -> bool {
+fn should_merge(
+    a: &Engram,
+    b: &Engram,
+    semantic: &crate::semantic::SemanticField,
+    codec: u8,
+) -> bool {
     if a.episode.content == b.episode.content && a.episode.context == b.episode.context {
         return true;
     }
-    let dg_overlap = jaccard(&a.dg_neurons, &b.dg_neurons);
+    // Compare the *clean* content codes. `dg_neurons` carries up to MAX_SEPARATOR_ATTEMPTS
+    // artificial neurons that the dentate gyrus appended precisely because this engram
+    // resembled an existing one — and they are unique per engram by construction, so they
+    // can never match. Scoring the raw sets therefore caps similarity below the 0.85
+    // threshold exactly for the near-duplicates compaction exists to merge: a corpus of 250
+    // near-identical engrams yielded a single merge.
+    let dg_overlap = crate::derive::neuron_jaccard(
+        &crate::derive::content_dg(a, codec),
+        &crate::derive::content_dg(b, codec),
+    );
     if dg_overlap > 0.85 {
         return true;
     }
@@ -151,21 +173,6 @@ fn merge_neurons(dst: &mut Vec<NeuronId>, src: &[NeuronId]) {
         if !dst.contains(&n) {
             dst.push(n);
         }
-    }
-}
-
-fn jaccard(a: &[crate::id::NeuronId], b: &[crate::id::NeuronId]) -> f32 {
-    if a.is_empty() && b.is_empty() {
-        return 1.0;
-    }
-    let sa: HashSet<_> = a.iter().copied().collect();
-    let sb: HashSet<_> = b.iter().copied().collect();
-    let inter = sa.intersection(&sb).count() as f32;
-    let union = sa.union(&sb).count() as f32;
-    if union <= 0.0 {
-        0.0
-    } else {
-        inter / union
     }
 }
 

@@ -2,6 +2,17 @@
 
 FluctlightDB is **beta** (`0.5.x`). This page sets expectations for teams shipping a real agent — not a marketing claim of enterprise maturity.
 
+**Production readiness defaults to false.** For a production deployment, the Phase 5
+machine-readable gate must report `production_ready: true`; see
+[`runbooks/phase5-production.md`](runbooks/phase5-production.md). A passing test suite
+alone is insufficient when TLS, authentication, backup/restore evidence, or a required
+platform gate is absent.
+
+**CORTEX** (`feature = "cortex-sim"`) is an experimental deterministic-simulation
+correctness kernel for fencing/failover properties. It strengthens confidence in
+distributed failure modes; it does **not** flip `production_ready` by itself. See
+[`superpowers/specs/2026-07-22-cortex-extreme-production-doctrine.md`](superpowers/specs/2026-07-22-cortex-extreme-production-doctrine.md).
+
 ## Recommended for production today
 
 | Use case | Verdict |
@@ -9,6 +20,36 @@ FluctlightDB is **beta** (`0.5.x`). This page sets expectations for teams shippi
 | **Single agent, embedded brain on disk** (your process owns the `.brain` directory) | **Use `connect_embedded()`** — see [EMBEDDED.md](EMBEDDED.md) |
 | **Single-tenant HTTP serve** on localhost or private network with `FLUCTLIGHT_API_KEYS` | OK with auth enabled; see [SECURITY.md](../SECURITY.md) |
 | **Multi-tenant shared HTTP serve** | **Experimental** — adversarial tests exist but no third-party security audit |
+
+**Somnus (always on — no user toggle):** wake ticks/experiences are WAL traces only.
+Autonomic durability seals run on their own every `FLUCTLIGHT_SOMNUS_SEAL_EVERY_TICKS`
+(default 360) via `systems_seal` only — **no semantic sleep prune**, so activate /
+benchmark ranking is unchanged. Semantic `sleep()` still seals too. Obsolete gens prune to
+`FLUCTLIGHT_SOMNUS_KEEP` (default 3). CLS-native durability — see
+[`superpowers/specs/2026-07-25-somnus-cls-durability-doctrine.md`](superpowers/specs/2026-07-25-somnus-cls-durability-doctrine.md).
+`FLUCTLIGHT_SOMNUS=0` is a **debug-only** escape to legacy wake checkpoints (not for production).
+You do **not** set `FLUCTLIGHT_SOMNUS=1` to enable it.
+
+**Homeostasis (measurement):** `status().homeostasis` reports seal cadence, generation
+hygiene, and agent-prompt token estimates. Agent-lane only:
+`activate_for_agent_prompt` / `session_boot_context` pack a budgeted prompt slice
+(`FLUCTLIGHT_AGENT_ACTIVATE_MAX`, `FLUCTLIGHT_AGENT_PROMPT_TOKEN_BUDGET`) without changing
+`activate()` ranking used by benchmarks.
+
+**CortexSchema (Phase A — gates green):** semantic `sleep()` crystallizes durable schemas
+into `cortex.schemas`. Default `activate()` unchanged. Opt-in: `activate_with_schemas(cue)`.
+Prove: `cargo test -p fluctlightdb --test cortex_schema_gates --test activate_nonregression`.
+
+**CaptureGate (Phase B — gates green):** eligibility tags on experience; sleep captures only
+tagged engrams with supersede retention (no episode wipe). Prove:
+`cargo test -p fluctlightdb --test capture_gate_gates`.
+
+**Aeterna (Phase C — gates green):** `session_boot_context` / `activate_for_agent_prompt`
+lossless id+gist index + `expand_engrams`. Somnus seals on tick **or** WAL pressure.
+Prove: `cargo test -p fluctlightdb --test aeterna_gates --test somnus_durability`.
+
+**Ops brain path:** backup/replicate/drill scripts resolve
+`serverbrain-v2` before `default` when env is unset (`scripts/resolve-brain.sh`).
 
 ## Embedded quick path
 

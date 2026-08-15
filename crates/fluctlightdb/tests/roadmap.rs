@@ -317,7 +317,13 @@ fn semantic_recall_benchmark_fixture_pairs() {
 fn tenant_config_layout() {
     let dir = tempdir().unwrap();
     let cfg = TenantConfig::default_for("telegram_123", dir.path());
-    assert!(cfg.brain_path.to_string_lossy().contains("telegram_123"));
+    let slug = fluctlightdb::tenant::locus_slug("telegram_123");
+    let path = cfg.brain_path.to_string_lossy();
+    assert!(
+        path.contains(&slug) && path.contains("tenants"),
+        "CAB hashed locus expected, got {path}"
+    );
+    assert!(!path.contains("telegram_123"));
 }
 
 #[test]

@@ -6,6 +6,20 @@
 
 > **Codex Community Hackathon:** [Fluctlight Swarm Memory — problem, architecture, and one-command demo](HACKATHON.md)
 
+### Fluctlight Swarm Memory — built with Codex
+
+This hackathon prototype solves a failure mode in parallel coding agents: workers can receive duplicate context, repeat known failures, and promote unverified claims into shared knowledge. The Codex plugin gives every worker shared verified truth and warnings, but assigns different episodic strategies; it binds attempts to workers/worktrees and learns only from evidence accepted by a trusted verifier. State survives restarts through FluctlightDB WAL and v4 checkpoints.
+
+Codex parallel agents were used to audit both codebases, design the transaction model, implement the Rust coordinator and MCP hooks, discover and fix an MCP 2.0 compatibility issue, and run the verification suite. Reproduce the shipped artifact with:
+
+[![Watch the 61-second Fluctlight Swarm Memory demo](docs/demo/fluctlight-swarm-memory-preview.png)](docs/demo/fluctlight-swarm-memory-demo.mp4)
+
+**[Watch the 61-second demo video](docs/demo/fluctlight-swarm-memory-demo.mp4)** · [Read the demo narration](docs/demo/demo-voiceover-script.md)
+
+```bash
+python3 scripts/demo_codex_swarm.py
+```
+
 ## Install
 
 ```bash

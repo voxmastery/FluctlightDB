@@ -1,8 +1,9 @@
-//! Per-tenant brain configuration and storage layout.
+//! Per-tenant brain configuration and storage layout (CAB locus).
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantConfig {
@@ -25,9 +26,89 @@ fn env_usize(key: &str, default: usize) -> usize {
         .unwrap_or(default)
 }
 
+/// True when `tenant_id` is safe as a single path segment (legacy layout only).
+pub fn is_safe_legacy_tenant_id(tenant_id: &str) -> bool {
+    if tenant_id.is_empty() || tenant_id.len() > 128 {
+        return false;
+    }
+    let mut chars = tenant_id.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphanumeric()) {
+        return false;
+    }
+    tenant_id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        && !tenant_id.contains("..")
+}
+
+/// Stable path-safe slug: first 32 hex chars of SHA-256(tenant_id).
+pub fn locus_slug(tenant_id: &str) -> String {
+    let digest = Sha256::digest(tenant_id.as_bytes());
+    let mut out = String::with_capacity(32);
+    for b in digest.iter().take(16) {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
+/// Resolve tenant directory under `base/tenants` with CAB locus rules.
+///
+/// - Prefer hashed locus if it exists.
+/// - Else prefer legacy `tenants/<id>` only when `id` is a safe single segment and exists.
+/// - New tenants always use the hashed locus (never raw join of untrusted ids).
+pub fn tenant_dir(base: &Path, tenant_id: &str) -> PathBuf {
+    let tenants_root = base.join("tenants");
+    let hashed = tenants_root.join(locus_slug(tenant_id));
+    if hashed.exists() {
+        return hashed;
+    }
+    if is_safe_legacy_tenant_id(tenant_id) {
+        let legacy = tenants_root.join(tenant_id);
+        if legacy.exists() {
+            return legacy;
+        }
+    }
+    hashed
+}
+
+/// Ensure resolved path stays under `base/tenants` (after canonicalize when possible).
+pub fn assert_locus_contained(base: &Path, dir: &Path) -> Result<(), String> {
+    let tenants_root = base.join("tenants");
+    let root = std::fs::canonicalize(&tenants_root).unwrap_or(tenants_root);
+    let candidate = if dir.exists() {
+        std::fs::canonicalize(dir).map_err(|e| e.to_string())?
+    } else {
+        // Parent may exist; compare lexicographic prefix on cleaned paths.
+        let cleaned = dir.components().collect::<PathBuf>();
+        cleaned
+    };
+    if !candidate.starts_with(&root) {
+        // Allow not-yet-created hashed dir directly under tenants_root.
+        let parent_ok = dir
+            .parent()
+            .map(|p| {
+                let p_can = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+                p_can == root || p_can.starts_with(&root)
+            })
+            .unwrap_or(false);
+        if !parent_ok && !dir.starts_with(&root) {
+            return Err(format!(
+                "tenant locus escapes tenants root: {} (root={})",
+                dir.display(),
+                root.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
 impl TenantConfig {
     pub fn default_for(tenant_id: &str, base: &Path) -> Self {
-        let root = base.join("tenants").join(tenant_id);
+        let root = tenant_dir(base, tenant_id);
+        let _ = assert_locus_contained(base, &root);
         let brain_path =
             if crate::storage::format_from_env() == crate::storage::StorageFormat::V4Dir {
                 root.join("brain")
@@ -111,27 +192,51 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn tenant_layout() {
+    fn tenant_layout_uses_hashed_locus_for_new() {
         let dir = tempdir().unwrap();
         let cfg = TenantConfig::default_for("agent_a", dir.path());
+        let slug = locus_slug("agent_a");
         assert!(
-            cfg.brain_path.ends_with("tenants/agent_a/brain")
-                || cfg.brain_path.ends_with("tenants/agent_a/brain.flct")
+            cfg.brain_path.ends_with(format!("tenants/{slug}/brain"))
+                || cfg
+                    .brain_path
+                    .ends_with(format!("tenants/{slug}/brain.flct")),
+            "path={}",
+            cfg.brain_path.display()
         );
     }
 
     #[test]
-    fn tenant_file_config_overrides_limits() {
+    fn unsafe_tenant_id_never_joins_raw_path_segment() {
         let dir = tempdir().unwrap();
-        let tenant_root = dir.path().join("tenants").join("tier_a");
-        std::fs::create_dir_all(&tenant_root).unwrap();
+        let evil = "../PWNED";
+        let cfg = TenantConfig::default_for(evil, dir.path());
+        let s = cfg.brain_path.to_string_lossy();
+        assert!(!s.contains("PWNED"), "{s}");
+        assert!(s.contains(&locus_slug(evil)), "{s}");
+    }
+
+    #[test]
+    fn legacy_safe_id_still_resolves_existing_dir() {
+        let dir = tempdir().unwrap();
+        let legacy = dir.path().join("tenants").join("tier_a");
+        std::fs::create_dir_all(&legacy).unwrap();
         std::fs::write(
-            tenant_root.join("config.json"),
+            legacy.join("config.json"),
             r#"{"max_engrams": 42, "max_synapses": 1000}"#,
         )
         .unwrap();
         let cfg = TenantConfig::default_for("tier_a", dir.path());
         assert_eq!(cfg.max_engrams, 42);
         assert_eq!(cfg.max_synapses, 1000);
+        assert!(cfg.brain_path.starts_with(&legacy) || cfg.brain_path.parent() == Some(legacy.as_path()));
+    }
+
+    #[test]
+    fn safe_legacy_id_helper() {
+        assert!(is_safe_legacy_tenant_id("agent_a"));
+        assert!(!is_safe_legacy_tenant_id("../x"));
+        assert!(!is_safe_legacy_tenant_id("a/b"));
+        assert!(!is_safe_legacy_tenant_id("C:\\foo"));
     }
 }

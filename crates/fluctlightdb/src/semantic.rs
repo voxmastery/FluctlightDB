@@ -42,6 +42,7 @@ impl SemanticField {
         engram_id: Uuid,
         life_id: Uuid,
         vector: Vec<f32>,
+        codec: u8,
     ) -> Vec<NeuronId> {
         if vector.is_empty() {
             return Vec::new();
@@ -49,17 +50,23 @@ impl SemanticField {
         if self.dimension == 0 {
             self.dimension = vector.len().min(u16::MAX as usize) as u16;
         }
-        let ec = project_to_ec_neurons(&vector, life_id, engram_id);
+        let ec = project_to_ec_neurons(&vector, life_id, engram_id, codec);
         self.engram_vectors.insert(engram_id, vector);
         self.ec_semantic_neurons.insert(engram_id, ec.clone());
         ec
     }
 
-    pub fn cue_ec_neurons(&self, cue_vector: &[f32], life_id: Uuid, cue_id: Uuid) -> Vec<NeuronId> {
+    pub fn cue_ec_neurons(
+        &self,
+        cue_vector: &[f32],
+        life_id: Uuid,
+        cue_id: Uuid,
+        codec: u8,
+    ) -> Vec<NeuronId> {
         if cue_vector.is_empty() {
             return Vec::new();
         }
-        project_to_ec_neurons(cue_vector, life_id, cue_id)
+        project_to_ec_neurons(cue_vector, life_id, cue_id, codec)
     }
 
     /// Cosine similarity recall boost per engram (hippocampal index lookup).
@@ -157,17 +164,27 @@ impl SemanticField {
 }
 
 /// Random hyperplane projection → sparse EC neuron IDs (entorhinal gateway).
-pub fn project_to_ec_neurons(vector: &[f32], life_id: Uuid, seed_id: Uuid) -> Vec<NeuronId> {
+/// Project a dense vector onto sparse EC semantic neurons via signed random bands.
+///
+/// Persisted in `semantic.seg` (`ec_semantic_neurons`) **and** recomputed at query time by
+/// [`SemanticField::cue_ec_neurons`] — the same store-and-re-derive shape as `NeuronId`, so
+/// it carries the same drift hazard and is pinned by the same codec.
+pub fn project_to_ec_neurons(
+    vector: &[f32],
+    life_id: Uuid,
+    seed_id: Uuid,
+    codec: u8,
+) -> Vec<NeuronId> {
     let mut neurons = Vec::with_capacity(EC_PROJECTION_BANDS);
     for band in 0..EC_PROJECTION_BANDS {
         let mut acc = 0.0_f32;
         for (i, &v) in vector.iter().enumerate() {
-            let h = hash_mix(life_id, seed_id, band as u32, i as u32);
+            let h = hash_mix(life_id, seed_id, band as u32, i as u32, codec);
             let sign = if h & 1 == 0 { 1.0 } else { -1.0 };
             acc += v * sign;
         }
         let surface = format!("ec:sem:{band}:{acc:.4}");
-        neurons.push(NeuronId::from_seeds(&["semantic", &surface]));
+        neurons.push(NeuronId::from_seeds_with(codec, &["semantic", &surface]));
     }
     neurons
 }
@@ -198,7 +215,25 @@ fn blend_vector_inplace(dst: &mut [f32], src: &[f32], alpha: f32) {
     }
 }
 
-fn hash_mix(life: Uuid, seed: Uuid, band: u32, idx: u32) -> u64 {
+/// Band sign source for [`project_to_ec_neurons`].
+///
+/// Under [`crate::id::CODEC_FLCT1`] this routes through the frozen codec. The legacy arm
+/// keeps `DefaultHasher` verbatim so brains written before the freeze keep projecting cue
+/// vectors onto the same neurons their stored engrams occupy.
+fn hash_mix(life: Uuid, seed: Uuid, band: u32, idx: u32, codec: u8) -> u64 {
+    if codec == crate::id::CODEC_FLCT1 {
+        return crate::id::NeuronId::from_seeds_with(
+            codec,
+            &[
+                "ecband",
+                &life.to_string(),
+                &seed.to_string(),
+                &band.to_string(),
+                &idx.to_string(),
+            ],
+        )
+        .0;
+    }
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     life.hash(&mut h);
@@ -223,8 +258,8 @@ mod tests {
         let life = Uuid::new_v4();
         let seed = Uuid::new_v4();
         let v = vec![0.1, 0.2, 0.3, 0.4];
-        let a = project_to_ec_neurons(&v, life, seed);
-        let b = project_to_ec_neurons(&v, life, seed);
+        let a = project_to_ec_neurons(&v, life, seed, crate::id::CURRENT_CODEC);
+        let b = project_to_ec_neurons(&v, life, seed, crate::id::CURRENT_CODEC);
         assert_eq!(a, b);
         assert_eq!(a.len(), EC_PROJECTION_BANDS);
     }
@@ -235,7 +270,7 @@ mod tests {
         let life = Uuid::new_v4();
         let id = Uuid::new_v4();
         let v = vec![0.5, 0.5, 0.0];
-        field.register_engram(id, life, v.clone());
+        field.register_engram(id, life, v.clone(), crate::id::CURRENT_CODEC);
         let cue = vec![0.48, 0.52, 0.01];
         let engram = Engram {
             id,

@@ -1,8 +1,5 @@
 //! Tenant → shard routing for horizontal scale-out.
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
 #[derive(Debug, Clone)]
 pub struct ShardRouter {
     pub shard_count: u32,
@@ -32,13 +29,19 @@ impl ShardRouter {
         }
     }
 
+    /// Map a tenant to a shard.
+    ///
+    /// Uses the frozen [`crate::id::CODEC_FLCT1`] rather than `DefaultHasher`: shard
+    /// assignment is a *placement* decision whose result is implicitly persisted as
+    /// "which host holds this tenant's data". A standard-library hash change would silently
+    /// re-home every tenant to a shard that does not have their brain, which presents as
+    /// universal empty recall rather than as an error.
     pub fn shard_for(&self, tenant_id: &str) -> u32 {
         if self.shard_count <= 1 {
             return 0;
         }
-        let mut h = DefaultHasher::new();
-        tenant_id.hash(&mut h);
-        (h.finish() as u32) % self.shard_count
+        let h = crate::id::NeuronId::from_seeds_with(crate::id::CODEC_FLCT1, &["shard", tenant_id]);
+        ((h.0 >> 32) as u32) % self.shard_count
     }
 
     pub fn serve_addr(&self, tenant_id: &str) -> String {
