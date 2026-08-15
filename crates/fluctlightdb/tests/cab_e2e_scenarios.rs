@@ -8,10 +8,10 @@ use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 
+use fluctlightdb::auth::{AuthConfig, Role};
 use fluctlightdb::auth_store::AuthStore;
 use fluctlightdb::tenant::{locus_slug, tenant_dir};
 use fluctlightdb::test_env::EnvGuard;
-use fluctlightdb::auth::{AuthConfig, Role};
 use fluctlightdb::{reset_shutdown_for_tests, BrainServer};
 use tempfile::tempdir;
 
@@ -105,7 +105,10 @@ fn scenario_open_mode_default_write_and_block_traversal() {
         false,
     );
     assert_eq!(s, 200, "open default activate: {body}");
-    assert!(body.contains("hello") || body.contains("recalls") || body.contains("engram"), "{body}");
+    assert!(
+        body.contains("hello") || body.contains("recalls") || body.contains("engram"),
+        "{body}"
+    );
 
     // Traversal blocked
     let sentinel = tmp.path().join("OUTSIDE");
@@ -180,7 +183,14 @@ fn scenario_write_admin_platform_full_matrix() {
     assert_eq!(s, 403);
 
     // Write cannot compact
-    let (s, _) = http(39202, "POST", "/api/v1/compact", "{}", Some("writeSecret"), false);
+    let (s, _) = http(
+        39202,
+        "POST",
+        "/api/v1/compact",
+        "{}",
+        Some("writeSecret"),
+        false,
+    );
     assert_ne!(s, 200);
 
     // Platform cannot encode into a brain
@@ -278,9 +288,23 @@ fn scenario_unknown_role_and_missing_bearer() {
     let body = r#"{"content":"x","context":"x","salience_hint":0.5}"#;
     let (s, _) = http(39203, "POST", "/api/v1/experience", body, None, false);
     assert_eq!(s, 401);
-    let (s, _) = http(39203, "POST", "/api/v1/experience", body, Some("bad"), false);
+    let (s, _) = http(
+        39203,
+        "POST",
+        "/api/v1/experience",
+        body,
+        Some("bad"),
+        false,
+    );
     assert_eq!(s, 401);
-    let (s, _) = http(39203, "POST", "/api/v1/experience", body, Some("good"), false);
+    let (s, _) = http(
+        39203,
+        "POST",
+        "/api/v1/experience",
+        body,
+        Some("good"),
+        false,
+    );
     assert_eq!(s, 200);
 }
 

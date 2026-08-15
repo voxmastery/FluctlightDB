@@ -147,7 +147,7 @@ pub use reality::{VerifiedContext, VerifiedFact};
 pub use recall_fabric::{FabricConfig, FabricHit, RecallFabric};
 pub use recall_router::{RecallMode, TemporalFilter, UnifiedRecallHit, UnifiedRecallResult};
 pub use relation::{extract_relations, Relation};
-pub use replicate::open_replica_brain;
+pub use replicate::{open_replica_brain, sync_once, ReplicaStatus};
 pub use retention_policy::{RetentionPolicy, RetentionReport, RetentionState};
 pub use schema::{Schema, SchemaAwareActivation, SchemaStatus, SchemaStore};
 pub use semantic::{SemanticField, DEFAULT_SEMANTIC_DIM};

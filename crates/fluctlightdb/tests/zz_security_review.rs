@@ -82,12 +82,19 @@ fn h1_path_traversal_does_not_write_outside_tenant_root() {
         r#"{{"tenant_id":"{sentinel_str}","content":"traversal-poc","context":"x","salience_hint":0.9}}"#
     );
     let (status, resp) = post(39141, "/api/v1/experience", &body, None);
-    println!("H1: status={status} resp={} sentinel={}", resp.trim(), sentinel.exists());
+    println!(
+        "H1: status={status} resp={} sentinel={}",
+        resp.trim(),
+        sentinel.exists()
+    );
     assert!(
         !sentinel.exists(),
         "H1: brain must not be created outside tenant root"
     );
-    assert_ne!(status, 200, "H1: open-mode must not honor attacker tenant_id");
+    assert_ne!(
+        status, 200,
+        "H1: open-mode must not honor attacker tenant_id"
+    );
 }
 
 #[test]
@@ -109,7 +116,10 @@ fn h2_admin_key_cannot_cross_tenant() {
         Some("adminA"),
     );
     println!("H2: status={status} resp={}", resp.trim());
-    assert_eq!(status, 403, "H2: per-tenant admin must not write other tenants");
+    assert_eq!(
+        status, 403,
+        "H2: per-tenant admin must not write other tenants"
+    );
 }
 
 #[test]

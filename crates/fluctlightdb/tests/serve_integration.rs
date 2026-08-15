@@ -256,12 +256,7 @@ fn serve_swarm_lifecycle_enforces_verifier_role() {
         post(port, "/api/v1/swarm/evidence", &body, Some("worker_key")).0,
         403
     );
-    let (status, response) = post(
-        port,
-        "/api/v1/swarm/evidence",
-        &body,
-        Some("admin_key"),
-    );
+    let (status, response) = post(port, "/api/v1/swarm/evidence", &body, Some("admin_key"));
     assert_eq!(status, 200, "evidence failed: {response}");
     assert!(response.contains(&memory_id.to_string()));
 

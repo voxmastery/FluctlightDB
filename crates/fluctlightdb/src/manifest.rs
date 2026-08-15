@@ -55,6 +55,8 @@ impl Default for BrainManifest {
                 "muon".into(),
                 "tau".into(),
                 "swarm".into(),
+                "agent".into(),
+                "governance".into(),
             ],
         }
     }
@@ -199,6 +201,15 @@ fn write_checkpoint_dir(brain: &FluctlightBrain, dir: &Path) -> Result<()> {
     segment::write_segment(dir, "muon", &brain.muon)?;
     segment::write_segment(dir, "tau", &brain.tau)?;
     segment::write_segment(dir, "swarm", &brain.swarm)?;
+    // Agent + governance: same omission as the muon/tau lanes above, one layer up.
+    // `agent` carries the WM ring, the retention policy and the auto-consolidate flag, so
+    // unflushed working memory was silently dropped on every restart. `governance` carries
+    // the compliance audit log; an audit trail that does not survive a restart is worse than
+    // none, because `audit_log()` still returns 200 with an empty list and no client can
+    // tell the difference. `load_v4_dir` already reads both — without these writes the
+    // reads only ever hit `unwrap_or_default()`, which makes the loss look fixed.
+    segment::write_segment(dir, "agent", &brain.agent)?;
+    segment::write_segment(dir, "governance", &brain.governance)?;
 
     let identity = brain.wal_identity();
     let manifest = BrainManifest {
@@ -530,6 +541,87 @@ mod tests {
 
         assert!(loaded.swarm.runs.contains_key(&swarm_id));
         assert_eq!(loaded.swarm.applied_transactions.len(), 1);
+    }
+
+    /// The compliance audit log must survive a restart.
+    ///
+    /// `load_v4_dir` reads `governance`, but `write_checkpoint_dir` did not write it — so the
+    /// read only ever hit `unwrap_or_default()` and every restart silently emptied the audit
+    /// trail while `audit_log()` kept returning 200 with an empty list.
+    #[test]
+    fn v4_roundtrip_preserves_governance_audit_log() {
+        let dir = tempdir().unwrap();
+        let v4 = dir.path().join("brain_v4");
+        let mut brain = FluctlightBrain::new();
+        brain
+            .experience(Episode::new(
+                "reach bob@example.com for the invoice",
+                "test",
+                0.6,
+            ))
+            .unwrap();
+        let scrub = brain.scrub_pii().unwrap();
+        assert_eq!(
+            scrub.engrams_scrubbed, 1,
+            "precondition: something was scrubbed"
+        );
+        let before = brain.governance_state().audit_log.len();
+        assert!(before > 0, "precondition: an audit entry was recorded");
+
+        save_v4_dir(&brain, &v4).unwrap();
+        let loaded = load_v4_dir(&v4).unwrap();
+        assert_eq!(
+            loaded.governance_state().audit_log.len(),
+            before,
+            "compliance audit entries must survive a restart"
+        );
+    }
+
+    /// Working memory that has not yet been flushed must survive a checkpoint. `agent`
+    /// (AgentState) holds the WM ring, retention policy and auto-consolidate flag.
+    #[test]
+    fn v4_roundtrip_preserves_agent_state() {
+        let dir = tempdir().unwrap();
+        let v4 = dir.path().join("brain_v4");
+        let mut brain = FluctlightBrain::new();
+        brain.turn_begin();
+        brain.wm_push("user prefers dark mode", "settings", 0.8, None);
+        let before = brain.wm_len();
+        assert!(before > 0, "precondition: WM holds a slot");
+
+        save_v4_dir(&brain, &v4).unwrap();
+        let loaded = load_v4_dir(&v4).unwrap();
+        assert_eq!(
+            loaded.wm_len(),
+            before,
+            "unflushed working memory must survive a checkpoint"
+        );
+    }
+
+    /// Guard against the whole bug class: every segment the manifest *declares* must actually
+    /// be written to the published generation.
+    ///
+    /// This is the check that would have caught `agent`/`governance` being dropped. Adding a
+    /// persistable field to `FluctlightBrain` and listing it in `BrainManifest::default()`
+    /// without a matching `write_segment` call now fails loudly here, instead of silently
+    /// discarding that state at the next restart.
+    #[test]
+    fn every_declared_segment_is_actually_written() {
+        let dir = tempdir().unwrap();
+        let v4 = dir.path().join("brain_v4");
+        save_v4_dir(&FluctlightBrain::new(), &v4).unwrap();
+        let checkpoint = resolve_checkpoint_dir(&v4).unwrap();
+
+        let declared = BrainManifest::default().segments;
+        let missing: Vec<&str> = declared
+            .iter()
+            .filter(|name| !crate::segment::segment_exists(&checkpoint, name))
+            .map(|s| s.as_str())
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "manifest declares segments that the checkpoint never writes: {missing:?}"
+        );
     }
 
     /// A brain directory written before lane persistence has no muon/tau segment. Loading it
