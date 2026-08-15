@@ -41,6 +41,7 @@ impl Default for BrainManifest {
                 "semantic".into(),
                 "muon".into(),
                 "tau".into(),
+                "swarm".into(),
             ],
         }
     }
@@ -70,6 +71,7 @@ pub fn save_v4_dir(brain: &FluctlightBrain, dir: &Path) -> Result<()> {
     // Serialize/Deserialize; they just were never written.
     segment::write_segment(dir, "muon", &brain.muon)?;
     segment::write_segment(dir, "tau", &brain.tau)?;
+    segment::write_segment(dir, "swarm", &brain.swarm)?;
 
     let manifest = BrainManifest {
         format_version: V4_VERSION,
@@ -117,6 +119,7 @@ pub fn load_v4_dir(dir: &Path) -> Result<FluctlightBrain> {
     // older brain directories readable and matches the previous (always-empty) behaviour.
     brain.muon = segment::read_segment(dir, "muon").unwrap_or_default();
     brain.tau = segment::read_segment(dir, "tau").unwrap_or_default();
+    brain.swarm = segment::read_segment(dir, "swarm").unwrap_or_default();
     Ok(brain)
 }
 
@@ -129,8 +132,32 @@ pub fn migrate_v3_file_to_v4(v3_path: &Path, v4_dir: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::swarm::{BeginSwarm, SwarmTransaction, WorkerSlot, WorkerStatus};
     use crate::types::Episode;
     use tempfile::tempdir;
+
+    fn add_swarm(brain: &mut FluctlightBrain) -> uuid::Uuid {
+        let swarm_id = uuid::Uuid::new_v4();
+        brain
+            .apply_swarm_transaction(SwarmTransaction::Begin(BeginSwarm {
+                transaction_id: uuid::Uuid::new_v4(),
+                swarm_id,
+                project_id: "fluctlight".into(),
+                objective_digest: "sha256:objective".into(),
+                repository_identity: "repo".into(),
+                base_commit: "abc123".into(),
+                policy_version: "v1".into(),
+                roster: vec![WorkerSlot {
+                    slot_id: "slot-a".into(),
+                    role: "worker".into(),
+                    agent_id: None,
+                    worktree: None,
+                    status: WorkerStatus::Declared,
+                }],
+            }))
+            .unwrap();
+        swarm_id
+    }
 
     #[test]
     fn v4_roundtrip() {
@@ -181,6 +208,20 @@ mod tests {
         );
     }
 
+    #[test]
+    fn v4_roundtrip_preserves_swarm_state() {
+        let dir = tempdir().unwrap();
+        let v4 = dir.path().join("brain_v4");
+        let mut brain = FluctlightBrain::new();
+        let swarm_id = add_swarm(&mut brain);
+
+        save_v4_dir(&brain, &v4).unwrap();
+        let loaded = load_v4_dir(&v4).unwrap();
+
+        assert!(loaded.swarm.runs.contains_key(&swarm_id));
+        assert_eq!(loaded.swarm.applied_transactions.len(), 1);
+    }
+
     /// A brain directory written before lane persistence has no muon/tau segment. Loading it
     /// must still succeed (falling back to empty lanes) rather than erroring out.
     #[test]
@@ -192,8 +233,10 @@ mod tests {
         // simulate an older brain dir: drop the lane segments
         let _ = fs::remove_file(v4.join("muon.seg"));
         let _ = fs::remove_file(v4.join("tau.seg"));
+        let _ = fs::remove_file(v4.join("swarm.seg"));
 
         let loaded = load_v4_dir(&v4).expect("older brain dirs must still load");
         assert_eq!(loaded.muon_len(), 0);
+        assert!(loaded.swarm.runs.is_empty());
     }
 }

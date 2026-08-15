@@ -615,6 +615,7 @@ impl BrainSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::swarm::{BeginSwarm, SwarmTransaction, WorkerSlot, WorkerStatus};
     use crate::types::Episode;
     use tempfile::tempdir;
 
@@ -644,6 +645,35 @@ mod tests {
         let report = verify_path(&path).unwrap();
         assert!(report.ok);
         assert_eq!(report.format, "v3.1");
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn v3_store_rejects_swarm_transactions_instead_of_losing_them() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("swarm.flct");
+        let mut brain = FluctlightBrain::open(&path).unwrap();
+        let swarm_id = uuid::Uuid::new_v4();
+        let result = brain
+            .apply_swarm_transaction(SwarmTransaction::Begin(BeginSwarm {
+                transaction_id: uuid::Uuid::new_v4(),
+                swarm_id,
+                project_id: "fluctlight".into(),
+                objective_digest: "sha256:objective".into(),
+                repository_identity: "repo".into(),
+                base_commit: "abc123".into(),
+                policy_version: "v1".into(),
+                roster: vec![WorkerSlot {
+                    slot_id: "slot-a".into(),
+                    role: "worker".into(),
+                    agent_id: None,
+                    worktree: None,
+                    status: WorkerStatus::Declared,
+                }],
+            }));
+
+        assert!(result.is_err());
+        assert!(brain.swarm.runs.is_empty());
     }
 
     #[test]

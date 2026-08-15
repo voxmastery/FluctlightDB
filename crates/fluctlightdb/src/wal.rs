@@ -410,7 +410,7 @@ mod tests {
     #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
     fn wal_replays_swarm_transaction_after_checkpoint_gap() {
         let dir = tempdir().unwrap();
-        let path = dir.path().join("swarm.flct");
+        let path = dir.path().join("swarm-brain");
         let brain = FluctlightBrain::open(&path).unwrap();
         brain.checkpoint().unwrap();
         drop(brain);
@@ -421,13 +421,16 @@ mod tests {
 
         let loaded = FluctlightBrain::open(&path).unwrap();
         assert!(loaded.swarm.runs.contains_key(&swarm_id));
+        drop(loaded);
+        let reopened = FluctlightBrain::open(&path).unwrap();
+        assert!(reopened.swarm.runs.contains_key(&swarm_id));
     }
 
     #[test]
     #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
     fn duplicate_swarm_transactions_replay_once() {
         let dir = tempdir().unwrap();
-        let path = dir.path().join("swarm.flct");
+        let path = dir.path().join("swarm-brain");
         let brain = FluctlightBrain::open(&path).unwrap();
         brain.checkpoint().unwrap();
         drop(brain);

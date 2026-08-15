@@ -192,6 +192,13 @@ impl FluctlightBrain {
         &mut self,
         transaction: crate::swarm::SwarmTransaction,
     ) -> Result<crate::swarm::SwarmRun> {
+        if let Some(path) = self.store_path.as_deref() {
+            if !crate::storage::should_use_v4(path) {
+                return Err(Error::Store(
+                    "swarm coordination requires v4 segmented storage".into(),
+                ));
+            }
+        }
         let mut next = self.swarm.clone();
         let run = next.apply_transaction(transaction.clone())?;
         if next == self.swarm {
