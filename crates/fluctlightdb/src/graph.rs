@@ -41,6 +41,19 @@ pub struct BrainGraph {
     adjacency_ready: bool,
 }
 
+
+/// Per-neuron out-degree cap for synaptic competition. Cortical neurons keep a bounded synapse
+/// budget; unbounded fan-out is what let one runaway loop mint 64.8M edges. 0 disables.
+fn max_out_degree() -> usize {
+    static CAP: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CAP.get_or_init(|| {
+        std::env::var("FLUCTLIGHT_MAX_OUT_DEGREE")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(256)
+    })
+}
+
 impl Default for BrainGraph {
     fn default() -> Self {
         Self {
@@ -68,6 +81,37 @@ impl BrainGraph {
                 self.synapses[idx].weight = synapse.weight;
             }
             return;
+        }
+        // Synaptic competition (neurotrophin-style): a neuron supports only a bounded number of
+        // outgoing synapses, and a new edge must displace its weakest sibling to earn a slot.
+        // This bounds the graph at O(neurons x cap) BY CONSTRUCTION — the production explosion
+        // (64.8M synapses, 95.7% never reinforced past init weight) becomes impossible rather
+        // than merely cleaned up after the fact. Eviction reuses the loser's Vec slot, so
+        // adjacency entries for `from` stay valid; only the (from,to) pair index changes.
+        let cap = max_out_degree();
+        if cap > 0 && self.adjacency_ready {
+            let siblings = self.adjacency.get(&key.0).map(Vec::as_slice).unwrap_or(&[]);
+            if siblings.len() >= cap {
+                let weakest = siblings
+                    .iter()
+                    .copied()
+                    .min_by(|&a, &b| {
+                        self.synapses[a as usize]
+                            .weight
+                            .partial_cmp(&self.synapses[b as usize].weight)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .expect("cap > 0 so siblings is non-empty");
+                let loser = &self.synapses[weakest as usize];
+                if synapse.weight <= loser.weight {
+                    return; // too weak to displace anything — no slot earned
+                }
+                let old_key = (loser.from.0, loser.to.0);
+                self.synapse_index.remove(&old_key);
+                self.synapse_index.insert(key, weakest as usize);
+                self.synapses[weakest as usize] = synapse;
+                return;
+            }
         }
         let idx = self.synapses.len();
         self.synapses.push(synapse);
@@ -152,6 +196,35 @@ impl BrainGraph {
             }
         }
         out
+    }
+
+    /// Sleep-time homeostatic downscaling (synaptic homeostasis hypothesis, Tononi & Cirelli).
+    ///
+    /// Wake plasticity is potentiation-biased: Hebbian + STDP only ever push weights up, so
+    /// weights saturate — production accumulated 2.6M synapses parked at the 1.0 clamp, which
+    /// flattens the weight distribution recall ranking depends on. Sleep multiplicatively scales
+    /// every synapse down EXCEPT those replayed tonight (`protected`), restoring dynamic range
+    /// while consolidation re-strengthens what mattered. Runs only inside sleep — never on the
+    /// experience hot path — so the full sweep is acceptable (ms at bounded graph sizes).
+    /// Returns how many synapses were scaled.
+    pub fn homeostatic_downscale(
+        &mut self,
+        protected: &HashSet<NeuronId>,
+        factor: f32,
+    ) -> u32 {
+        let factor = factor.clamp(0.5, 1.0);
+        if factor >= 1.0 {
+            return 0;
+        }
+        let mut scaled = 0u32;
+        for s in &mut self.synapses {
+            if protected.contains(&s.from) && protected.contains(&s.to) {
+                continue; // replayed tonight — consolidation owns these
+            }
+            s.weight = (s.weight * factor).max(0.001);
+            scaled += 1;
+        }
+        scaled
     }
 
     pub fn prune_below(&mut self, threshold: f32) -> u32 {
@@ -292,6 +365,90 @@ mod tests {
         g.add_synapse(Synapse::new(a, b, Region::HippocampusCa3, 0.8));
         assert_eq!(g.synapse_count(), 1);
         assert!((g.synapses[0].weight - 0.8).abs() < 1e-5);
+    }
+
+
+
+    /// B: sleep downscaling decays un-replayed synapses but protects tonight's replay set.
+    #[test]
+    fn homeostatic_downscale_protects_replayed() {
+        let mut g = BrainGraph::default();
+        wire(&mut g, 1, 2, 1.0);   // replayed pair — protected
+        wire(&mut g, 3, 4, 1.0);   // idle — must decay
+        let protected: HashSet<NeuronId> = [NeuronId(1), NeuronId(2)].into_iter().collect();
+
+        let scaled = g.homeostatic_downscale(&protected, 0.98);
+        assert_eq!(scaled, 1);
+        fn w(g: &BrainGraph, f: u64, t: u64) -> f32 {
+            g.neighbors(NeuronId(f))
+                .find(|(_, to)| to.0 == t)
+                .map(|(s, _)| s.weight)
+                .unwrap()
+        }
+        assert!((w(&g, 1, 2) - 1.0).abs() < 1e-6, "replayed synapse untouched");
+        assert!((w(&g, 3, 4) - 0.98).abs() < 1e-6, "idle synapse decayed");
+
+        // repeated idle nights walk it down toward the prune threshold, never below floor
+        for _ in 0..500 {
+            g.homeostatic_downscale(&protected, 0.9);
+        }
+        let final_w = w(&g, 3, 4);
+        assert!(final_w >= 0.001 && final_w < 0.01);
+        // factor 1.0 disables
+        assert_eq!(g.homeostatic_downscale(&protected, 1.0), 0);
+    }
+
+    /// C: out-degree is bounded — a neuron can never exceed the cap, and a stronger
+    /// newcomer displaces the weakest sibling while a weaker one is rejected.
+    #[test]
+    fn degree_cap_competitive_eviction() {
+        std::env::set_var("FLUCTLIGHT_MAX_OUT_DEGREE", "256");
+        let mut g = BrainGraph::default();
+        let from = 42u64;
+        // fill to cap with ascending weights 0.30..
+        for i in 0..256u64 {
+            wire(&mut g, from, 1000 + i, 0.30 + (i as f32) * 0.001);
+        }
+        assert_eq!(g.neighbors(NeuronId(from)).count(), 256);
+
+        // weaker than every sibling -> rejected
+        wire(&mut g, from, 9001, 0.10);
+        assert_eq!(g.neighbors(NeuronId(from)).count(), 256);
+        assert!(!g.neighbors(NeuronId(from)).any(|(_, to)| to.0 == 9001));
+
+        // stronger -> evicts the weakest (to=1000, w=0.30)
+        wire(&mut g, from, 9002, 0.90);
+        assert_eq!(g.neighbors(NeuronId(from)).count(), 256, "cap must hold");
+        assert!(g.neighbors(NeuronId(from)).any(|(_, to)| to.0 == 9002));
+        assert!(!g.neighbors(NeuronId(from)).any(|(_, to)| to.0 == 1000), "weakest evicted");
+
+        // synapse_index stays consistent: re-adding the evicted edge dedups correctly
+        let count_before = g.synapse_count();
+        wire(&mut g, from, 9002, 0.95); // dedup path, strengthen in place
+        assert_eq!(g.synapse_count(), count_before);
+        let w = g
+            .neighbors(NeuronId(from))
+            .find(|(_, to)| to.0 == 9002)
+            .map(|(s, _)| s.weight)
+            .unwrap();
+        assert!((w - 0.95).abs() < 1e-6);
+    }
+
+    /// C: the graph as a whole is bounded by neurons x cap even under runaway wiring.
+    #[test]
+    fn degree_cap_bounds_total_graph() {
+        std::env::set_var("FLUCTLIGHT_MAX_OUT_DEGREE", "256");
+        let mut g = BrainGraph::default();
+        let mut x: u64 = 7;
+        for i in 0..50_000u64 {
+            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            wire(&mut g, i % 8, (x >> 33) % 100_000, 0.30 + ((i % 60) as f32) * 0.01);
+        }
+        assert!(
+            g.synapse_count() <= 8 * 256,
+            "8 neurons x cap 256 must bound the graph, got {}",
+            g.synapse_count()
+        );
     }
 
     /// Deterministic pseudo-random graph for plasticity tests (no rand dep).

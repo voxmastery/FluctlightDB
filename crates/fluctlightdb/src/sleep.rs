@@ -94,6 +94,16 @@ pub fn sleep_cycle(
         }
     }
 
+    // Homeostatic downscaling before pruning: un-replayed synapses drift down each sleep, so
+    // junk decays away through the normal prune threshold instead of accumulating forever,
+    // and the saturated-at-1.0 mass regains ranking dynamic range. FLUCTLIGHT_SLEEP_DOWNSCALE
+    // sets the factor (default 0.98/night); 1.0 disables.
+    let downscale = std::env::var("FLUCTLIGHT_SLEEP_DOWNSCALE")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(0.98);
+    let _ = graph.homeostatic_downscale(&active_union, downscale);
+
     let pruned = graph.prune_below(threshold);
     amygdala.decay();
     neuromodulators.on_sleep();
