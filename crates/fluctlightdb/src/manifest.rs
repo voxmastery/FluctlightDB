@@ -277,7 +277,7 @@ fn load_checkpoint_dir(dir: &Path) -> Result<FluctlightBrain> {
         segment::read_segment(dir, "neuromodulators")?,
         segment::read_segment(dir, "graph")?,
         crate::legacy_hippocampus::read_hippocampus_segment(dir)?,
-        segment::read_segment(dir, "cortex")?,
+        crate::legacy_cortex::read_cortex_segment(dir)?,
         segment::read_segment(dir, "amygdala")?,
         segment::read_segment(dir, "prefrontal").unwrap_or_default(),
         segment::read_segment(dir, "core_memories")?,

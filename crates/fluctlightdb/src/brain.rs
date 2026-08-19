@@ -536,7 +536,7 @@ impl FluctlightBrain {
             self.graph.synapse_count(),
             self.development.stage.max_synapses(),
         );
-        if pressure >= PRESSURE_COMPACT_THRESHOLD {
+        if pressure >= PRESSURE_COMPACT_THRESHOLD && hotpath_compact_allowed() {
             let _ = self.compact_internal(false);
         }
         // Bleed the re-key queue a little on every write so an active brain migrates itself
@@ -2087,4 +2087,28 @@ mod tests {
             .unwrap();
         assert_eq!(brain.semantic.engram_vectors.len(), 1);
     }
+}
+
+/// Compaction inside experience() runs with the brain write lock held; on a large brain one
+/// pass takes minutes, so under sustained pressure every single write stalled for minutes and
+/// starved all recall (production: 280s+ per experience). Rate-limit the hot path — sleep-time
+/// consolidation remains the proper home for bulk work. FLUCTLIGHT_HOTPATH_COMPACT=0 disables.
+fn hotpath_compact_allowed() -> bool {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static LAST: AtomicU64 = AtomicU64::new(0);
+    if std::env::var("FLUCTLIGHT_HOTPATH_COMPACT").map(|v| v == "0").unwrap_or(false) {
+        return false;
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let last = LAST.load(Ordering::Relaxed);
+    let min_gap = std::env::var("FLUCTLIGHT_HOTPATH_COMPACT_GAP_SECS")
+        .ok().and_then(|v| v.parse().ok()).unwrap_or(600);
+    if now.saturating_sub(last) < min_gap {
+        return false;
+    }
+    LAST.store(now, Ordering::Relaxed);
+    true
 }
