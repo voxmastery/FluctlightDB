@@ -49,6 +49,7 @@ pub mod id;
 pub mod index;
 pub mod late_interaction;
 pub mod lattice;
+pub mod legacy_cortex;
 pub mod legacy_hippocampus;
 pub mod life;
 pub mod manifest;
