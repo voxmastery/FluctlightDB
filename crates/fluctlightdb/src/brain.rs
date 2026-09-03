@@ -578,13 +578,20 @@ impl FluctlightBrain {
         if pressure >= PRESSURE_COMPACT_THRESHOLD && hotpath_compact_allowed() {
             let _ = self.compact_internal(false);
         }
-        // Bleed the re-key queue a little on every write so an active brain migrates itself
-        // without an operator noticing. Sleep drains it in much larger batches.
-        crate::derive::drain(self, 4);
-
         let engram_id = engram.id;
         self.amygdala.tag(engram_id, salience);
         self.hippocampus.encode(engram);
+        // An engram written mid-migration was encoded under the still-legacy codec. Queue it
+        // before draining: the codec flip waits for an empty queue, so it is guaranteed
+        // re-keyed before cues switch codecs — otherwise it would be stranded under a codec
+        // no cue will ever be derived with again. (Queued after encode so a drain that
+        // reaches it can actually find it.)
+        if !self.rekey_pending.is_empty() {
+            self.rekey_pending.push(engram_id);
+        }
+        // Bleed the re-key queue a little on every write so an active brain migrates itself
+        // without an operator noticing. Sleep drains it in much larger batches.
+        crate::derive::drain(self, 4);
 
         let content_for_index = self
             .hippocampus

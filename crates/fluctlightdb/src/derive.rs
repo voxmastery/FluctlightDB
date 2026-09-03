@@ -164,9 +164,17 @@ pub fn drain(brain: &mut crate::brain::FluctlightBrain, limit: usize) -> u64 {
         }
         brain.rekey_pending.retain(|p| *p != id);
     }
-    if done > 0 {
+    // The codec may only flip once the WHOLE queue has drained. Cues are derived under
+    // `life.neuron_codec`, so flipping after a partial batch strands every engram still
+    // pending — and once a checkpoint persists the flipped codec, a reload sees
+    // "current codec, no drift" and never rebuilds the queue: those engrams become
+    // permanently unreachable. (Observed on a 12,917-engram production copy: ingest
+    // drained 4, shutdown checkpointed codec=FLCT1, reopen recalled almost nothing.)
+    if done > 0 && brain.rekey_pending.is_empty() {
         brain.life.neuron_codec = crate::id::CURRENT_CODEC;
         brain.life.codec_probes = crate::life::codec_probes_for(crate::id::CURRENT_CODEC);
+        brain.invalidate_activation_cache();
+    } else if done > 0 {
         brain.invalidate_activation_cache();
     }
     done

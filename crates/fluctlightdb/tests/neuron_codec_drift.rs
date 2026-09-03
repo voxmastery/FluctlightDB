@@ -180,3 +180,130 @@ fn legacy_brain_recalls_correctly_before_being_rekeyed() {
         "recall must survive the migration too"
     );
 }
+
+/// The codec may only flip once the WHOLE re-key queue has drained.
+///
+/// Regression: `derive::drain` used to flip `life.neuron_codec` after ANY successful batch.
+/// On a legacy production copy (12,917 engrams) one ingest drained 4, the shutdown checkpoint
+/// persisted codec=FLCT1, and the reopened brain saw "current codec, no drift" — never
+/// rebuilding the queue. 12,912 engrams became permanently unreachable, silently.
+#[test]
+fn partial_drain_must_not_flip_codec_and_reload_requeues() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("brain");
+    {
+        let mut brain = FluctlightBrain::open(&path).unwrap();
+        for i in 0..12 {
+            brain
+                .experience(Episode {
+                    content: format!("legacy fact number {i} about topic {i}"),
+                    context: "drift".into(),
+                    outcome: None,
+                    salience_hint: 0.6,
+                    semantic_vector: None,
+                    agent_id: None,
+                    tenant_id: None,
+                    rag: None,
+                    provenance: None,
+                })
+                .unwrap();
+        }
+        brain.checkpoint().unwrap();
+    }
+    // Force the brain into "legacy codec, full queue" the same way a real legacy load does.
+    {
+        let gen = fluctlightdb::manifest::active_generation_dir(&path).unwrap();
+        let mut life = fluctlightdb::life::read_life_segment(&gen).unwrap();
+        life.neuron_codec = 0; // CODEC_LEGACY_STD
+        life.codec_probes = fluctlightdb::life::codec_probes_for(0);
+        fluctlightdb::segment::write_segment(&gen, "life", &life).unwrap();
+    }
+    let mut brain = FluctlightBrain::open(&path).unwrap();
+    let queued = brain.rekey_pending_count();
+    assert!(queued >= 12, "legacy load must queue everything: {queued}");
+
+    // Partial drain: codec must NOT flip while anything is still pending.
+    fluctlightdb::derive::drain(&mut brain, 4);
+    assert!(brain.rekey_pending_count() > 0);
+    assert_eq!(
+        brain.life.neuron_codec, 0,
+        "codec flipped with {} engrams still pending",
+        brain.rekey_pending_count()
+    );
+
+    // A checkpoint + reload mid-migration must re-queue the remainder, not strand it.
+    brain.checkpoint().unwrap();
+    drop(brain);
+    let brain = FluctlightBrain::open(&path).unwrap();
+    assert!(
+        brain.rekey_pending_count() > 0,
+        "reload mid-migration lost the re-key queue"
+    );
+
+    // Full drain: now the flip happens.
+    let mut brain = brain;
+    brain.rekey_now();
+    assert_eq!(brain.rekey_pending_count(), 0);
+    assert_eq!(brain.life.neuron_codec, fluctlightdb::id::CURRENT_CODEC);
+}
+
+/// An engram written while migration is in flight must be re-keyed before the flip,
+/// or it is stranded under a codec no cue will ever be derived with again.
+#[test]
+fn engram_written_mid_migration_is_not_stranded() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("brain");
+    {
+        let mut brain = FluctlightBrain::open(&path).unwrap();
+        for i in 0..8 {
+            brain
+                .experience(Episode {
+                    content: format!("old memory {i} in the archive"),
+                    context: "drift".into(),
+                    outcome: None,
+                    salience_hint: 0.6,
+                    semantic_vector: None,
+                    agent_id: None,
+                    tenant_id: None,
+                    rag: None,
+                    provenance: None,
+                })
+                .unwrap();
+        }
+        brain.checkpoint().unwrap();
+    }
+    {
+        let gen = fluctlightdb::manifest::active_generation_dir(&path).unwrap();
+        let mut life = fluctlightdb::life::read_life_segment(&gen).unwrap();
+        life.neuron_codec = 0;
+        life.codec_probes = fluctlightdb::life::codec_probes_for(0);
+        fluctlightdb::segment::write_segment(&gen, "life", &life).unwrap();
+    }
+    let mut brain = FluctlightBrain::open(&path).unwrap();
+    assert!(brain.rekey_pending_count() > 0);
+
+    // Write during migration, then drain to completion.
+    brain
+        .experience(Episode {
+            content: "fresh migration window observation about zebras".into(),
+            context: "drift".into(),
+            outcome: None,
+            salience_hint: 0.8,
+            semantic_vector: None,
+            agent_id: None,
+            tenant_id: None,
+            rag: None,
+            provenance: None,
+        })
+        .unwrap();
+    brain.rekey_now();
+    assert_eq!(brain.life.neuron_codec, fluctlightdb::id::CURRENT_CODEC);
+
+    let hits = brain.activate("zebras migration observation");
+    assert!(
+        hits.recalls
+            .iter()
+            .any(|r| r.episode.content.contains("zebras")),
+        "mid-migration engram stranded after codec flip"
+    );
+}
