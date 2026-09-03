@@ -40,6 +40,8 @@ pub enum Error {
     DistributedMutationDisabled { operation: &'static str },
     #[error("serialization error: {0}")]
     Serde(String),
+    #[error(transparent)]
+    Swarm(#[from] crate::swarm::SwarmError),
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 }

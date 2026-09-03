@@ -97,6 +97,9 @@ pub enum WalEntry {
         cause: String,
     },
     Compact,
+    SwarmTransaction {
+        transaction: crate::swarm::SwarmTransaction,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -467,6 +470,7 @@ fn append_record(brain_path: &Path, record: WalRecord) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
+    repair_torn_tail(&path)?;
     let line = serde_json::to_string(&record).map_err(|e| Error::Serde(e.to_string()))?;
     let mut file = open_append_private(&path)?;
     // A crash can leave the active segment without a trailing newline (torn
@@ -484,6 +488,25 @@ fn append_record(brain_path: &Path, record: WalRecord) -> Result<()> {
     }
     writeln!(file, "{line}")?;
     crate::wal_sync::append_and_sync(brain_path, &mut file, line.len() + 1)?;
+    Ok(())
+}
+
+fn repair_torn_tail(path: &Path) -> Result<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let bytes = fs::read(path)?;
+    if bytes.is_empty() || bytes.ends_with(b"\n") {
+        return Ok(());
+    }
+    let complete_len = bytes
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    let file = OpenOptions::new().write(true).open(path)?;
+    file.set_len(complete_len as u64)?;
+    file.sync_all()?;
     Ok(())
 }
 
@@ -706,6 +729,9 @@ fn apply_entry(brain: &mut FluctlightBrain, entry: WalEntry) -> Result<()> {
         WalEntry::Compact => {
             brain.compact_internal(false)?;
         }
+        WalEntry::SwarmTransaction { transaction } => {
+            brain.apply_swarm_transaction_internal(transaction, false)?;
+        }
     }
     Ok(())
 }
@@ -713,8 +739,29 @@ fn apply_entry(brain: &mut FluctlightBrain, entry: WalEntry) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::swarm::{BeginSwarm, SwarmTransaction, WorkerSlot, WorkerStatus};
     use crate::types::Episode;
     use tempfile::tempdir;
+
+    fn begin_transaction(transaction_id: uuid::Uuid, swarm_id: uuid::Uuid) -> SwarmTransaction {
+        SwarmTransaction::Begin(BeginSwarm {
+            transaction_id,
+            swarm_id,
+            project_id: "fluctlight".into(),
+            objective_digest: "sha256:objective".into(),
+            repository_identity: "repo".into(),
+            base_commit: "abc123".into(),
+            policy_version: "v1".into(),
+            roster: vec![WorkerSlot {
+                slot_id: "slot-a".into(),
+                role: "worker".into(),
+                agent_id: None,
+                worktree: None,
+                status: WorkerStatus::Declared,
+            }],
+            allocations: std::collections::HashMap::new(),
+        })
+    }
 
     #[test]
     #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
@@ -936,6 +983,52 @@ mod tests {
         let back: WalRecord = serde_json::from_str(&line).unwrap();
         assert_eq!(back.seq, 42);
         assert!(matches!(back.entry, WalEntry::Experience { .. }));
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn wal_replays_swarm_transaction_after_checkpoint_gap() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("swarm-brain");
+        let brain = FluctlightBrain::open(&path).unwrap();
+        brain.checkpoint().unwrap();
+        drop(brain);
+        let swarm_id = uuid::Uuid::new_v4();
+        let transaction = begin_transaction(uuid::Uuid::new_v4(), swarm_id);
+
+        append(&path, 1, &WalEntry::SwarmTransaction { transaction }).unwrap();
+
+        let loaded = FluctlightBrain::open(&path).unwrap();
+        assert!(loaded.swarm.runs.contains_key(&swarm_id));
+        drop(loaded);
+        let reopened = FluctlightBrain::open(&path).unwrap();
+        assert!(reopened.swarm.runs.contains_key(&swarm_id));
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "opens brain (sqlite3 FFI)")]
+    fn duplicate_swarm_transactions_replay_once() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("swarm-brain");
+        let brain = FluctlightBrain::open(&path).unwrap();
+        brain.checkpoint().unwrap();
+        drop(brain);
+        let swarm_id = uuid::Uuid::new_v4();
+        let transaction = begin_transaction(uuid::Uuid::new_v4(), swarm_id);
+
+        append(
+            &path,
+            1,
+            &WalEntry::SwarmTransaction {
+                transaction: transaction.clone(),
+            },
+        )
+        .unwrap();
+        append(&path, 2, &WalEntry::SwarmTransaction { transaction }).unwrap();
+
+        let loaded = FluctlightBrain::open(&path).unwrap();
+        assert_eq!(loaded.swarm.runs.len(), 1);
+        assert_eq!(loaded.swarm.applied_transactions.len(), 1);
     }
 
     #[test]

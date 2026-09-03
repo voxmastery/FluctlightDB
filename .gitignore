@@ -2,6 +2,7 @@
 **/*.rs.bk
 *.pyc
 __pycache__/
+demo/remotion/node_modules/
 .venv/
 .bench-venv/
 .reproduce-venv/

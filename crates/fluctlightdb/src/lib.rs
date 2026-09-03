@@ -92,6 +92,7 @@ pub mod stage_schedule;
 pub mod storage;
 pub mod store;
 pub mod store_lock;
+pub mod swarm;
 pub mod tau;
 pub mod tau_runtime;
 pub mod tenant;
@@ -162,6 +163,13 @@ pub use stage_schedule::StageConsolidationReport;
 pub use storage::{default_brain_path, default_tenant_brain_dir, StorageFormat};
 pub use store::{verify_path, BrainVerifyReport};
 pub use store_lock::{SharedStoreLock, StoreLock};
+pub use swarm::{
+    allocate_roster, BeginSwarm, CitationReceipt, CiteMemories, ClaimSlot, EngramFeedback,
+    EvidenceReceipt, EvidenceResult, FinishSwarm, MemoryBundle, MemoryCandidate, MemoryExposure,
+    PendingAttempt, RecordEvidence, ReportAttempt, SwarmApplyResult, SwarmError, SwarmRun,
+    SwarmState, SwarmStatus, SwarmSummary, SwarmTransaction, TruthRevision, VerifiedOutcome,
+    WorkerSlot, WorkerStatus,
+};
 pub use tau::{TauHit, TauLane, TauShard};
 pub use types::{
     ActivationResult, Episode, ExperienceReport, Provenance, ProvenanceKind, RecallResult,
