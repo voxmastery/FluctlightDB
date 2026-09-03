@@ -22,6 +22,12 @@ impl FluctlightBrain {
 
     /// Penetrative imprint of one session (no hippocampal encode, no embed HTTP).
     pub fn muon_imprint(&mut self, session_id: &str, date: &str, body: &str, user_keys: &str) {
+        if self
+            .reject_distributed_mutation("FluctlightBrain::muon_imprint")
+            .is_err()
+        {
+            return;
+        }
         if !muon_enabled() {
             return;
         }
@@ -39,6 +45,12 @@ impl FluctlightBrain {
     }
 
     pub fn muon_imprint_batch(&mut self, sessions: &[MuonImprintInput]) -> usize {
+        if self
+            .reject_distributed_mutation("FluctlightBrain::muon_imprint_batch")
+            .is_err()
+        {
+            return 0;
+        }
         if !muon_enabled() {
             return 0;
         }

@@ -1,0 +1,15 @@
+{
+  "name": "cls-impossible-held-out-slot-composition",
+  "date": "2026-07-25",
+  "held_out_n": 30,
+  "lookup_acc": 0.0,
+  "stored_cooccur_acc": 0.0,
+  "schema_compose_acc": 1.0,
+  "schema_floor": 0.85,
+  "margin": 0.25,
+  "recombination_passed": true,
+  "cf_mean_drop": 0.0,
+  "cf_passed": true,
+  "overall_passed": true,
+  "claim": "query-time Person→City→Lang composition; no stored co-occurrence of held-out pair"
+}

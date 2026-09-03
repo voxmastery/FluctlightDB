@@ -60,6 +60,7 @@ pub fn import_snapshot_json(
     brain: &mut FluctlightBrain,
     json: &str,
 ) -> Result<SnapshotImportReport> {
+    brain.reject_distributed_mutation("brain_snapshot::import_snapshot_json")?;
     let snap: BrainSnapshot =
         serde_json::from_str(json).map_err(|e| crate::error::Error::Serde(e.to_string()))?;
     import_snapshot(brain, &snap)
@@ -69,6 +70,7 @@ pub fn import_snapshot(
     brain: &mut FluctlightBrain,
     snap: &BrainSnapshot,
 ) -> Result<SnapshotImportReport> {
+    brain.reject_distributed_mutation("brain_snapshot::import_snapshot")?;
     if snap.format != SNAPSHOT_FORMAT {
         return Err(crate::error::Error::Serde(format!(
             "unknown snapshot format: {}",

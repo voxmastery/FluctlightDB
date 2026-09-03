@@ -250,7 +250,7 @@ impl TauLane {
             .map(|(i, cheap, photon, lexical)| {
                 let shard = &self.shards[i];
                 let phase = structural_boost(cue, &shard.content, 256);
-                let parent = session_hits.get(&shard.session_id).copied().unwrap_or(0.0);
+                let _parent = session_hits.get(&shard.session_id).copied().unwrap_or(0.0);
                 let score = cheap + 0.15 * phase;
                 TauHit {
                     shard_id: shard.shard_id.clone(),
@@ -764,21 +764,20 @@ fn type_boost(profile: &str, cue: &str, shard: &TauShard) -> f32 {
             if cl.contains("commute") && ct.contains("commute") {
                 b += 0.12;
             }
-            if cl.contains("reunion") || cl.contains("nostalgic") {
-                if ct.contains("high school") || ct.contains("reunion") {
-                    b += 0.14;
-                }
+            if (cl.contains("reunion") || cl.contains("nostalgic"))
+                && (ct.contains("high school") || ct.contains("reunion"))
+            {
+                b += 0.14;
             }
             if cl.contains("phone") && cl.contains("accessories") && ct.contains("phone") {
                 b += 0.10;
             }
-            if cl.contains("furniture") || cl.contains("bedroom") || cl.contains("rearrang") {
-                if shard.chunk_id.starts_with("domain-furniture")
+            if (cl.contains("furniture") || cl.contains("bedroom") || cl.contains("rearrang"))
+                && (shard.chunk_id.starts_with("domain-furniture")
                     || ct.contains("dresser")
-                    || ct.contains("bedroom")
-                {
-                    b += 0.16;
-                }
+                    || ct.contains("bedroom"))
+            {
+                b += 0.16;
             }
         }
         "temporal-reasoning" => {
@@ -805,10 +804,10 @@ fn type_boost(profile: &str, cue: &str, shard: &TauShard) -> f32 {
             if shard.is_fact {
                 b += 0.10;
             }
-            if cl.contains("before") || cl.contains("new") || cl.contains("invest") {
-                if ct.contains("kitchen") || ct.contains("gadget") || ct.contains("appliance") {
-                    b += 0.10;
-                }
+            if (cl.contains("before") || cl.contains("new") || cl.contains("invest"))
+                && (ct.contains("kitchen") || ct.contains("gadget") || ct.contains("appliance"))
+            {
+                b += 0.10;
             }
             if cl.contains("dr ") || cl.contains("doctor") {
                 if ct.contains("dr.")
@@ -1148,6 +1147,7 @@ fn civil_days(y: i32, m: u32, d: u32) -> Option<u32> {
     Some(days + d)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn push_shard(
     lane: &mut TauLane,
     session_id: &str,
@@ -1225,7 +1225,7 @@ fn extract_atomic_facts(content: &str, date: &str) -> Vec<String> {
     ];
     let first_person = [" i ", " i'm ", " i've ", " my ", " we ", " our "];
     let mut out = Vec::new();
-    for sent in content.split(|c: char| c == '.' || c == '!' || c == '?') {
+    for sent in content.split(['.', '!', '?']) {
         let s = sent.trim();
         if s.len() < 12 {
             continue;
@@ -1243,6 +1243,7 @@ fn extract_atomic_facts(content: &str, date: &str) -> Vec<String> {
     out
 }
 
+#[allow(dead_code)]
 fn rare_token_boost(cue: &str, content: &str) -> f32 {
     rare_token_boost_lower(cue, &content.to_lowercase())
 }

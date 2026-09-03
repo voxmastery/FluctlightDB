@@ -142,6 +142,7 @@ impl FluctlightBrain {
 
     /// θ-sweep + collapse promoted traces into full hippocampal engrams.
     pub fn chorus_sleep(&mut self) -> Result<ChorusSleepReport, crate::error::Error> {
+        self.reject_distributed_mutation("FluctlightBrain::chorus_sleep")?;
         if !chorus_enabled() {
             return Ok(ChorusSleepReport::default());
         }

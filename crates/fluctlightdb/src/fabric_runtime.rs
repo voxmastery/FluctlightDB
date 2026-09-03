@@ -132,6 +132,7 @@ impl FluctlightBrain {
     }
 
     /// Photon LSH candidate ids for the hybrid activation prefilter (fast path).
+    #[allow(dead_code)]
     pub(crate) fn fabric_photon_candidates(
         &self,
         cue_vector: Option<&[f32]>,
@@ -166,7 +167,7 @@ impl FluctlightBrain {
         &self,
         cue: &str,
         cue_vector: Option<&[f32]>,
-        recalls: &mut Vec<RecallResult>,
+        recalls: &mut [RecallResult],
     ) {
         if !fabric_enabled() || recalls.is_empty() {
             return;
@@ -224,7 +225,7 @@ impl FluctlightBrain {
         &self,
         cue: &str,
         cue_vector: Option<&[f32]>,
-        hits: &mut Vec<ChorusHit>,
+        hits: &mut [ChorusHit],
     ) {
         if !fabric_enabled() || hits.is_empty() {
             return;

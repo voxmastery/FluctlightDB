@@ -15,6 +15,7 @@ use tempfile::tempdir;
 const AUTH_ENV: &[&str] = &[
     "FLUCTLIGHT_API_KEYS",
     "FLUCTLIGHT_REQUIRE_AUTH",
+    "FLUCTLIGHT_SERVER_MODE",
     "HOME",
     "USERPROFILE",
 ];
@@ -65,6 +66,7 @@ fn h1_path_traversal_does_not_write_outside_tenant_root() {
     let env = EnvGuard::acquire(AUTH_ENV);
     env.remove("FLUCTLIGHT_API_KEYS");
     env.set("FLUCTLIGHT_REQUIRE_AUTH", "false");
+    env.set("FLUCTLIGHT_SERVER_MODE", "development");
 
     let tmp = tempdir().unwrap();
     let home = tmp.path().join("home");
@@ -82,12 +84,19 @@ fn h1_path_traversal_does_not_write_outside_tenant_root() {
         r#"{{"tenant_id":"{sentinel_str}","content":"traversal-poc","context":"x","salience_hint":0.9}}"#
     );
     let (status, resp) = post(39141, "/api/v1/experience", &body, None);
-    println!("H1: status={status} resp={} sentinel={}", resp.trim(), sentinel.exists());
+    println!(
+        "H1: status={status} resp={} sentinel={}",
+        resp.trim(),
+        sentinel.exists()
+    );
     assert!(
         !sentinel.exists(),
         "H1: brain must not be created outside tenant root"
     );
-    assert_ne!(status, 200, "H1: open-mode must not honor attacker tenant_id");
+    assert_ne!(
+        status, 200,
+        "H1: open-mode must not honor attacker tenant_id"
+    );
 }
 
 #[test]
@@ -109,7 +118,10 @@ fn h2_admin_key_cannot_cross_tenant() {
         Some("adminA"),
     );
     println!("H2: status={status} resp={}", resp.trim());
-    assert_eq!(status, 403, "H2: per-tenant admin must not write other tenants");
+    assert_eq!(
+        status, 403,
+        "H2: per-tenant admin must not write other tenants"
+    );
 }
 
 #[test]
@@ -124,7 +136,7 @@ fn m1_unknown_role_does_not_grant_write() {
     let _h = start(tmp.path().join("default_brain"), 39143);
 
     let body = r#"{"content":"x","context":"x","salience_hint":0.5}"#;
-    let (status, resp) = post(39143, "/api/v1/experience", &body, Some("keyX"));
+    let (status, resp) = post(39143, "/api/v1/experience", body, Some("keyX"));
     println!("M1: status={status} resp={}", resp.trim());
     assert_eq!(status, 401, "M1: unknown role must not authorize");
 }
@@ -141,7 +153,7 @@ fn control_read_role_cannot_write() {
     let _h = start(tmp.path().join("default_brain"), 39144);
 
     let body = r#"{"content":"x","context":"x","salience_hint":0.5}"#;
-    let (status, resp) = post(39144, "/api/v1/experience", &body, Some("readK"));
+    let (status, resp) = post(39144, "/api/v1/experience", body, Some("readK"));
     println!("CONTROL: status={status} resp={}", resp.trim());
     assert_ne!(status, 200, "CONTROL: read key must be denied write");
 }

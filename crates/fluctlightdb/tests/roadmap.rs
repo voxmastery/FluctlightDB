@@ -116,7 +116,7 @@ fn auth_keys_require_bearer() {
 }
 
 #[test]
-fn serve_reloads_after_external_snapshot_write() {
+fn serve_exclusive_store_lock_rejects_external_writer() {
     use fluctlightdb::BrainServer;
 
     let dir = tempdir().unwrap();
@@ -130,28 +130,13 @@ fn serve_reloads_after_external_snapshot_write() {
         0
     );
 
-    let mut external = FluctlightBrain::open(&path).unwrap();
-    external
-        .experience(Episode {
-            content: "external writer".into(),
-            context: "cli".into(),
-            outcome: None,
-            salience_hint: 0.5,
-            semantic_vector: None,
-            agent_id: None,
-            tenant_id: None,
-            rag: None,
-            provenance: None,
-        })
-        .unwrap();
-    drop(external);
-
-    assert_eq!(
-        server
-            .with_brain_read("default", |b| Ok(b.hippocampus.engrams.len()))
-            .unwrap(),
-        1
-    );
+    let error = fluctlightdb::store_lock::StoreLock::acquire_with_timeout(
+        &path,
+        std::time::Duration::from_millis(10),
+    )
+    .err()
+    .expect("external writer must not acquire the serving store");
+    assert!(error.to_string().contains("brain lock busy"), "{error}");
 }
 
 #[test]
@@ -458,12 +443,21 @@ fn tenant_access_binding() {
 #[test]
 fn replicate_sync_preserves_engrams() {
     use fluctlightdb::manifest::save_v4_dir;
-    use fluctlightdb::replicate::{open_replica_brain, sync_once};
+    use fluctlightdb::placement::DurabilityPolicy;
+    use fluctlightdb::replicate::{open_replica_brain, CheckpointTransfer, ReplicaStore};
+    use fluctlightdb::wal::WalIdentity;
 
     let dir = tempdir().unwrap();
     let primary = dir.path().join("primary_brain");
     let replica = dir.path().join("replica_root");
+    let identity = WalIdentity {
+        tenant_uuid: uuid::Uuid::from_u128(77),
+        writer_epoch: 1,
+        fence_generation: 1,
+        durability: DurabilityPolicy::Local,
+    };
     let mut brain = FluctlightBrain::new();
+    brain.set_wal_identity(Some(identity));
     brain
         .experience(Episode {
             content: "replica sync payload".into(),
@@ -478,8 +472,10 @@ fn replicate_sync_preserves_engrams() {
         })
         .unwrap();
     save_v4_dir(&brain, &primary).unwrap();
-    let status = sync_once(&primary, &replica).unwrap();
-    assert!(status.snapshot_copied);
+    let transfer = CheckpointTransfer::from_active(&primary, identity).unwrap();
+    ReplicaStore::new(&replica, identity)
+        .install_checkpoint(transfer)
+        .unwrap();
     let loaded = open_replica_brain(&replica).unwrap();
     assert_eq!(loaded.hippocampus.engrams.len(), 1);
 }

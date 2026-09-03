@@ -676,22 +676,32 @@ impl FluctlightBrain {
         self.activate_with_semantic(cue, None)
     }
 
-    /// Opt-in schema lane: episodic `activate` unchanged + matching active schemas.
+    /// Opt-in schema lane: episodic `activate` unchanged + matching active schemas
+    /// + **query-time** compositional hops ([`compose_schemas_for_cue`]).
     /// Does not alter default `activate()` ranking.
     pub fn activate_with_schemas(&self, cue: &str) -> crate::schema::SchemaAwareActivation {
         let episodic = self.activate(cue);
         let cue_l = cue.to_lowercase();
         let cue_toks: Vec<&str> = cue_l.split_whitespace().collect();
-        let schemas: Vec<_> = self
+        let mut schemas: Vec<_> = self
             .cortex
             .schemas
             .active()
             .filter(|s| {
                 let st = s.statement.to_lowercase();
-                cue_toks.iter().any(|t| st.contains(t)) || st.split_whitespace().any(|t| cue_l.contains(t))
+                cue_toks.iter().any(|t| st.contains(t))
+                    || st.split_whitespace().any(|t| cue_l.contains(t))
+                    || s.slots
+                        .iter()
+                        .any(|slot| cue_l.contains(&slot.to_lowercase()))
             })
             .cloned()
             .collect();
+        for composed in crate::schema::compose_schemas_for_cue(&self.cortex.schemas, cue) {
+            if !schemas.iter().any(|s| s.key == composed.key) {
+                schemas.push(composed);
+            }
+        }
         crate::schema::SchemaAwareActivation { episodic, schemas }
     }
 

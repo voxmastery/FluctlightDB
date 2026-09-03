@@ -100,7 +100,7 @@ fn scale_recall_10k() {
         "FTS5+HNSW sidecar required at scale"
     );
 
-    let query_n = (n / 10).max(100).min(1000);
+    let query_n = (n / 10).clamp(100, 1000);
     let mut hits = 0usize;
     let query_start = Instant::now();
     for q in 0..query_n {

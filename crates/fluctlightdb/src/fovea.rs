@@ -121,6 +121,6 @@ mod tests {
         let packets = scan_text(text, "test://doc", &FoveaConfig::default());
         assert!(!packets.is_empty());
         assert!(packets[0].foveal.contains("The"));
-        assert!(packets.last().unwrap().foveal.len() > 0);
+        assert!(!packets.last().unwrap().foveal.is_empty());
     }
 }

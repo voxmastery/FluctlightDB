@@ -75,6 +75,7 @@ pub fn export_raw(brain: &FluctlightBrain) -> RawExport {
 }
 
 pub fn import_raw_json(brain: &mut FluctlightBrain, json: &str) -> Result<RawImportReport> {
+    brain.reject_distributed_mutation("raw_export::import_raw_json")?;
     let raw: RawImportFile =
         serde_json::from_str(json).map_err(|e| crate::error::Error::Serde(e.to_string()))?;
     import_raw_parts(
@@ -90,6 +91,7 @@ pub fn import_raw_json(brain: &mut FluctlightBrain, json: &str) -> Result<RawImp
 }
 
 pub fn import_raw(brain: &mut FluctlightBrain, raw: RawExport) -> Result<RawImportReport> {
+    brain.reject_distributed_mutation("raw_export::import_raw")?;
     import_raw_parts(
         brain,
         raw.engrams,
@@ -102,6 +104,7 @@ pub fn import_raw(brain: &mut FluctlightBrain, raw: RawExport) -> Result<RawImpo
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn import_raw_parts(
     brain: &mut FluctlightBrain,
     engrams: Vec<Engram>,

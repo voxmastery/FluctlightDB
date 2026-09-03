@@ -674,7 +674,9 @@ cargo test -p fluctlightdb --test cortex_schema_gates --test capture_gate_gates 
 
 Expected: all PASS
 
-- [ ] Update `docs/PRODUCTION.md` + spec status to Phase A/B/C gates green
+- [x] Update `docs/PRODUCTION.md` + spec status to Phase A/B/C gates green
+- [x] Lookup-ceiling + CF ε freeze: `cls_lookup_ceiling_proof` → `benchmarks/results/cls-lookup-ceiling-proof-2026-07-25.json`
+- [x] Impossible-bar held-out slot composition: `cls_impossible_held_out_proof` → `benchmarks/results/cls-impossible-held-out-slot-composition-2026-07-25.json`
 - [ ] Commit
 
 ```bash

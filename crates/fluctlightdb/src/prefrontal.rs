@@ -256,7 +256,7 @@ impl Prefrontal {
         if self
             .task_context
             .as_ref()
-            .map_or(false, |t| t.strength <= 0.0)
+            .is_some_and(|t| t.strength <= 0.0)
         {
             self.task_context = None;
         }

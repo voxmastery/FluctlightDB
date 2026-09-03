@@ -48,6 +48,15 @@ tagged engrams with supersede retention (no episode wipe). Prove:
 lossless id+gist index + `expand_engrams`. Somnus seals on tick **or** WAL pressure.
 Prove: `cargo test -p fluctlightdb --test aeterna_gates --test somnus_durability`.
 
+**Lookup-ceiling (impossible bar — frozen):** held-out Person→City→Lang composition
+where the (person, lang) pair **never co-occurs in any stored schema statement**;
+answer is produced only by query-time slot compose. Prove:
+`cargo test -p fluctlightdb --test cls_impossible_held_out_proof`.
+Freeze: [`benchmarks/results/cls-impossible-held-out-slot-composition-2026-07-25.json`](../benchmarks/results/cls-impossible-held-out-slot-composition-2026-07-25.json).
+Earlier concat-bridge harness remains as a weaker regression:
+`cargo test -p fluctlightdb --test cls_lookup_ceiling_proof`.
+Does **not** set `production_ready`.
+
 **Ops brain path:** backup/replicate/drill scripts resolve
 `serverbrain-v2` before `default` when env is unset (`scripts/resolve-brain.sh`).
 

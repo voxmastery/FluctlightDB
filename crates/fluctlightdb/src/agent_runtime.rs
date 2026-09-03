@@ -173,10 +173,12 @@ impl FluctlightBrain {
                 turn_id: self.agent.wm.turn_id,
             });
         }
+        self.reject_distributed_mutation("FluctlightBrain::turn_end")?;
         self.flush_wm_internal()
     }
 
     pub fn flush_wm(&mut self) -> Result<WmFlushReport> {
+        self.reject_distributed_mutation("FluctlightBrain::flush_wm")?;
         self.flush_wm_internal()
     }
 
@@ -209,6 +211,7 @@ impl FluctlightBrain {
 
     /// Observe a tool/MCP result with provenance sheath pre-filled.
     pub fn observe_tool(&mut self, input: &ToolObserveInput) -> Result<serde_json::Value> {
+        self.reject_distributed_mutation("FluctlightBrain::observe_tool")?;
         let ctx = input
             .context
             .clone()
@@ -281,6 +284,7 @@ impl FluctlightBrain {
 
     /// Apply retention DSL — prune aged / low-salience engrams and CHORUS traces.
     pub fn apply_retention(&mut self) -> Result<RetentionReport> {
+        self.reject_distributed_mutation("FluctlightBrain::apply_retention")?;
         let now = self.autonomic.total_ticks;
         let mut report = RetentionReport::default();
         let before = self.hippocampus.engrams.len();
@@ -362,7 +366,7 @@ impl FluctlightBrain {
         }
 
         if matches!(mode, RecallMode::Session | RecallMode::Hybrid) {
-            if self.muon.len() > 0 {
+            if !self.muon.is_empty() {
                 let hits = self.muon_recall(cue, k);
                 if !hits.is_empty() {
                     lanes_used.push("muon".into());
@@ -424,6 +428,7 @@ impl FluctlightBrain {
 
     /// Idle consolidation — WM flush + CHORUS sleep + hippocampal sleep + retention.
     pub fn consolidate(&mut self) -> Result<ConsolidateReport> {
+        self.reject_distributed_mutation("FluctlightBrain::consolidate")?;
         let mut report = ConsolidateReport::default();
         let wm = self.flush_wm_internal()?;
         report.wm_flushed = wm.committed;
@@ -493,7 +498,7 @@ mod tests {
         brain.wm_push("user likes dark mode", "settings", 0.8, None);
         let report = brain.flush_wm().unwrap();
         assert_eq!(report.committed, 1);
-        assert!(brain.hippocampus.engrams.len() >= 1);
+        assert!(!brain.hippocampus.engrams.is_empty());
     }
 
     #[test]

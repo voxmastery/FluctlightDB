@@ -295,7 +295,7 @@ impl ChorusField {
         Self {
             theta_clock: 0,
             tick: 0,
-            hasher: SimHasher::new(bits, 0xC0DE_501u64),
+            hasher: SimHasher::new(bits, 0x0C0D_E501_u64),
             photon: PhotonStore::new(bits, config.grg_lsh_bands, config.grg_lsh_rows),
             config,
             plane_cache: Mutex::new(HashMap::new()),
@@ -354,6 +354,7 @@ impl ChorusField {
         taps
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn inject_wavelet(
         &mut self,
         theta: u8,

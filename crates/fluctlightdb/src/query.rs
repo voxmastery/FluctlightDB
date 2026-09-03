@@ -82,6 +82,7 @@ fn clamp_top_k(n: usize) -> usize {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 pub enum QueryResponse {
     ListEngrams {
         total: usize,
@@ -117,6 +118,9 @@ pub enum QueryResponse {
     },
     Stats {
         stats: BrainQueryStats,
+    },
+    Disabled {
+        operation: String,
     },
 }
 
@@ -385,6 +389,12 @@ fn engram_summary(e: &crate::engram::Engram) -> EngramSummary {
 }
 
 pub fn forget_engram(brain: &mut FluctlightBrain, engram_id: Uuid) -> bool {
+    if brain
+        .reject_distributed_mutation("query::forget_engram")
+        .is_err()
+    {
+        return false;
+    }
     let before = brain.hippocampus.engrams.len();
     brain.hippocampus.engrams.retain(|e| e.id != engram_id);
     brain.semantic.engram_vectors.remove(&engram_id);
@@ -395,6 +405,12 @@ pub fn forget_engram(brain: &mut FluctlightBrain, engram_id: Uuid) -> bool {
 }
 
 pub fn forget_before(brain: &mut FluctlightBrain, tick: u64) -> usize {
+    if brain
+        .reject_distributed_mutation("query::forget_before")
+        .is_err()
+    {
+        return 0;
+    }
     let before = brain.hippocampus.engrams.len();
     let removed_ids: Vec<Uuid> = brain
         .hippocampus
@@ -417,6 +433,14 @@ pub fn forget_before(brain: &mut FluctlightBrain, tick: u64) -> usize {
 }
 
 pub fn execute_mut(brain: &mut FluctlightBrain, req: QueryRequest) -> QueryResponse {
+    if brain
+        .reject_distributed_mutation("query::execute_mut")
+        .is_err()
+    {
+        return QueryResponse::Disabled {
+            operation: "query::execute_mut".into(),
+        };
+    }
     match req {
         QueryRequest::Forget { engram_id } => QueryResponse::Forget {
             removed: forget_engram(brain, engram_id),

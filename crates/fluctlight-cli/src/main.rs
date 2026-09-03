@@ -210,6 +210,12 @@ fn main() {
     }
 
     if args[1] == "serve" {
+        if let Some(path) = parse_flag_path(&args, "--bootstrap-secret-file") {
+            env::set_var("FLUCTLIGHT_PLATFORM_BOOTSTRAP_FILE", path);
+        }
+        if args.iter().any(|arg| arg == "--bootstrap-secret-stdin") {
+            env::set_var("FLUCTLIGHT_PLATFORM_BOOTSTRAP_STDIN", "true");
+        }
         let path = parse_path(&args);
         let addr = parse_addr(&args);
         let read_only = args.iter().any(|a| a == "--replica" || a == "--read-only");
@@ -271,10 +277,11 @@ fn main() {
 
     if args[1] == "tenant" && args.get(2).map(|s| s.as_str()) == Some("create") {
         let tenant_id = args.get(3).cloned().unwrap_or_else(|| "default".into());
-        let cfg = fluctlightdb::tenant::TenantConfig::default_for(
+        let cfg = fluctlightdb::tenant::TenantConfig::try_default_for(
             &tenant_id,
             &fluctlightdb::tenant::default_tenant_root(),
-        );
+        )
+        .unwrap_or_else(|error| panic!("tenant containment: {error}"));
         cfg.ensure_dirs().expect("tenant dirs");
         let _ = FluctlightBrain::open(&cfg.brain_path).expect("init tenant brain");
         println!(
@@ -287,6 +294,19 @@ fn main() {
 
     if args[1] == "tenant" && args.get(2).map(|s| s.as_str()) == Some("provision") {
         let tenant_id = args.get(3).cloned().unwrap_or_else(|| "default".into());
+        if env::var("FLUCTLIGHT_DISTRIBUTED")
+            .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        {
+            let body = serde_json::json!({"tenant_id": tenant_id}).to_string();
+            match http_post_json("/api/v1/admin/tenant/provision", &body) {
+                Ok(response) => println!("{response}"),
+                Err(error) => {
+                    eprintln!("distributed tenant provision failed: {error}");
+                    std::process::exit(1);
+                }
+            }
+            return;
+        }
         let role = args
             .iter()
             .position(|a| a == "--role")
@@ -298,10 +318,11 @@ fn main() {
             "write" => fluctlightdb::auth::Role::Write,
             _ => fluctlightdb::auth::Role::Admin,
         };
-        let cfg = fluctlightdb::tenant::TenantConfig::default_for(
+        let cfg = fluctlightdb::tenant::TenantConfig::try_default_for(
             &tenant_id,
             &fluctlightdb::tenant::default_tenant_root(),
-        );
+        )
+        .unwrap_or_else(|error| panic!("tenant containment: {error}"));
         cfg.ensure_dirs().expect("tenant dirs");
         let _ = FluctlightBrain::open(&cfg.brain_path).expect("init tenant brain");
         let api_key = fluctlightdb::auth::generate_api_key();
@@ -350,29 +371,9 @@ fn main() {
     }
 
     if args[1] == "replicate" {
-        let primary = parse_flag_path(&args, "--primary")
-            .unwrap_or_else(|| fluctlightdb::default_brain_path());
-        let replica = parse_flag_path(&args, "--replica")
-            .unwrap_or_else(|| dirs_home().join(".fluctlight").join("replica"));
-        let interval_secs: u64 = args
-            .iter()
-            .position(|a| a == "--interval")
-            .and_then(|i| args.get(i + 1))
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(2);
-        eprintln!(
-            "replicating {} -> {} every {}s",
-            primary.display(),
-            replica.display(),
-            interval_secs
+        panic!(
+            "filesystem-copy replication is quarantined; run a distributed data node with authenticated mTLS tenant replication"
         );
-        fluctlightdb::replicate::run_tail_loop(
-            &primary,
-            &replica,
-            Duration::from_secs(interval_secs),
-        )
-        .expect("replicate");
-        return;
     }
 
     if args[1] == "verify" {
@@ -735,7 +736,7 @@ fn print_usage() {
          fluctlight sleep [--path FILE]\n\
          fluctlight tick [N] [--path FILE]     background heartbeat + auto-sleep\n\
          fluctlight compact [--path FILE]      merge engrams + dedupe synapses\n\
-         fluctlight serve [--addr HOST:PORT] [--path FILE] [--replica]   in-process HTTP API\n\
+         fluctlight serve [--addr HOST:PORT] [--path FILE] [--replica] [--bootstrap-secret-file FILE|--bootstrap-secret-stdin]   in-process HTTP API\n\
          fluctlight replicate --primary PATH --replica DIR [--interval SEC]\n\
          fluctlight run [SECONDS] [--path FILE]  autonomic loop (daemon)\n\
          fluctlight export-viz [FILE] [--path FILE]\n\

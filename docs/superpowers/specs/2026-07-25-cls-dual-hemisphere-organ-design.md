@@ -1,6 +1,6 @@
 # CLS Dual-Hemisphere Organ — CortexSchema → CaptureGate → Aeterna
 
-**Status:** design approved in brainstorming 2026-07-25 (Approach 3; §§1–3 yes)  
+**Status:** Phase A/B/C organ gates green; **impossible-bar** held-out slot composition proven 2026-07-25 (`cls_impossible_held_out_proof`, overall_passed: query-time Person→City→Lang with zero stored co-occurrence of held-out pair)  
 **Product:** FluctlightDB  
 **Non-goals:** FluctlightDB is not AGI; no LLM weight training as the learning path; no `production_ready` claim from this alone.
 

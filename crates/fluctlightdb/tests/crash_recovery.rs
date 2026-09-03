@@ -28,6 +28,7 @@ fn append_experience(path: &std::path::Path, seq: u64, content: &str) {
         seq,
         &WalEntry::Experience {
             episode: sample_episode(content),
+            assigned_engram_id: None,
         },
     )
     .expect("wal append");
@@ -45,16 +46,16 @@ fn crash_recovery_replays_wal_after_checkpoint() {
 
     let loaded = FluctlightBrain::open(&path).unwrap();
     assert!(
-        loaded.activate("survives crash").recalls.len() >= 1,
+        !loaded.activate("survives crash").recalls.is_empty(),
         "expected WAL replay after simulated crash"
     );
 }
 
 #[test]
-fn crash_recovery_skips_corrupt_wal_line() {
+fn crash_recovery_rejects_interior_corrupt_wal_line() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("brain.flct");
-    let mut brain = FluctlightBrain::open(&path).unwrap();
+    let brain = FluctlightBrain::open(&path).unwrap();
     brain.checkpoint().unwrap();
     let wal = wal::wal_path(&path);
     {
@@ -68,15 +69,18 @@ fn crash_recovery_skips_corrupt_wal_line() {
     drop(brain);
     append_experience(&path, 1, "after corrupt line");
 
-    let loaded = FluctlightBrain::open(&path).unwrap();
-    assert!(loaded.activate("after corrupt").recalls.len() >= 1);
+    let error = FluctlightBrain::open(&path).unwrap_err();
+    assert!(
+        error.to_string().contains("interior WAL corruption"),
+        "{error}"
+    );
 }
 
 #[test]
 fn crash_recovery_truncated_wal_tail() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("brain.flct");
-    let mut brain = FluctlightBrain::open(&path).unwrap();
+    let brain = FluctlightBrain::open(&path).unwrap();
     brain.checkpoint().unwrap();
     drop(brain);
     append_experience(&path, 1, "before torn write");
@@ -89,7 +93,7 @@ fn crash_recovery_truncated_wal_tail() {
     }
 
     let loaded = FluctlightBrain::open(&path).unwrap();
-    assert!(loaded.activate("before torn").recalls.len() >= 1);
+    assert!(!loaded.activate("before torn").recalls.is_empty());
 }
 
 #[test]
@@ -104,7 +108,7 @@ fn crash_recovery_uncheckpointed_experience_persists_via_wal() {
 
     let loaded = FluctlightBrain::open(&path).unwrap();
     assert!(
-        loaded.activate("mid-flight").recalls.len() >= 1,
+        !loaded.activate("mid-flight").recalls.is_empty(),
         "uncheckpointed experience should replay from WAL"
     );
 }
