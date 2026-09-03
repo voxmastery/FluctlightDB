@@ -201,41 +201,11 @@ impl BrainServer {
         self.metrics.clone()
     }
 
-    fn tenant_path(&self, tenant_id: &str, pool: &BrainPool) -> PathBuf {
-        if tenant_id == pool.default_tenant {
-            return self.default_path.clone();
-        }
-        TenantConfig::default_for(tenant_id, &pool.tenant_root).brain_path
-    }
-
     fn refresh_if_stale(&self, tenant_id: &str) -> Result<()> {
-        let disk_mtime = {
-            let pool = self
-                .pool
-                .read()
-                .map_err(|_| Error::Store("pool lock poisoned".into()))?;
-            let path = pool
-                .tenants
-                .get(tenant_id)
-                .map(|s| s.path.clone())
-                .unwrap_or_else(|| self.tenant_path(tenant_id, &pool));
-            store::snapshot_mtime(&path).unwrap_or(SystemTime::UNIX_EPOCH)
-        };
-
-        let mut pool = self
-            .pool
-            .write()
-            .map_err(|_| Error::Store("pool lock poisoned".into()))?;
-        let slot = match pool.tenants.get_mut(tenant_id) {
-            Some(s) => s,
-            None => return Ok(()),
-        };
-        if disk_mtime <= slot.loaded_mtime {
-            return Ok(());
-        }
-        let brain = FluctlightBrain::open(&slot.path)?;
-        slot.brain = Arc::new(RwLock::new(brain));
-        slot.loaded_mtime = disk_mtime;
+        // Serve holds an exclusive store lock; in-memory state is authoritative.
+        // Re-opening the same path while the previous brain Arc still holds
+        // brain.lock self-deadlocks the pool (and wedges /ready + all APIs).
+        let _ = tenant_id;
         Ok(())
     }
 
@@ -268,12 +238,33 @@ impl BrainServer {
             slot.last_access = Instant::now();
             return Ok(slot.brain.clone());
         }
-        self.evict_if_needed(&mut pool);
         let cfg = if tenant_id == pool.default_tenant {
             TenantConfig::with_brain_path(tenant_id, &pool.tenant_root, self.default_path.clone())
         } else {
             TenantConfig::default_for(tenant_id, &pool.tenant_root)
         };
+        // Reuse an already-open brain for the same path (auth tenant id may differ
+        // from the slot key used at serve startup). Never open the same path twice:
+        // the second open busy-spins on our own exclusive flock while holding the
+        // pool write lock, wedging every tenant until the request timeout.
+        if let Some((brain, path, loaded_mtime)) = pool
+            .tenants
+            .values()
+            .find(|slot| slot.path == cfg.brain_path)
+            .map(|slot| (slot.brain.clone(), slot.path.clone(), slot.loaded_mtime))
+        {
+            pool.tenants.insert(
+                tenant_id.to_string(),
+                TenantSlot {
+                    brain: brain.clone(),
+                    path,
+                    loaded_mtime,
+                    last_access: Instant::now(),
+                },
+            );
+            return Ok(brain);
+        }
+        self.evict_if_needed(&mut pool);
         cfg.ensure_dirs().map_err(Error::Io)?;
         let brain = FluctlightBrain::open(&cfg.brain_path)?;
         let loaded_mtime = store::snapshot_mtime(&cfg.brain_path).unwrap_or(SystemTime::UNIX_EPOCH);
