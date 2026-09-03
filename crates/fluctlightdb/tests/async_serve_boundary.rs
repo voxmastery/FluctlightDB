@@ -15,6 +15,7 @@ const SERVER_ENV: &[&str] = &[
     "FLUCTLIGHT_FOVEA_INGESTION",
     "FLUCTLIGHT_REQUEST_TIMEOUT_MS",
     "FLUCTLIGHT_MAX_CONNECTIONS",
+    "FLUCTLIGHT_TENANT_ROOT",
 ];
 
 fn free_port() -> u16 {
@@ -200,6 +201,9 @@ fn utf8_codepoint_split_across_tcp_writes_is_preserved() {
     env.set("FLUCTLIGHT_REQUIRE_AUTH", "false");
 
     let dir = tempdir().unwrap();
+    // A cue-less tenant resolves against the default tenant root; keep the test
+    // out of $HOME/.fluctlight so it cannot collide with a live serve's flocks.
+    env.set("FLUCTLIGHT_TENANT_ROOT", dir.path().to_str().unwrap());
     let port = free_port();
     let handle = start_server(BrainServer::open(dir.path().join("brain")).unwrap(), port);
     let body = r#"{"content":"boundary 🧠 café","context":"utf8"}"#;
@@ -546,6 +550,7 @@ fn graceful_shutdown_drains_an_in_flight_request() {
     env.set("FLUCTLIGHT_REQUEST_TIMEOUT_MS", "1000");
 
     let dir = tempdir().unwrap();
+    env.set("FLUCTLIGHT_TENANT_ROOT", dir.path().to_str().unwrap());
     let port = free_port();
     let handle = start_server(BrainServer::open(dir.path().join("brain")).unwrap(), port);
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();

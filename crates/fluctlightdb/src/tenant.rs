@@ -191,6 +191,11 @@ impl TenantConfig {
 }
 
 pub fn default_tenant_root() -> PathBuf {
+    if let Ok(root) = std::env::var("FLUCTLIGHT_TENANT_ROOT") {
+        if !root.trim().is_empty() {
+            return PathBuf::from(root);
+        }
+    }
     std::env::var("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."))
