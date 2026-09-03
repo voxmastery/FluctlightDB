@@ -1170,6 +1170,10 @@ struct ApiRequest {
     sessions: Option<Vec<crate::muon::MuonImprintInput>>,
     #[serde(default)]
     user_keys: Option<String>,
+    #[serde(default)]
+    transaction: Option<crate::swarm::SwarmTransaction>,
+    #[serde(default)]
+    swarm_id: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1635,6 +1639,17 @@ fn process_request(
                 "operation": operation,
             }),
         ),
+        Err(Error::Swarm(
+            crate::swarm::SwarmError::SwarmNotFound(_)
+            | crate::swarm::SwarmError::SlotNotFound(_),
+        )) => json_response(
+            StatusCode::NOT_FOUND,
+            serde_json::json!({"error": "swarm resource not found"}),
+        ),
+        Err(Error::Swarm(error)) => json_response(
+            StatusCode::CONFLICT,
+            serde_json::json!({"error": error.to_string()}),
+        ),
         Err(error) => json_response(
             StatusCode::INTERNAL_SERVER_ERROR,
             serde_json::json!({"error": error.to_string()}),
@@ -1721,6 +1736,95 @@ fn dispatch(
                 "read_only": server.read_only,
                 "brain_path": server.default_path.display().to_string(),
             }))
+        }
+        "/api/v1/swarm/begin" => {
+            require_writable(server)?;
+            require_role(auth, Role::Admin)?;
+            let transaction = swarm_transaction(api_body)?;
+            if !matches!(&transaction, crate::swarm::SwarmTransaction::Begin(_)) {
+                return Err(Error::Store("expected begin swarm transaction".into()));
+            }
+            let result = server.with_brain_write(tenant_id, |brain| {
+                brain.apply_swarm_transaction(transaction)
+            })?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "/api/v1/swarm/claim" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let transaction = swarm_transaction(api_body)?;
+            if !matches!(&transaction, crate::swarm::SwarmTransaction::Claim(_)) {
+                return Err(Error::Store("expected claim swarm transaction".into()));
+            }
+            let result = server.with_brain_write(tenant_id, |brain| {
+                brain.apply_swarm_transaction(transaction)
+            })?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "/api/v1/swarm/cite" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let transaction = swarm_transaction(api_body)?;
+            if !matches!(&transaction, crate::swarm::SwarmTransaction::Cite(_)) {
+                return Err(Error::Store("expected cite swarm transaction".into()));
+            }
+            let result = server.with_brain_write(tenant_id, |brain| {
+                brain.apply_swarm_transaction(transaction)
+            })?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "/api/v1/swarm/attempt" => {
+            require_writable(server)?;
+            require_role(auth, Role::Write)?;
+            let transaction = swarm_transaction(api_body)?;
+            if !matches!(&transaction, crate::swarm::SwarmTransaction::Report(_)) {
+                return Err(Error::Store("expected report swarm transaction".into()));
+            }
+            let result = server.with_brain_write(tenant_id, |brain| {
+                brain.apply_swarm_transaction(transaction)
+            })?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "/api/v1/swarm/evidence" => {
+            require_writable(server)?;
+            require_role(auth, Role::Admin)?;
+            let transaction = swarm_transaction(api_body)?;
+            if !matches!(&transaction, crate::swarm::SwarmTransaction::Evidence(_)) {
+                return Err(Error::Store("expected evidence swarm transaction".into()));
+            }
+            let result = server.with_brain_write(tenant_id, |brain| {
+                brain.apply_swarm_transaction(transaction)
+            })?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "/api/v1/swarm/finish" => {
+            require_writable(server)?;
+            require_role(auth, Role::Admin)?;
+            let transaction = swarm_transaction(api_body)?;
+            if !matches!(&transaction, crate::swarm::SwarmTransaction::Finish(_)) {
+                return Err(Error::Store("expected finish swarm transaction".into()));
+            }
+            let result = server.with_brain_write(tenant_id, |brain| {
+                brain.apply_swarm_transaction(transaction)
+            })?;
+            Ok(serde_json::to_value(result).unwrap())
+        }
+        "/api/v1/swarm/get" => {
+            require_role(auth, Role::Read)?;
+            let swarm_id = api_body
+                .swarm_id
+                .as_deref()
+                .ok_or_else(|| Error::Store("missing swarm_id".into()))?
+                .parse::<uuid::Uuid>()
+                .map_err(|_| Error::Store("invalid swarm_id".into()))?;
+            server.with_brain_read(tenant_id, |brain| {
+                let run = brain
+                    .swarm
+                    .runs
+                    .get(&swarm_id)
+                    .ok_or(crate::swarm::SwarmError::SwarmNotFound(swarm_id))?;
+                Ok(serde_json::to_value(run).unwrap())
+            })
         }
         "/api/v1/experience" | "/experience" => {
             require_writable(server)?;
@@ -2631,6 +2735,12 @@ fn dispatch(
         }
         _ => Err(Error::Store("not found".into())),
     }
+}
+
+fn swarm_transaction(api_body: ApiRequest) -> Result<crate::swarm::SwarmTransaction> {
+    api_body
+        .transaction
+        .ok_or_else(|| Error::Store("missing swarm transaction".into()))
 }
 
 fn rag_from_api(api_body: &ApiRequest) -> Option<crate::types::RagRef> {
