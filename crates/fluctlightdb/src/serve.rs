@@ -1,18 +1,21 @@
 //! In-process HTTP API — tenant pool, RwLock reads, auth, metrics, v1 contract.
 
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::{Arc, RwLock};
-use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
-#[cfg(unix)]
-extern "C" fn handle_shutdown_signal(_: libc::c_int) {
-    SHUTDOWN_REQUESTED.store(true, AtomicOrdering::SeqCst);
-}
+use axum::body::{to_bytes, Body};
+use axum::error_handling::HandleErrorLayer;
+use axum::extract::State;
+use axum::http::{header, HeaderMap, HeaderValue, Request, Response, StatusCode};
+use axum::response::IntoResponse;
+use axum::routing::any;
+use axum::{BoxError, Router};
+use tower::ServiceBuilder;
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::trace::TraceLayer;
 
 static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
 
@@ -42,87 +45,14 @@ use crate::tenant::{default_tenant_root, TenantConfig};
 use crate::types::{ActivationResult, Episode, ExperienceReport};
 
 const MAX_BODY_BYTES: usize = 1_048_576;
+const MAX_HEADERS: usize = 64;
+const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// The built-in Living Brain viewer (single-file SPA, no build step).
 const VIEWER_HTML: &str = include_str!("viewer.html");
 const MAX_IDEMPOTENCY_KEYS: usize = 10_000;
 const DEFAULT_HOT_TENANTS: usize = 256;
 const DEFAULT_MAX_CONNECTIONS: usize = 500;
-
-fn max_connections() -> usize {
-    std::env::var("FLUCTLIGHT_MAX_CONNECTIONS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_MAX_CONNECTIONS)
-        .max(32)
-}
-
-struct ConnectionGate(Arc<AtomicUsize>);
-
-impl Clone for ConnectionGate {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
-}
-
-impl ConnectionGate {
-    fn new() -> Self {
-        Self(Arc::new(AtomicUsize::new(0)))
-    }
-
-    fn try_acquire(&self, metrics: &Arc<Metrics>) -> Option<ConnectionGuard> {
-        let max = max_connections();
-        loop {
-            let cur = self.0.load(AtomicOrdering::Acquire);
-            if cur >= max {
-                metrics
-                    .rejected_connections
-                    .fetch_add(1, AtomicOrdering::Relaxed);
-                return None;
-            }
-            if self
-                .0
-                .compare_exchange(
-                    cur,
-                    cur + 1,
-                    AtomicOrdering::AcqRel,
-                    AtomicOrdering::Relaxed,
-                )
-                .is_ok()
-            {
-                metrics
-                    .active_connections
-                    .fetch_add(1, AtomicOrdering::Relaxed);
-                return Some(ConnectionGuard {
-                    gate: self.0.clone(),
-                    metrics: metrics.clone(),
-                });
-            }
-        }
-    }
-}
-
-struct ConnectionGuard {
-    gate: Arc<AtomicUsize>,
-    metrics: Arc<Metrics>,
-}
-
-impl Drop for ConnectionGuard {
-    fn drop(&mut self) {
-        self.gate.fetch_sub(1, AtomicOrdering::Release);
-        self.metrics
-            .active_connections
-            .fetch_sub(1, AtomicOrdering::Relaxed);
-    }
-}
-
-fn max_hot_tenants() -> usize {
-    std::env::var("FLUCTLIGHT_MAX_HOT_TENANTS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(DEFAULT_HOT_TENANTS)
-        .max(16)
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ServerMode {
@@ -142,6 +72,39 @@ impl ServerMode {
     }
 }
 
+fn max_connections() -> usize {
+    std::env::var("FLUCTLIGHT_MAX_CONNECTIONS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_MAX_CONNECTIONS)
+        .max(1)
+}
+
+fn request_timeout() -> Duration {
+    std::env::var("FLUCTLIGHT_REQUEST_TIMEOUT_MS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .map(Duration::from_millis)
+        .unwrap_or(DEFAULT_REQUEST_TIMEOUT)
+}
+
+fn max_hot_tenants() -> usize {
+    std::env::var("FLUCTLIGHT_MAX_HOT_TENANTS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_HOT_TENANTS)
+        .max(16)
+}
+
+#[cfg(feature = "distributed")]
+fn policy_required(policy: crate::placement::DurabilityPolicy, assigned: usize) -> usize {
+    match policy {
+        crate::placement::DurabilityPolicy::Local => 1,
+        crate::placement::DurabilityPolicy::Quorum => assigned / 2 + 1,
+        crate::placement::DurabilityPolicy::All => assigned,
+    }
+}
+
 #[derive(Clone)]
 pub struct BrainServer {
     pool: Arc<RwLock<BrainPool>>,
@@ -151,6 +114,36 @@ pub struct BrainServer {
     idempotency: Arc<RwLock<HashSet<String>>>,
     read_only: bool,
     mode: ServerMode,
+    fovea_ingestion: bool,
+    dispatch_gate: Arc<tokio::sync::Semaphore>,
+    #[cfg(feature = "distributed")]
+    applied_control: Option<AppliedControl>,
+    #[cfg(feature = "distributed")]
+    control_node: Option<Arc<crate::control::service::ControlNode>>,
+    #[cfg(feature = "distributed")]
+    linearizable_request: bool,
+    #[cfg(feature = "distributed")]
+    control_ready: Arc<AtomicBool>,
+    #[cfg(feature = "distributed")]
+    tenant_replication: Option<Arc<TenantReplicationRuntime>>,
+}
+
+#[cfg(feature = "distributed")]
+#[derive(Clone)]
+struct AppliedControl {
+    node_id: crate::control::types::NodeId,
+    state: Arc<RwLock<crate::control::types::ControlState>>,
+    observed_at: Arc<RwLock<SystemTime>>,
+}
+
+#[cfg(feature = "distributed")]
+struct TenantReplicationRuntime {
+    client: crate::replicate::TenantReplicationClient,
+    targets: std::collections::BTreeMap<
+        crate::control::types::NodeId,
+        crate::control::types::NodeMetadata,
+    >,
+    timeout: Duration,
 }
 
 struct TenantSlot {
@@ -168,26 +161,51 @@ struct BrainPool {
 
 impl BrainServer {
     pub fn open(path: PathBuf) -> Result<Self> {
-        let tenant = "default".to_string();
+        // Prefer the tenant directory name (…/tenants/<id>/brain) so auth-scoped
+        // keys like `serverbrain-v2:…:admin` hit the already-open exclusive brain
+        // instead of trying to open the same path a second time (self-deadlock).
+        let tenant = path
+            .parent()
+            .and_then(|parent| parent.file_name())
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+            .unwrap_or("default")
+            .to_string();
         let mut tenants = HashMap::new();
         let brain = FluctlightBrain::open(&path)?;
         let loaded_mtime = store::snapshot_mtime(&path).unwrap_or(SystemTime::UNIX_EPOCH);
+        let primary = Arc::new(RwLock::new(brain));
         tenants.insert(
             tenant.clone(),
             TenantSlot {
-                brain: Arc::new(RwLock::new(brain)),
+                brain: primary.clone(),
                 path: path.clone(),
                 loaded_mtime,
                 last_access: Instant::now(),
             },
         );
+        // "default" always addresses the brain this server was opened on, even
+        // when the slot key is the tenant directory name. Without the alias an
+        // unauthenticated request would resolve "default" against the global
+        // tenant root and open (or read) an unrelated brain.
+        if tenant != "default" {
+            tenants.insert(
+                "default".to_string(),
+                TenantSlot {
+                    brain: primary,
+                    path: path.clone(),
+                    loaded_mtime,
+                    last_access: Instant::now(),
+                },
+            );
+        }
         let pool = BrainPool {
             tenants,
             tenant_root: default_tenant_root(),
             default_tenant: tenant,
         };
         let metrics = Metrics::new();
-        if let Some(slot) = pool.tenants.get("default") {
+        if let Some(slot) = pool.tenants.get(&pool.default_tenant) {
             if let Ok(guard) = slot.brain.read() {
                 metrics.set_synapses(guard.graph.synapse_count());
             }
@@ -200,6 +218,19 @@ impl BrainServer {
             idempotency: Arc::new(RwLock::new(HashSet::new())),
             read_only: false,
             mode: ServerMode::from_env(),
+            fovea_ingestion: std::env::var("FLUCTLIGHT_FOVEA_INGESTION")
+                .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true")),
+            dispatch_gate: Arc::new(tokio::sync::Semaphore::new(max_connections())),
+            #[cfg(feature = "distributed")]
+            applied_control: None,
+            #[cfg(feature = "distributed")]
+            control_node: None,
+            #[cfg(feature = "distributed")]
+            linearizable_request: false,
+            #[cfg(feature = "distributed")]
+            control_ready: Arc::new(AtomicBool::new(false)),
+            #[cfg(feature = "distributed")]
+            tenant_replication: None,
         })
     }
 
@@ -219,6 +250,500 @@ impl BrainServer {
 
     pub fn metrics(&self) -> Arc<Metrics> {
         self.metrics.clone()
+    }
+
+    #[cfg(feature = "distributed")]
+    pub fn with_applied_control_state(
+        mut self,
+        node_id: crate::control::types::NodeId,
+        state: crate::control::types::ControlState,
+    ) -> Self {
+        self.applied_control = Some(AppliedControl {
+            node_id,
+            state: Arc::new(RwLock::new(state)),
+            observed_at: Arc::new(RwLock::new(SystemTime::now())),
+        });
+        self
+    }
+
+    #[cfg(feature = "distributed")]
+    pub fn with_tenant_replication(
+        mut self,
+        client: crate::replicate::TenantReplicationClient,
+        targets: std::collections::BTreeMap<
+            crate::control::types::NodeId,
+            crate::control::types::NodeMetadata,
+        >,
+        timeout: Duration,
+    ) -> Self {
+        self.tenant_replication = Some(Arc::new(TenantReplicationRuntime {
+            client,
+            targets,
+            timeout,
+        }));
+        self
+    }
+
+    #[cfg(feature = "distributed")]
+    pub fn with_control_node(
+        mut self,
+        control_node: Arc<crate::control::service::ControlNode>,
+    ) -> Result<Self> {
+        let node_id = control_node.metadata().node_id;
+        let state = control_node.local_state().map_err(Error::Store)?;
+        self = self.with_applied_control_state(node_id, state);
+        self.control_node = Some(control_node);
+        self.linearizable_request = false;
+        Ok(self)
+    }
+
+    #[cfg(feature = "distributed")]
+    pub async fn attach_existing_control_node(
+        self,
+        control_node: Arc<crate::control::service::ControlNode>,
+    ) -> Result<Self> {
+        let state = control_node
+            .linearizable_read()
+            .await
+            .map_err(Error::PlacementUnavailable)?;
+        let server = self.with_control_node(control_node)?;
+        server.update_applied_control_state(state)?;
+        server.control_ready.store(true, AtomicOrdering::Release);
+        Ok(server)
+    }
+
+    #[cfg(feature = "distributed")]
+    pub fn control_ready(&self) -> bool {
+        self.control_ready.load(AtomicOrdering::Acquire)
+    }
+
+    #[cfg(feature = "distributed")]
+    pub fn control_node_id(&self) -> Option<crate::control::types::NodeId> {
+        self.control_node
+            .as_ref()
+            .map(|node| node.metadata().node_id)
+    }
+
+    #[cfg(feature = "distributed")]
+    pub async fn attach_distributed_control(
+        self,
+        config: crate::control::service::DistributedProductionConfig,
+    ) -> Result<Self> {
+        crate::control::service::validate_production_ready(&config.node, &config.bootstrap)
+            .map_err(Error::PlacementUnavailable)?;
+        let bootstrap = config.bootstrap.clone();
+        let platform_bootstrap = config.platform_bootstrap.clone();
+        let control_node = Arc::new(
+            crate::control::service::ControlNode::start(config.node)
+                .await
+                .map_err(Error::PlacementUnavailable)?,
+        );
+        match bootstrap {
+            crate::control::service::BootstrapMode::Single => {
+                control_node
+                    .bootstrap_single()
+                    .await
+                    .map_err(Error::PlacementUnavailable)?;
+                match platform_bootstrap {
+                    #[cfg(unix)]
+                    Some(crate::control::service::PlatformBootstrapSource::File(path)) => {
+                        control_node
+                            .bootstrap_platform_credential_from_file(&path)
+                            .await
+                            .map_err(Error::PlacementUnavailable)?;
+                    }
+                    Some(crate::control::service::PlatformBootstrapSource::Stdin) => {
+                        let mut secret = tokio::task::spawn_blocking(|| {
+                            let mut secret = String::new();
+                            std::io::Read::read_to_string(&mut std::io::stdin(), &mut secret)
+                                .map(|_| secret)
+                                .map_err(|error| error.to_string())
+                        })
+                        .await
+                        .map_err(|error| Error::PlacementUnavailable(error.to_string()))?
+                        .map_err(Error::PlacementUnavailable)?;
+                        while secret.ends_with(['\r', '\n']) {
+                            secret.pop();
+                        }
+                        let result = control_node
+                            .bootstrap_platform_credential(&secret)
+                            .await
+                            .map_err(Error::PlacementUnavailable);
+                        secret.clear();
+                        result?;
+                    }
+                    #[cfg(not(unix))]
+                    Some(crate::control::service::PlatformBootstrapSource::File(_)) => {
+                        return Err(Error::PlacementUnavailable(
+                            "mode-0600 bootstrap files require Unix; use stdin".into(),
+                        ));
+                    }
+                    None => {
+                        return Err(Error::PlacementUnavailable(
+                            "single-node control bootstrap requires a one-time platform credential source"
+                                .into(),
+                        ));
+                    }
+                }
+            }
+            crate::control::service::BootstrapMode::Join { seed } => control_node
+                .join_cluster(seed)
+                .await
+                .map_err(Error::PlacementUnavailable)?,
+        }
+        let state = control_node
+            .linearizable_read()
+            .await
+            .map_err(Error::PlacementUnavailable)?;
+        let server = self.with_control_node(control_node)?;
+        server.update_applied_control_state(state)?;
+        server.control_ready.store(true, AtomicOrdering::Release);
+        Ok(server)
+    }
+
+    #[cfg(feature = "distributed")]
+    pub async fn attach_distributed_control_from_env(self) -> Result<Self> {
+        let config = crate::control::service::production_config_from_env()
+            .map_err(Error::PlacementUnavailable)?;
+        self.attach_distributed_control(config).await
+    }
+
+    #[cfg(feature = "distributed")]
+    async fn authorize_distributed_request(&self) -> Result<Self> {
+        let Some(control_node) = &self.control_node else {
+            return Ok(self.clone());
+        };
+        let state = match control_node.linearizable_read().await {
+            Ok(state) => state,
+            Err(error) => {
+                self.control_ready.store(false, AtomicOrdering::Release);
+                return Err(Error::PlacementUnavailable(format!(
+                    "control quorum unavailable: {error}"
+                )));
+            }
+        };
+        self.update_applied_control_state(state)?;
+        self.control_ready.store(true, AtomicOrdering::Release);
+        let mut authorized = self.clone();
+        authorized.linearizable_request = true;
+        Ok(authorized)
+    }
+
+    async fn authorize_request_context(
+        &self,
+        bearer: Option<&str>,
+        tenant_hint: Option<&str>,
+    ) -> Result<Option<AuthContext>> {
+        #[cfg(feature = "distributed")]
+        if let Some(control_node) = &self.control_node {
+            let Some(secret) = bearer else {
+                return Ok(None);
+            };
+            let now_unix_ms = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+                .try_into()
+                .unwrap_or(u64::MAX);
+            let authorized = control_node
+                .authorize_linearizable(secret, now_unix_ms)
+                .await
+                .map_err(Error::PlacementUnavailable)?;
+            return Ok(authorized.map(|key| AuthContext {
+                tenant_id: key.tenant_id,
+                role: match key.role {
+                    crate::control::types::ControlRole::Read => Role::Read,
+                    crate::control::types::ControlRole::Write => Role::Write,
+                    crate::control::types::ControlRole::Admin => Role::Admin,
+                    crate::control::types::ControlRole::Platform => Role::Platform,
+                },
+            }));
+        }
+        Ok(self.auth.authorize(bearer, tenant_hint))
+    }
+
+    #[cfg(feature = "distributed")]
+    pub fn update_applied_control_state(
+        &self,
+        state: crate::control::types::ControlState,
+    ) -> Result<()> {
+        let control = self
+            .applied_control
+            .as_ref()
+            .ok_or_else(|| Error::Store("distributed control state is not attached".into()))?;
+        *control
+            .state
+            .write()
+            .map_err(|_| Error::Store("control state lock poisoned".into()))? = state;
+        *control
+            .observed_at
+            .write()
+            .map_err(|_| Error::Store("control watermark lock poisoned".into()))? =
+            SystemTime::now();
+        Ok(())
+    }
+
+    #[cfg(feature = "distributed")]
+    pub fn primary_route(
+        &self,
+        tenant_id: &str,
+    ) -> Result<(crate::control::types::NodeId, String)> {
+        let control = self
+            .applied_control
+            .as_ref()
+            .ok_or_else(|| Error::Store("distributed control state is not attached".into()))?;
+        let state = control
+            .state
+            .read()
+            .map_err(|_| Error::Store("control state lock poisoned".into()))?;
+        let placement = state
+            .placements
+            .get(tenant_id)
+            .ok_or_else(|| Error::Store("tenant placement unavailable".into()))?;
+        let primary = placement
+            .primary
+            .ok_or_else(|| Error::Store("tenant primary unavailable".into()))?;
+        let api_addr = state
+            .nodes
+            .get(&primary)
+            .map(|node| node.api_addr.clone())
+            .unwrap_or_default();
+        Ok((primary, api_addr))
+    }
+
+    #[cfg(feature = "distributed")]
+    fn distributed_write_identity(
+        &self,
+        tenant_id: &str,
+    ) -> Result<Option<crate::wal::WalIdentity>> {
+        let Some(control) = &self.applied_control else {
+            return Ok(None);
+        };
+        if self.control_node.is_some() && !self.linearizable_request {
+            return Err(Error::PlacementUnavailable(
+                "write requires a fresh linearizable control read".into(),
+            ));
+        }
+        let state = control
+            .state
+            .read()
+            .map_err(|_| Error::Store("control state lock poisoned".into()))?;
+        let placement = state
+            .placements
+            .get(tenant_id)
+            .ok_or_else(|| Error::PlacementUnavailable("tenant has no applied placement".into()))?;
+        let authorization = placement.authorize_write(&crate::placement::WriteFence {
+            tenant_uuid: placement.tenant_uuid,
+            node_id: control.node_id,
+            generation: placement.generation,
+        });
+        if let Err(error) = authorization {
+            return match error {
+                crate::placement::PlacementError::NotPrimary {
+                    primary,
+                    generation,
+                } => {
+                    let api_addr = primary
+                        .and_then(|node| state.nodes.get(&node))
+                        .map(|node| node.api_addr.clone())
+                        .filter(|address| address.starts_with("https://"));
+                    Err(Error::NotPrimary {
+                        primary,
+                        generation,
+                        api_addr,
+                    })
+                }
+                other => Err(Error::PlacementUnavailable(other.to_string())),
+            };
+        }
+        Ok(Some(crate::wal::WalIdentity {
+            tenant_uuid: placement.tenant_uuid,
+            writer_epoch: placement.generation,
+            fence_generation: placement.generation,
+            durability: placement.durability,
+        }))
+    }
+
+    #[cfg(feature = "distributed")]
+    fn distributed_durability_context(
+        &self,
+        tenant_id: &str,
+    ) -> Result<
+        Option<(
+            crate::wal::WalIdentity,
+            crate::placement::Placement,
+            crate::control::types::NodeId,
+        )>,
+    > {
+        let Some(control) = &self.applied_control else {
+            return Ok(None);
+        };
+        let state = control
+            .state
+            .read()
+            .map_err(|_| Error::Store("control state lock poisoned".into()))?;
+        let placement =
+            state.placements.get(tenant_id).cloned().ok_or_else(|| {
+                Error::PlacementUnavailable("tenant has no applied placement".into())
+            })?;
+        let identity = crate::wal::WalIdentity {
+            tenant_uuid: placement.tenant_uuid,
+            writer_epoch: placement.generation,
+            fence_generation: placement.generation,
+            durability: placement.durability,
+        };
+        Ok(Some((identity, placement, control.node_id)))
+    }
+
+    #[cfg(feature = "distributed")]
+    #[allow(clippy::too_many_arguments)]
+    fn replicate_canonical_range(
+        &self,
+        tenant_id: &str,
+        path: &std::path::Path,
+        after_seq: u64,
+        through_seq: u64,
+        identity: crate::wal::WalIdentity,
+        placement: &crate::placement::Placement,
+        node_id: crate::control::types::NodeId,
+    ) -> Result<()> {
+        let frames = crate::wal::replication_frames(path, after_seq, through_seq, &identity)?;
+        for frame in frames {
+            let mutation_hash = frame.sha256;
+            let mut acknowledgements = vec![crate::placement::ReplicaDurableAck::exact(
+                node_id,
+                frame.seq,
+                mutation_hash,
+            )];
+            if placement.durability != crate::placement::DurabilityPolicy::Local {
+                let runtime = self.tenant_replication.clone().ok_or_else(|| {
+                    Error::DurabilityUnavailable {
+                        policy: format!("{:?}", placement.durability),
+                        watermark: frame.seq,
+                        required: policy_required(placement.durability, placement.members.len()),
+                        received: 1,
+                    }
+                })?;
+                let targets: Vec<_> = placement
+                    .members
+                    .iter()
+                    .filter(|member| **member != node_id)
+                    .filter_map(|member| {
+                        runtime
+                            .targets
+                            .get(member)
+                            .cloned()
+                            .map(|target| (*member, target))
+                    })
+                    .collect();
+                let client = runtime.client.clone();
+                let timeout = runtime.timeout;
+                let replicated_frame = frame.clone();
+                let remote = std::thread::spawn(move || {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| error.to_string())?;
+                    Ok::<_, String>(runtime.block_on(async move {
+                        let mut durable = Vec::new();
+                        for (remote_node, target) in targets {
+                            let request = client.apply_wal(&target, vec![replicated_frame.clone()]);
+                            if let Ok(Ok(ack)) = tokio::time::timeout(timeout, request).await {
+                                if ack.durable_watermark == replicated_frame.seq
+                                    && ack.tenant_uuid == replicated_frame.tenant_uuid
+                                    && ack.fence_generation == replicated_frame.fence_generation
+                                    && ack.operation_id.as_deref()
+                                        == Some(replicated_frame.operation_id.as_str())
+                                    && ack.mutation_sha256 == Some(replicated_frame.sha256)
+                                {
+                                    durable.push(remote_node);
+                                }
+                            }
+                        }
+                        durable
+                    }))
+                })
+                .join()
+                .map_err(|_| Error::Store("tenant replication worker panicked".into()))?
+                .map_err(Error::Store)?;
+                acknowledgements.extend(remote.into_iter().map(|remote_node| {
+                    crate::placement::ReplicaDurableAck::exact(
+                        remote_node,
+                        frame.seq,
+                        mutation_hash,
+                    )
+                }));
+            }
+            if crate::placement::evaluate_durable_write(
+                placement.durability,
+                &placement.members,
+                node_id,
+                frame.seq,
+                mutation_hash,
+                &acknowledgements,
+            )
+            .is_err()
+            {
+                return Err(Error::DurabilityUnavailable {
+                    policy: format!("{:?}", placement.durability),
+                    watermark: frame.seq,
+                    required: policy_required(placement.durability, placement.members.len()),
+                    received: acknowledgements.len(),
+                });
+            }
+            if let Some(control_node) = self.control_node.clone() {
+                let reports: Vec<_> = acknowledgements
+                    .iter()
+                    .map(|ack| (ack.node_id, ack.watermark))
+                    .collect();
+                let tenant_id = tenant_id.to_string();
+                let generation = placement.generation;
+                let operation_id = frame.operation_id.clone();
+                let state = std::thread::spawn(move || {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .map_err(|error| error.to_string())?;
+                    runtime.block_on(async move {
+                        for (reported_node, durable_watermark) in reports {
+                            let response = control_node
+                                .propose(
+                                    crate::control::types::ControlCommand::ReportDurableWatermark {
+                                        tenant_id: tenant_id.clone(),
+                                        request_id: format!(
+                                            "durable-{operation_id}-{reported_node}"
+                                        ),
+                                        node_id: reported_node,
+                                        generation,
+                                        durable_watermark,
+                                    },
+                                )
+                                .await?;
+                            if let crate::control::types::ControlResponse::Rejected { reason } =
+                                response
+                            {
+                                return Err(reason);
+                            }
+                        }
+                        control_node.linearizable_read().await
+                    })
+                })
+                .join()
+                .map_err(|_| Error::Store("control watermark reporter panicked".into()))?
+                .map_err(Error::PlacementUnavailable)?;
+                self.update_applied_control_state(state)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn tenant_path(&self, tenant_id: &str, pool: &BrainPool) -> Result<PathBuf> {
+        if tenant_id == pool.default_tenant {
+            return Ok(self.default_path.clone());
+        }
+        TenantConfig::try_default_for(tenant_id, &pool.tenant_root)
+            .map(|cfg| cfg.brain_path)
+            .map_err(Error::Store)
     }
 
     fn refresh_if_stale(&self, tenant_id: &str) -> Result<()> {
@@ -258,21 +783,16 @@ impl BrainServer {
             slot.last_access = Instant::now();
             return Ok(slot.brain.clone());
         }
-        let cfg = if tenant_id == pool.default_tenant {
-            TenantConfig::with_brain_path(tenant_id, &pool.tenant_root, self.default_path.clone())
-        } else {
-            TenantConfig::try_default_for(tenant_id, &pool.tenant_root).map_err(Error::Store)?
-        };
+        let brain_path = self.tenant_path(tenant_id, &pool)?;
         // Reuse an already-open brain for the same path (auth tenant id may differ
-        // from the slot key used at serve startup). Never open the same path twice:
-        // the second open busy-spins on our own exclusive flock while holding the
-        // pool write lock, wedging every tenant until the request timeout.
-        if let Some((brain, path, loaded_mtime)) = pool
+        // from the slot key used at serve startup). Never open the same path twice.
+        if let Some(existing) = pool
             .tenants
             .values()
-            .find(|slot| slot.path == cfg.brain_path)
+            .find(|slot| slot.path == brain_path)
             .map(|slot| (slot.brain.clone(), slot.path.clone(), slot.loaded_mtime))
         {
+            let (brain, path, loaded_mtime) = existing;
             pool.tenants.insert(
                 tenant_id.to_string(),
                 TenantSlot {
@@ -285,15 +805,22 @@ impl BrainServer {
             return Ok(brain);
         }
         self.evict_if_needed(&mut pool);
-        cfg.ensure_dirs().map_err(Error::Io)?;
-        let brain = FluctlightBrain::open(&cfg.brain_path)?;
-        let loaded_mtime = store::snapshot_mtime(&cfg.brain_path).unwrap_or(SystemTime::UNIX_EPOCH);
+        if tenant_id == pool.default_tenant {
+            // Primary serve path is already ensured by the caller.
+        } else {
+            TenantConfig::try_default_for(tenant_id, &pool.tenant_root)
+                .map_err(Error::Store)?
+                .ensure_dirs()
+                .map_err(Error::Io)?;
+        }
+        let brain = FluctlightBrain::open(&brain_path)?;
+        let loaded_mtime = store::snapshot_mtime(&brain_path).unwrap_or(SystemTime::UNIX_EPOCH);
         let arc = Arc::new(RwLock::new(brain));
         pool.tenants.insert(
             tenant_id.to_string(),
             TenantSlot {
                 brain: arc.clone(),
-                path: cfg.brain_path,
+                path: brain_path,
                 loaded_mtime,
                 last_access: Instant::now(),
             },
@@ -326,27 +853,118 @@ impl BrainServer {
         f(&guard)
     }
 
+    #[cfg(feature = "distributed")]
+    pub fn with_brain_read_consistent<F, T>(
+        &self,
+        tenant_id: &str,
+        consistency: crate::placement::ReadConsistency,
+        f: F,
+    ) -> Result<T>
+    where
+        F: FnOnce(&FluctlightBrain) -> Result<T>,
+    {
+        let control = self
+            .applied_control
+            .as_ref()
+            .ok_or_else(|| Error::Store("distributed control state is not attached".into()))?;
+        let state = control
+            .state
+            .read()
+            .map_err(|_| Error::Store("control state lock poisoned".into()))?;
+        let placement = state
+            .placements
+            .get(tenant_id)
+            .ok_or_else(|| Error::Store("tenant placement unavailable".into()))?;
+        let local =
+            crate::placement::PlacementReconciler::new(control.node_id).reconcile(Some(placement));
+        if matches!(
+            local.state,
+            crate::placement::PlacementState::Absent
+                | crate::placement::PlacementState::Draining
+                | crate::placement::PlacementState::Staging
+        ) {
+            return Err(Error::ReadConsistencyUnavailable(
+                "local replica is absent, staging, or draining".into(),
+            ));
+        }
+        let observed_at = *control
+            .observed_at
+            .read()
+            .map_err(|_| Error::Store("control watermark lock poisoned".into()))?;
+        let follower = placement
+            .durable_watermarks
+            .get(&control.node_id)
+            .copied()
+            .map(|durable| crate::placement::FollowerWatermark {
+                durable,
+                observed_at,
+            });
+        let primary = local.state == crate::placement::PlacementState::Primary;
+        if !consistency.allows(primary, follower, SystemTime::now()) {
+            return Err(Error::ReadConsistencyUnavailable(
+                "requested watermark, age, or primary ownership is not satisfied".into(),
+            ));
+        }
+        drop(state);
+        self.with_brain_read(tenant_id, f)
+    }
+
     pub fn with_brain_write<F, T>(&self, tenant_id: &str, f: F) -> Result<T>
     where
         F: FnOnce(&mut FluctlightBrain) -> Result<T>,
     {
+        #[cfg(feature = "distributed")]
+        let write_identity = self.distributed_write_identity(tenant_id)?;
+        #[cfg(feature = "distributed")]
+        let durability_context = self.distributed_durability_context(tenant_id)?;
         let brain = self.get_brain(tenant_id)?;
         let mut guard = brain
             .write()
             .map_err(|_| Error::Store("brain lock poisoned".into()))?;
+        #[cfg(feature = "distributed")]
+        if write_identity.is_some() {
+            guard.set_wal_identity(write_identity);
+        }
+        #[cfg(feature = "distributed")]
+        let before_wal = guard.wal_seq;
         let out = f(&mut guard)?;
+        #[cfg(feature = "distributed")]
+        let after_wal = guard.wal_seq;
+        #[cfg(feature = "distributed")]
+        let brain_path = guard.store_path().map(PathBuf::from);
         self.metrics.set_synapses(guard.graph.synapse_count());
+        drop(guard);
+        #[cfg(feature = "distributed")]
+        if let Some((identity, placement, node_id)) = durability_context {
+            let path = brain_path
+                .ok_or_else(|| Error::Store("distributed brain has no WAL path".into()))?;
+            if after_wal <= before_wal {
+                return Err(Error::DurabilityUnavailable {
+                    policy: format!("{:?}", placement.durability),
+                    watermark: before_wal,
+                    required: policy_required(placement.durability, placement.members.len()),
+                    received: 0,
+                });
+            }
+            self.replicate_canonical_range(
+                tenant_id, &path, before_wal, after_wal, identity, &placement, node_id,
+            )?;
+        }
         self.touch_mtime(tenant_id);
         Ok(out)
     }
 
     pub fn flush_all_checkpoints(&self) -> Result<()> {
-        let pool = self
+        let brains: Vec<_> = self
             .pool
             .read()
-            .map_err(|_| Error::Store("pool lock poisoned".into()))?;
-        for slot in pool.tenants.values() {
-            if let Ok(guard) = slot.brain.read() {
+            .map_err(|_| Error::Store("pool lock poisoned".into()))?
+            .tenants
+            .values()
+            .map(|slot| slot.brain.clone())
+            .collect();
+        for brain in brains {
+            if let Ok(guard) = brain.read() {
                 let _ = guard.checkpoint();
             }
         }
@@ -370,60 +988,86 @@ impl BrainServer {
                 "production mode requires authentication; set FLUCTLIGHT_REQUIRE_AUTH=true and configure the active authentication source".into(),
             ));
         }
+        #[cfg(feature = "distributed")]
+        if self.control_node.is_some() {
+            return Ok(());
+        }
         enforce_bind_auth(addr, &self.auth)
     }
 
     pub fn serve(&self, addr: &str) -> Result<()> {
-        self.validate_serve_config(addr)?;
-        // SAFETY: POSIX signal handlers for graceful shutdown on SIGTERM/SIGINT.
-        // Registers process-global handlers; no Rust invariants are violated beyond
-        // setting an AtomicBool. Not exercised under Miri (Unix-only, signal API).
-        #[cfg(unix)]
-        unsafe {
-            libc::signal(
-                libc::SIGTERM,
-                handle_shutdown_signal as *const () as libc::sighandler_t,
-            );
-            libc::signal(
-                libc::SIGINT,
-                handle_shutdown_signal as *const () as libc::sighandler_t,
-            );
-        }
-        let listener = TcpListener::bind(addr).map_err(Error::Io)?;
-        listener.set_nonblocking(true).map_err(Error::Io)?;
-        eprintln!("fluctlight serve listening on http://{addr}");
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(Error::Io)?;
         let server = self.clone();
-        let gate = ConnectionGate::new();
-        while !SHUTDOWN_REQUESTED.load(AtomicOrdering::Relaxed) {
-            match listener.accept() {
-                Ok((stream, _)) => {
-                    let server = server.clone();
-                    let gate = gate.clone();
-                    let Some(_guard) = gate.try_acquire(&server.metrics) else {
-                        let mut stream = stream;
-                        let _ = write_json(
-                            &mut stream,
-                            503,
-                            &serde_json::json!({"error": "server busy"}),
-                        );
-                        continue;
-                    };
-                    thread::spawn(move || {
-                        let _ = stream.set_nodelay(true);
-                        if let Err(e) = handle_connection(stream, &server) {
-                            eprintln!("serve error: {e}");
-                        }
-                    });
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    thread::sleep(Duration::from_millis(1));
-                }
-                Err(e) => return Err(Error::Io(e)),
-            }
+        runtime.block_on(async move {
+            #[cfg(feature = "distributed")]
+            let server = if std::env::var("FLUCTLIGHT_DISTRIBUTED")
+                .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+                && server.control_node.is_none()
+            {
+                server.attach_distributed_control_from_env().await?
+            } else {
+                server
+            };
+            server.serve_async(addr).await
+        })
+    }
+
+    pub async fn serve_async(&self, addr: &str) -> Result<()> {
+        self.validate_serve_config(addr)?;
+        #[cfg(feature = "distributed")]
+        if std::env::var("FLUCTLIGHT_DISTRIBUTED")
+            .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+            && (self.control_node.is_none() || !self.control_ready())
+        {
+            return Err(Error::PlacementUnavailable(
+                "distributed control node is not ready".into(),
+            ));
         }
-        eprintln!("fluctlight serve shutting down — flushing checkpoints");
-        self.flush_all_checkpoints()?;
-        Ok(())
+        let listener = tokio::net::TcpListener::bind(addr)
+            .await
+            .map_err(Error::Io)?;
+        tracing::info!(address = %addr, "fluctlight serve listening");
+        eprintln!("fluctlight serve listening on http://{addr}");
+
+        let middleware = ServiceBuilder::new()
+            .layer(HandleErrorLayer::new(handle_tower_error))
+            .load_shed()
+            .concurrency_limit(max_connections())
+            .timeout(request_timeout())
+            .layer(SetRequestIdLayer::new(
+                header::HeaderName::from_static("x-request-id"),
+                MakeRequestUuid,
+            ))
+            .layer(
+                TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+                    let request_id = request
+                        .headers()
+                        .get("x-request-id")
+                        .and_then(|value| value.to_str().ok())
+                        .unwrap_or("missing");
+                    tracing::info_span!(
+                        "http_request",
+                        request_id,
+                        method = %request.method(),
+                        uri = %request.uri()
+                    )
+                }),
+            )
+            .layer(PropagateRequestIdLayer::x_request_id());
+        let app = Router::new()
+            .fallback(any(handle_request))
+            .with_state(self.clone())
+            .layer(middleware);
+
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await
+            .map_err(Error::Io)?;
+        tracing::info!("fluctlight serve drained; flushing checkpoints");
+        self.flush_all_checkpoints()
     }
 }
 
@@ -455,6 +1099,12 @@ struct ApiRequest {
     agent_id: Option<String>,
     #[serde(default)]
     tenant_id: Option<String>,
+    #[serde(default)]
+    read_consistency: Option<String>,
+    #[serde(default)]
+    minimum_watermark: Option<u64>,
+    #[serde(default)]
+    maximum_staleness_ms: Option<u64>,
     #[serde(default)]
     query: Option<QueryRequest>,
     #[serde(default)]
@@ -532,170 +1182,362 @@ struct ActivateBatchItem {
     agent_id: Option<String>,
 }
 
-struct HttpRequest<'a> {
-    method: &'a str,
-    path: &'a str,
-    body: &'a str,
-    auth: Option<&'a str>,
-    idempotency: Option<&'a str>,
+async fn handle_tower_error(error: BoxError) -> impl IntoResponse {
+    if error.is::<tower::load_shed::error::Overloaded>() {
+        return api_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"error": "server busy"}).to_string(),
+            "application/json",
+        );
+    }
+    if error.is::<tower::timeout::error::Elapsed>() {
+        return api_response(
+            StatusCode::GATEWAY_TIMEOUT,
+            serde_json::json!({"error": "request timeout"}).to_string(),
+            "application/json",
+        );
+    }
+    tracing::error!(error = %error, "unhandled serving middleware error");
+    api_response(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        serde_json::json!({"error": "internal server error"}).to_string(),
+        "application/json",
+    )
 }
 
-/// A request split at the header/body boundary **before** any text decoding.
-///
-/// The head is ASCII by RFC 9110 and is validated as UTF-8 once. The body stays raw
-/// bytes until the whole entity has arrived, so a multi-byte character spanning two
-/// socket reads is never decoded in halves.
-struct RawRequest {
-    head: String,
-    body: Vec<u8>,
-}
-
-fn handle_connection(mut stream: TcpStream, server: &BrainServer) -> Result<()> {
-    stream
-        .set_read_timeout(Some(Duration::from_secs(30)))
-        .map_err(Error::Io)?;
+#[cfg(unix)]
+async fn shutdown_signal() {
+    let mut terminate =
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).ok();
     loop {
-        let raw = match read_http_request(&mut stream) {
-            Ok(r) => r,
-            Err(_) => break,
-        };
-        let keep_alive = request_keep_alive(&raw.head);
-        // Decode the body exactly once, on the complete entity. Invalid UTF-8 is a client
-        // error: storing it would mean writing characters the client never sent into
-        // durable memory, which is strictly worse than refusing the write.
-        let body = match std::str::from_utf8(&raw.body) {
-            Ok(b) => b,
-            Err(e) => {
-                write_json_conn(
-                    &mut stream,
-                    400,
-                    &serde_json::json!({
-                        "error": "invalid utf-8 body",
-                        "valid_up_to": e.valid_up_to(),
-                    }),
-                    false,
-                )?;
-                break;
-            }
-        };
-        if !serve_one_request(&mut stream, server, &raw.head, body, keep_alive)? {
-            break;
+        if SHUTDOWN_REQUESTED.load(AtomicOrdering::Acquire) {
+            return;
         }
-        if !keep_alive {
-            break;
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+            _ = tokio::signal::ctrl_c() => {
+                request_shutdown();
+            }
+            _ = async {
+                match terminate.as_mut() {
+                    Some(signal) => { signal.recv().await; }
+                    None => std::future::pending::<()>().await,
+                }
+            } => {
+                request_shutdown();
+            }
         }
     }
-    Ok(())
 }
 
-fn serve_one_request(
-    stream: &mut TcpStream,
+#[cfg(not(unix))]
+async fn shutdown_signal() {
+    loop {
+        if SHUTDOWN_REQUESTED.load(AtomicOrdering::Acquire) {
+            return;
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+            _ = tokio::signal::ctrl_c() => {
+                request_shutdown();
+            }
+        }
+    }
+}
+
+async fn handle_request(
+    State(server): State<BrainServer>,
+    request: Request<Body>,
+) -> Response<Body> {
+    if request.headers().len() > MAX_HEADERS {
+        return json_response(
+            StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE,
+            serde_json::json!({"error": "too many headers"}),
+        );
+    }
+    if request.headers().contains_key(header::CONTENT_LENGTH)
+        && request.headers().contains_key(header::TRANSFER_ENCODING)
+    {
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            serde_json::json!({"error": "ambiguous request framing"}),
+        );
+    }
+    if request
+        .headers()
+        .get_all(header::TRANSFER_ENCODING)
+        .iter()
+        .count()
+        > 1
+    {
+        return json_response(
+            StatusCode::BAD_REQUEST,
+            serde_json::json!({"error": "duplicate transfer-encoding"}),
+        );
+    }
+    let method = request.method().clone();
+    let path = request.uri().path().to_string();
+    #[cfg(feature = "distributed")]
+    if method == "GET"
+        && matches!(path.as_str(), "/ready" | "/api/v1/ready")
+        && server.control_node.is_some()
+        && server.authorize_distributed_request().await.is_err()
+    {
+        return json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"ready": false}),
+        );
+    }
+    let auth = bearer_token(request.headers()).map(str::to_owned);
+    let idempotency = request
+        .headers()
+        .get("x-idempotency-key")
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned);
+    let body = match to_bytes(request.into_body(), MAX_BODY_BYTES).await {
+        Ok(body) => body,
+        Err(error) => {
+            let status = if error.to_string().contains("length limit") {
+                StatusCode::PAYLOAD_TOO_LARGE
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            return json_response(
+                status,
+                serde_json::json!({"error": if status == StatusCode::PAYLOAD_TOO_LARGE {
+                    "payload too large"
+                } else {
+                    "malformed request body"
+                }}),
+            );
+        }
+    };
+    let body = match String::from_utf8(body.to_vec()) {
+        Ok(body) => body,
+        Err(_) => {
+            return json_response(
+                StatusCode::BAD_REQUEST,
+                serde_json::json!({"error": "request body must be valid UTF-8"}),
+            )
+        }
+    };
+    #[cfg(feature = "distributed")]
+    let relaxed_follower_read = method == "POST"
+        && serde_json::from_str::<ApiRequest>(&body)
+            .ok()
+            .and_then(|request| request.read_consistency)
+            .is_some_and(|mode| matches!(mode.as_str(), "bounded_stale" | "eventual"));
+    #[cfg(feature = "distributed")]
+    let server = if method == "POST" && !relaxed_follower_read {
+        match server.authorize_distributed_request().await {
+            Ok(server) => server,
+            Err(Error::PlacementUnavailable(reason)) => {
+                return json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    serde_json::json!({
+                        "error": "placement_unavailable",
+                        "reason": reason,
+                    }),
+                )
+            }
+            Err(error) => {
+                return json_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    serde_json::json!({"error": error.to_string()}),
+                )
+            }
+        }
+    } else {
+        server
+    };
+    let auth_context = match server
+        .authorize_request_context(auth.as_deref(), None)
+        .await
+    {
+        Ok(context) => context,
+        Err(Error::PlacementUnavailable(reason)) => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                serde_json::json!({
+                    "error": "placement_unavailable",
+                    "reason": reason,
+                }),
+            )
+        }
+        Err(error) => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                serde_json::json!({"error": error.to_string()}),
+            )
+        }
+    };
+    if method != "POST" {
+        return process_request(
+            &server,
+            method.as_str(),
+            &path,
+            &body,
+            auth_context,
+            idempotency.as_deref(),
+        );
+    }
+    let permit = match server.dispatch_gate.clone().try_acquire_owned() {
+        Ok(permit) => permit,
+        Err(_) => {
+            return json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                serde_json::json!({"error": "server busy"}),
+            )
+        }
+    };
+    let dispatch_server = server.clone();
+    match tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        process_request(
+            &dispatch_server,
+            method.as_str(),
+            &path,
+            &body,
+            auth_context,
+            idempotency.as_deref(),
+        )
+    })
+    .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::error!(error = %error, "business dispatch task failed");
+            json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                serde_json::json!({"error": "business dispatch failed"}),
+            )
+        }
+    }
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?.trim();
+    let (scheme, token) = value.split_once(' ')?;
+    scheme
+        .eq_ignore_ascii_case("bearer")
+        .then_some(token.trim())
+        .filter(|token| !token.is_empty())
+}
+
+fn process_request(
     server: &BrainServer,
-    head: &str,
+    method: &str,
+    path: &str,
     body: &str,
-    keep_alive: bool,
-) -> Result<bool> {
-    let parsed = parse_http(head, body)?;
-
-    if parsed.body.len() > MAX_BODY_BYTES {
-        write_json_conn(
-            stream,
-            413,
-            &serde_json::json!({"error": "payload too large"}),
-            keep_alive,
-        )?;
-        return Ok(false);
-    }
-
-    if parsed.method == "GET" && parsed.path == "/metrics" {
-        let body = server.metrics().render_prometheus();
-        write_text_conn(stream, 200, "text/plain; version=0.0.4", &body, keep_alive)?;
-        return Ok(keep_alive);
-    }
-
-    // Built-in Living Brain viewer — the god-tier 3D connectome UI ships with the server.
-    if parsed.method == "GET"
+    auth_context: Option<AuthContext>,
+    idempotency: Option<&str>,
+) -> Response<Body> {
+    if method == "GET"
         && matches!(
-            parsed.path,
-            "/" | "/brain" | "/viewer" | "/brain/" | "/viewer/"
+            path,
+            "/health" | "/api/health" | "/api/v1/health" | "/live" | "/api/v1/live"
         )
     {
-        write_text_conn(
-            stream,
-            200,
+        return json_response(
+            StatusCode::OK,
+            serde_json::json!({"ok": true, "status": "live"}),
+        );
+    }
+    if method == "GET" && matches!(path, "/ready" | "/api/v1/ready") {
+        let ready = !SHUTDOWN_REQUESTED.load(AtomicOrdering::Acquire) && server.pool.read().is_ok();
+        #[cfg(feature = "distributed")]
+        let ready = ready && (server.control_node.is_none() || server.control_ready());
+        let status = if ready {
+            StatusCode::OK
+        } else {
+            StatusCode::SERVICE_UNAVAILABLE
+        };
+        return json_response(status, serde_json::json!({"ready": ready}));
+    }
+    if method == "GET" && path == "/metrics" {
+        let Some(context) = auth_context else {
+            return json_response(
+                StatusCode::UNAUTHORIZED,
+                serde_json::json!({"error": "unauthorized"}),
+            );
+        };
+        if require_role(&context, Role::Platform).is_err() {
+            return json_response(
+                StatusCode::FORBIDDEN,
+                serde_json::json!({"error": "forbidden"}),
+            );
+        }
+        return api_response(
+            StatusCode::OK,
+            server.metrics().render_prometheus(),
+            "text/plain; version=0.0.4",
+        );
+    }
+    if method == "GET" && matches!(path, "/" | "/brain" | "/viewer" | "/brain/" | "/viewer/") {
+        return api_response(
+            StatusCode::OK,
+            VIEWER_HTML.to_string(),
             "text/html; charset=utf-8",
-            VIEWER_HTML,
-            keep_alive,
-        )?;
-        return Ok(keep_alive);
+        );
+    }
+    if method != "POST" {
+        return json_response(
+            StatusCode::METHOD_NOT_ALLOWED,
+            serde_json::json!({"error": "method not allowed"}),
+        );
     }
 
-    if parsed.method == "GET"
-        && (parsed.path == "/health"
-            || parsed.path == "/api/health"
-            || parsed.path == "/api/v1/health")
-    {
-        write_json_conn(stream, 200, &serde_json::json!({"ok": true}), keep_alive)?;
-        return Ok(keep_alive);
-    }
-
-    if parsed.method != "POST" {
-        write_json_conn(
-            stream,
-            405,
-            &serde_json::json!({"error": "method not allowed"}),
-            keep_alive,
-        )?;
-        return Ok(false);
-    }
-
-    let (tenant_from_path, subpath) = split_tenant_path(parsed.path);
-    let tenant_hint = tenant_from_path.clone().or_else(|| {
-        if parsed.body.trim().is_empty() {
+    let (tenant_from_path, subpath) = split_tenant_path(path);
+    let _tenant_hint = tenant_from_path.clone().or_else(|| {
+        if body.trim().is_empty() {
             None
         } else {
-            serde_json::from_str::<ApiRequest>(parsed.body)
+            serde_json::from_str::<ApiRequest>(body)
                 .ok()
                 .and_then(|b| b.tenant_id)
         }
     });
-    let auth_ctx = match server.auth.authorize(parsed.auth, tenant_hint.as_deref()) {
+    let auth_ctx = match auth_context {
         Some(c) => c,
         None => {
-            write_json_conn(
-                stream,
-                401,
-                &serde_json::json!({"error": "unauthorized"}),
-                keep_alive,
-            )?;
-            return Ok(false);
+            return json_response(
+                StatusCode::UNAUTHORIZED,
+                serde_json::json!({"error": "unauthorized"}),
+            )
         }
     };
 
-    if let Some(key) = parsed.idempotency {
+    if let Some(key) = idempotency {
         let scoped = format!("{}:{}", auth_ctx.tenant_id, key);
-        let mut seen = server
-            .idempotency
-            .write()
-            .map_err(|_| Error::Store("idempotency lock poisoned".into()))?;
+        let Ok(mut seen) = server.idempotency.write() else {
+            return json_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                serde_json::json!({"error": "idempotency lock poisoned"}),
+            );
+        };
         if seen.len() >= MAX_IDEMPOTENCY_KEYS {
             seen.clear();
         }
         if !seen.insert(scoped) {
-            write_json_conn(
-                stream,
-                409,
-                &serde_json::json!({"error": "duplicate idempotency key"}),
-                keep_alive,
-            )?;
-            return Ok(false);
+            return json_response(
+                StatusCode::CONFLICT,
+                serde_json::json!({"error": "duplicate idempotency key"}),
+            );
         }
     }
 
-    let api_body: ApiRequest = if parsed.body.trim().is_empty() {
+    let api_body: ApiRequest = if body.trim().is_empty() {
         ApiRequest::default()
     } else {
-        serde_json::from_str(parsed.body).map_err(|e| Error::Serde(e.to_string()))?
+        match serde_json::from_str(body) {
+            Ok(body) => body,
+            Err(error) => {
+                return json_response(
+                    StatusCode::BAD_REQUEST,
+                    serde_json::json!({"error": error.to_string()}),
+                )
+            }
+        }
     };
 
     let tenant_id = tenant_from_path
@@ -703,68 +1545,160 @@ fn serve_one_request(
         .unwrap_or(auth_ctx.tenant_id.clone());
 
     if let Err(e) = enforce_tenant_access(&auth_ctx, &tenant_id) {
-        write_json_conn(
-            stream,
-            403,
-            &serde_json::json!({"error": e.to_string()}),
-            keep_alive,
-        )?;
-        return Ok(false);
+        return json_response(
+            StatusCode::FORBIDDEN,
+            serde_json::json!({"error": e.to_string()}),
+        );
     }
 
     if !rate_limit_allow(&tenant_id) {
-        write_json_conn(
-            stream,
-            429,
-            &serde_json::json!({"error": "rate limit exceeded", "retry_after_secs": 1}),
-            keep_alive,
-        )?;
-        return Ok(false);
+        let mut response = json_response(
+            StatusCode::TOO_MANY_REQUESTS,
+            serde_json::json!({"error": "rate limit exceeded", "retry_after_secs": 1}),
+        );
+        response
+            .headers_mut()
+            .insert(header::RETRY_AFTER, HeaderValue::from_static("1"));
+        return response;
     }
 
     let path = subpath.as_str();
-    let (status, response) = match dispatch(server, &auth_ctx, &tenant_id, path, api_body) {
-        Ok(v) => (200, v),
-        Err(Error::Store(msg)) if msg == "unauthorized" => {
-            write_json_conn(
-                stream,
-                403,
-                &serde_json::json!({"error": "forbidden"}),
-                keep_alive,
-            )?;
-            return Ok(false);
+    match dispatch(server, &auth_ctx, &tenant_id, path, api_body) {
+        Ok(value) => json_response(StatusCode::OK, value),
+        Err(Error::Store(message)) if message == "unauthorized" => json_response(
+            StatusCode::FORBIDDEN,
+            serde_json::json!({"error": "forbidden"}),
+        ),
+        Err(Error::Store(message)) if message == "not found" => json_response(
+            StatusCode::NOT_FOUND,
+            serde_json::json!({"error": "not found", "path": path}),
+        ),
+        Err(Error::Store(message)) if message == "read-only replica" => json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"error": "read-only replica"}),
+        ),
+        Err(Error::Store(message)) if message == "fovea ingestion disabled" => {
+            json_response(StatusCode::FORBIDDEN, serde_json::json!({"error": message}))
         }
-        Err(Error::Store(msg)) if msg == "not found" => {
-            write_json_conn(
-                stream,
-                404,
-                &serde_json::json!({"error": "not found", "path": path}),
-                keep_alive,
-            )?;
-            return Ok(false);
+        Err(Error::NotPrimary {
+            primary,
+            generation,
+            api_addr,
+        }) => {
+            let mut response = json_response(
+                if api_addr.is_some() {
+                    StatusCode::TEMPORARY_REDIRECT
+                } else {
+                    StatusCode::SERVICE_UNAVAILABLE
+                },
+                serde_json::json!({
+                    "error": "not_primary",
+                    "primary_node_id": primary,
+                    "placement_generation": generation,
+                    "primary_api": api_addr,
+                }),
+            );
+            if let Some(address) = api_addr {
+                if let Ok(location) = HeaderValue::from_str(&format!("{address}{path}")) {
+                    response.headers_mut().insert(header::LOCATION, location);
+                }
+            }
+            response
         }
-        Err(Error::Store(msg)) if msg == "read-only replica" => {
-            write_json_conn(
-                stream,
-                503,
-                &serde_json::json!({"error": "read-only replica"}),
-                keep_alive,
-            )?;
-            return Ok(false);
-        }
-        Err(e) => {
-            write_json_conn(
-                stream,
-                500,
-                &serde_json::json!({"error": e.to_string()}),
-                keep_alive,
-            )?;
-            return Ok(false);
-        }
-    };
+        Err(Error::PlacementUnavailable(reason)) => json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"error": "placement_unavailable", "reason": reason}),
+        ),
+        Err(Error::ReadConsistencyUnavailable(reason)) => json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({"error": "read_consistency_unavailable", "reason": reason}),
+        ),
+        Err(Error::DurabilityUnavailable {
+            policy,
+            watermark,
+            required,
+            received,
+        }) => json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({
+                "error": "durability_unavailable",
+                "policy": policy,
+                "watermark": watermark,
+                "required": required,
+                "received": received,
+            }),
+        ),
+        Err(Error::DistributedMutationDisabled { operation }) => json_response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            serde_json::json!({
+                "error": "distributed_mutation_disabled",
+                "operation": operation,
+            }),
+        ),
+        Err(error) => json_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            serde_json::json!({"error": error.to_string()}),
+        ),
+    }
+}
 
-    write_json_conn(stream, status, &response, keep_alive)?;
-    Ok(keep_alive)
+fn json_response(status: StatusCode, value: Value) -> Response<Body> {
+    api_response(status, value.to_string(), "application/json")
+}
+
+fn api_response(status: StatusCode, body: String, content_type: &'static str) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, content_type)
+        .body(Body::from(body))
+        .expect("valid API response")
+}
+
+fn requested_read_consistency(request: &ApiRequest) -> Result<crate::placement::ReadConsistency> {
+    match request.read_consistency.as_deref().unwrap_or("primary") {
+        "primary" | "linearizable" => Ok(crate::placement::ReadConsistency::Primary),
+        "bounded_stale" => Ok(crate::placement::ReadConsistency::BoundedStale {
+            minimum_watermark: request.minimum_watermark.unwrap_or_default(),
+            maximum_age: Duration::from_millis(request.maximum_staleness_ms.unwrap_or_default()),
+        }),
+        "eventual" => Ok(crate::placement::ReadConsistency::Eventual),
+        other => Err(Error::ReadConsistencyUnavailable(format!(
+            "unknown read consistency mode {other:?}"
+        ))),
+    }
+}
+
+fn with_brain_read_mode<F, T>(
+    server: &BrainServer,
+    tenant_id: &str,
+    _consistency: crate::placement::ReadConsistency,
+    read: F,
+) -> Result<T>
+where
+    F: FnOnce(&FluctlightBrain) -> Result<T>,
+{
+    #[cfg(feature = "distributed")]
+    if server.applied_control.is_some() {
+        return server.with_brain_read_consistent(tenant_id, _consistency, read);
+    }
+    server.with_brain_read(tenant_id, read)
+}
+
+fn with_api_brain_read<F, T>(
+    server: &BrainServer,
+    tenant_id: &str,
+    request: &ApiRequest,
+    read: F,
+) -> Result<T>
+where
+    F: FnOnce(&FluctlightBrain) -> Result<T>,
+{
+    with_brain_read_mode(
+        server,
+        tenant_id,
+        requested_read_consistency(request)?,
+        read,
+    )
 }
 
 fn dispatch(
@@ -777,7 +1711,9 @@ fn dispatch(
     match path {
         "/api/v1/status" | "/status" => {
             require_role(auth, Role::Read)?;
-            server.with_brain_read(tenant_id, |b| Ok(serde_json::to_value(b.status()).unwrap()))
+            with_api_brain_read(server, tenant_id, &api_body, |b| {
+                Ok(serde_json::to_value(b.status()).unwrap())
+            })
         }
         "/api/v1/replica-status" | "/replica-status" => {
             require_role(auth, Role::Read)?;
@@ -895,19 +1831,21 @@ fn dispatch(
         "/api/v1/activate" | "/activate" => {
             require_role(auth, Role::Read)?;
             let timer = Timer::start();
+            let consistency = requested_read_consistency(&api_body)?;
             let cue = api_body.cue.unwrap_or_default();
             let agent_id = api_body.agent_id.clone();
             let top_k = api_body
                 .limit
                 .unwrap_or(crate::api_slim::DEFAULT_API_RECALL_LIMIT);
-            let mut result: ActivationResult = server.with_brain_read(tenant_id, |b| {
-                Ok(b.activate_scoped(
-                    &cue,
-                    api_body.semantic_vector.as_deref(),
-                    agent_id.as_deref(),
-                    top_k,
-                ))
-            })?;
+            let mut result: ActivationResult =
+                with_brain_read_mode(server, tenant_id, consistency, |b| {
+                    Ok(b.activate_scoped(
+                        &cue,
+                        api_body.semantic_vector.as_deref(),
+                        agent_id.as_deref(),
+                        top_k,
+                    ))
+                })?;
             crate::api_slim::slim_activation_for_api(&mut result, api_body.limit);
             server
                 .metrics
@@ -1403,6 +2341,9 @@ fn dispatch(
             })
         }
         "/api/v1/fovea-read" | "/fovea-read" => {
+            if !server.fovea_ingestion {
+                return Err(Error::Store("fovea ingestion disabled".into()));
+            }
             require_writable(server)?;
             require_role(auth, Role::Write)?;
             let file_path = api_body
@@ -1534,6 +2475,16 @@ fn dispatch(
         }
         "/api/v1/admin/tenants" | "/admin/tenants" => {
             require_role(auth, Role::Platform)?;
+            #[cfg(feature = "distributed")]
+            if let Some(control) = &server.applied_control {
+                let state = control
+                    .state
+                    .read()
+                    .map_err(|_| Error::Store("control state lock poisoned".into()))?;
+                return Ok(serde_json::json!({
+                    "tenants": state.tenants.keys().collect::<Vec<_>>()
+                }));
+            }
             let store =
                 crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
             let tenants = store.list_tenants()?;
@@ -1545,10 +2496,51 @@ fn dispatch(
                 .tenant_id
                 .clone()
                 .ok_or_else(|| Error::Store("missing tenant_id".into()))?;
-            let cfg =
-                TenantConfig::try_default_for(&tid, &default_tenant_root()).map_err(Error::Store)?;
+            let cfg = TenantConfig::try_default_for(&tid, &default_tenant_root())
+                .map_err(Error::Store)?;
             cfg.ensure_dirs().map_err(Error::Io)?;
             let _ = FluctlightBrain::open(&cfg.brain_path)?;
+            #[cfg(feature = "distributed")]
+            if let Some(control_node) = &server.control_node {
+                let control_node = Arc::clone(control_node);
+                let tenant_id = tid.clone();
+                let issued = tokio::runtime::Handle::current().block_on(async move {
+                    let state = control_node.linearizable_read().await?;
+                    if !state.tenants.contains_key(&tenant_id) {
+                        match control_node
+                            .propose(crate::control::types::ControlCommand::CreateTenant {
+                                tenant_id: tenant_id.clone(),
+                                request_id: format!("provision-tenant-{tenant_id}"),
+                                config: crate::control::types::TenantControlConfig::default(),
+                            })
+                            .await?
+                        {
+                            crate::control::types::ControlResponse::Applied { .. }
+                            | crate::control::types::ControlResponse::AlreadyApplied { .. } => {}
+                            crate::control::types::ControlResponse::Rejected { reason } => {
+                                return Err(reason);
+                            }
+                        }
+                    }
+                    control_node
+                        .issue_credential(
+                            &tenant_id,
+                            crate::control::types::ControlRole::Write,
+                            None,
+                        )
+                        .await
+                });
+                let issued = issued.map_err(Error::Store)?;
+                return Ok(serde_json::json!({
+                    "kid": issued.metadata.key_id,
+                    "tenant_id": issued.metadata.tenant_id,
+                    "key": issued.secret,
+                    "role": "write",
+                    "created_at": issued.metadata.created_at_unix_ms,
+                    "expires_at": issued.metadata.expires_at_unix_ms,
+                    "revoked": false,
+                }));
+            }
             let store =
                 crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
             let key = store.issue_key(&tid, Role::Write)?;
@@ -1560,6 +2552,20 @@ fn dispatch(
                 .kid
                 .clone()
                 .ok_or_else(|| Error::Store("missing kid".into()))?;
+            #[cfg(feature = "distributed")]
+            if let Some(control_node) = &server.control_node {
+                let now_unix_ms = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis()
+                    .try_into()
+                    .unwrap_or(u64::MAX);
+                let control_node = Arc::clone(control_node);
+                tokio::runtime::Handle::current()
+                    .block_on(control_node.revoke_credential(&kid, now_unix_ms))
+                    .map_err(Error::Store)?;
+                return Ok(serde_json::json!({"revoked": true}));
+            }
             let store =
                 crate::auth_store::AuthStore::open(crate::auth_store::AuthStore::default_path())?;
             let removed = store.revoke_key(&kid)?;
@@ -1578,11 +2584,28 @@ fn dispatch(
                 .tenant_id
                 .clone()
                 .unwrap_or_else(|| tenant_id.to_string());
-            let router = crate::shard::ShardRouter::default();
+            #[cfg(feature = "distributed")]
+            if server.applied_control.is_some() {
+                let (primary_node_id, primary_api) = server.primary_route(&tid)?;
+                let generation = server
+                    .applied_control
+                    .as_ref()
+                    .and_then(|control| control.state.read().ok())
+                    .and_then(|state| state.placements.get(&tid).map(|p| p.generation))
+                    .ok_or_else(|| {
+                        Error::PlacementUnavailable("tenant placement unavailable".into())
+                    })?;
+                return Ok(serde_json::json!({
+                    "tenant_id": tid,
+                    "primary_node_id": primary_node_id,
+                    "primary_api": primary_api,
+                    "placement_generation": generation,
+                }));
+            }
             Ok(serde_json::json!({
                 "tenant_id": tid,
-                "shard": router.shard_for(&tid),
-                "serve_addr": router.serve_addr(&tid),
+                "mode": "local",
+                "primary": true,
             }))
         }
         "/api/v1/query" | "/query" => {
@@ -1736,182 +2759,228 @@ fn rate_limit_allow(tenant_id: &str) -> bool {
     crate::rate_limit::allow(tenant_id)
 }
 
-/// Case-insensitive header lookup over an already-split head.
-///
-/// RFC 9110 §5.1 makes field names case-insensitive, and HTTP/2 requires them lowercase —
-/// so any HTTP/2-fronted proxy emits `authorization:`, not `Authorization:`. These lookups
-/// used to be case-sensitive `strip_prefix` calls, which meant a lowercase `authorization:`
-/// was dropped (silently downgrading the caller to the default tenant), a lowercase
-/// `content-length:` parsed as zero (truncating the body), and a lowercase
-/// `x-idempotency-key:` disabled duplicate suppression.
-fn header_value<'a>(head: &'a str, name: &str) -> Option<&'a str> {
-    for line in head.split("\r\n").skip(1) {
-        if line.is_empty() {
-            break;
-        }
-        let (k, v) = line.split_once(':')?;
-        if k.trim().eq_ignore_ascii_case(name) {
-            return Some(v.trim());
-        }
-    }
-    None
-}
+#[cfg(all(test, feature = "distributed"))]
+mod placement_tests {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::sync::atomic::{AtomicBool, Ordering};
 
-fn parse_content_length(head: &str) -> usize {
-    header_value(head, "content-length")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0)
-}
-
-/// Read one request, framing on bytes rather than on decoded text.
-///
-/// Previously this called `String::from_utf8_lossy` on the first 8192-byte read and again
-/// on every 4096-byte continuation, so a character straddling a chunk boundary was mangled
-/// into replacement characters on both sides — and the inflated `String` length then broke
-/// the `&raw[body_start..body_start + content_length]` slice in `parse_http`, dropping the
-/// socket with no response.
-fn read_http_request(stream: &mut TcpStream) -> Result<RawRequest> {
-    let mut buf: Vec<u8> = Vec::with_capacity(8192);
-    let mut chunk = [0u8; 8192];
-
-    // Phase 1: read until the header terminator is present.
-    let header_end = loop {
-        if let Some(i) = find_subslice(&buf, b"\r\n\r\n") {
-            break i + 4;
-        }
-        if buf.len() > MAX_BODY_BYTES {
-            return Err(Error::Store("header too large".into()));
-        }
-        let n = stream.read(&mut chunk).map_err(Error::Io)?;
-        if n == 0 {
-            if buf.is_empty() {
-                return Err(Error::Store("empty request".into()));
-            }
-            return Err(Error::Store("truncated request head".into()));
-        }
-        buf.extend_from_slice(&chunk[..n]);
+    use super::*;
+    use crate::control::types::ControlState;
+    use crate::placement::{DurabilityPolicy, Placement};
+    use rcgen::{
+        BasicConstraints, CertificateParams, ExtendedKeyUsagePurpose, IsCa, KeyPair,
+        KeyUsagePurpose,
     };
 
-    let head = std::str::from_utf8(&buf[..header_end])
-        .map_err(|_| Error::Store("non-utf8 request head".into()))?
-        .to_string();
-    let content_length = parse_content_length(&head).min(MAX_BODY_BYTES + 1);
-
-    // Phase 2: read until the whole body has arrived. The target is an absolute buffer
-    // length, so body bytes already present in the first read are counted exactly once —
-    // reading `content_length` *further* bytes would hang on every request whose body
-    // arrived alongside its headers, which is the common case.
-    let target = header_end.saturating_add(content_length);
-    while buf.len() < target {
-        let n = stream.read(&mut chunk).map_err(Error::Io)?;
-        if n == 0 {
-            break;
-        }
-        buf.extend_from_slice(&chunk[..n]);
-    }
-
-    let end = target.min(buf.len());
-    let body = buf[header_end.min(end)..end].to_vec();
-    Ok(RawRequest { head, body })
-}
-
-fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    if needle.is_empty() || haystack.len() < needle.len() {
-        return None;
-    }
-    haystack.windows(needle.len()).position(|w| w == needle)
-}
-
-fn parse_http<'a>(head: &'a str, body: &'a str) -> Result<HttpRequest<'a>> {
-    let request_line = head
-        .split("\r\n")
-        .next()
-        .ok_or_else(|| Error::Store("empty request".into()))?;
-    let mut parts = request_line.split_whitespace();
-    let method = parts
-        .next()
-        .ok_or_else(|| Error::Store("no method".into()))?;
-    let path = parts.next().ok_or_else(|| Error::Store("no path".into()))?;
-    let path = path.split('?').next().unwrap_or(path);
-
-    let auth = header_value(head, "authorization").and_then(|v| {
-        // The scheme token is case-insensitive per RFC 9110 §11.1.
-        let (scheme, token) = v.split_once(' ')?;
-        scheme.eq_ignore_ascii_case("bearer").then(|| token.trim())
-    });
-    let idempotency = header_value(head, "x-idempotency-key");
-
-    Ok(HttpRequest {
-        method,
-        path,
-        body,
-        auth,
-        idempotency,
-    })
-}
-
-fn request_keep_alive(head: &str) -> bool {
-    if let Some(v) = header_value(head, "connection") {
-        if v.eq_ignore_ascii_case("close") {
-            return false;
-        }
-        if v.eq_ignore_ascii_case("keep-alive") {
-            return true;
+    fn control_identity(node_id: u64) -> crate::control::network::TlsIdentity {
+        let mut ca_params = CertificateParams::new(Vec::<String>::new()).unwrap();
+        ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        ca_params.key_usages = vec![
+            KeyUsagePurpose::DigitalSignature,
+            KeyUsagePurpose::KeyCertSign,
+        ];
+        let ca_key = KeyPair::generate().unwrap();
+        let ca = ca_params.self_signed(&ca_key).unwrap();
+        let mut node_params = CertificateParams::new(vec!["localhost".into()]).unwrap();
+        node_params.extended_key_usages = vec![
+            ExtendedKeyUsagePurpose::ServerAuth,
+            ExtendedKeyUsagePurpose::ClientAuth,
+        ];
+        let node_key = KeyPair::generate().unwrap();
+        let node = node_params.signed_by(&node_key, &ca, &ca_key).unwrap();
+        crate::control::network::TlsIdentity {
+            node_id,
+            certificate_chain_der: vec![node.der().to_vec()],
+            private_key_der: node_key.serialize_der(),
+            ca_certificate_der: ca.der().to_vec(),
+            server_name: "localhost".into(),
         }
     }
-    head.split("\r\n")
-        .next()
-        .map(|l| l.contains("HTTP/1.1"))
-        .unwrap_or(false)
-}
 
-fn write_json_conn(
-    stream: &mut TcpStream,
-    status: u16,
-    value: &Value,
-    keep_alive: bool,
-) -> Result<()> {
-    let body = serde_json::to_string(value).map_err(|e| Error::Serde(e.to_string()))?;
-    write_text_conn(stream, status, "application/json", &body, keep_alive)
-}
+    #[cfg(unix)]
+    fn bootstrap_file(dir: &std::path::Path, name: &str, secret: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
 
-fn write_json(stream: &mut TcpStream, status: u16, value: &Value) -> Result<()> {
-    write_json_conn(stream, status, value, false)
-}
+        let path = dir.join(name);
+        std::fs::write(&path, secret).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        path
+    }
 
-fn write_text_conn(
-    stream: &mut TcpStream,
-    status: u16,
-    content_type: &str,
-    body: &str,
-    keep_alive: bool,
-) -> Result<()> {
-    let status_text = match status {
-        200 => "OK",
-        401 => "Unauthorized",
-        403 => "Forbidden",
-        404 => "Not Found",
-        405 => "Method Not Allowed",
-        409 => "Conflict",
-        413 => "Payload Too Large",
-        429 => "Too Many Requests",
-        _ => "Error",
-    };
-    let retry = if status == 429 {
-        "Retry-After: 1\r\n"
-    } else {
-        ""
-    };
-    let conn = if keep_alive {
-        "Connection: keep-alive\r\n"
-    } else {
-        "Connection: close\r\n"
-    };
-    let response = format!(
-        "HTTP/1.1 {status} {status_text}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\n{conn}{retry}\r\n{body}",
-        body.len()
-    );
-    stream.write_all(response.as_bytes()).map_err(Error::Io)?;
-    stream.flush().map_err(Error::Io)?;
-    Ok(())
+    #[test]
+    fn distributed_write_checks_applied_primary_before_entering_brain_closure() {
+        let dir = tempfile::tempdir().unwrap();
+        let server = BrainServer::open(dir.path().join("brain.flct")).unwrap();
+        let tenant_uuid = uuid::Uuid::from_u128(123);
+        let mut state = ControlState::default();
+        state.placements.insert(
+            "default".into(),
+            Placement {
+                tenant_uuid,
+                generation: 4,
+                primary: Some(2),
+                members: BTreeSet::from([1, 2]),
+                draining: BTreeSet::new(),
+                durable_watermarks: BTreeMap::from([(1, 0), (2, 0)]),
+                committed_watermark: 0,
+                durability: DurabilityPolicy::Quorum,
+            },
+        );
+        let server = server.with_applied_control_state(1, state);
+        let entered = AtomicBool::new(false);
+        let error = server
+            .with_brain_write("default", |_| {
+                entered.store(true, Ordering::SeqCst);
+                Ok(())
+            })
+            .unwrap_err();
+        assert!(!entered.load(Ordering::SeqCst));
+        assert!(error.to_string().contains("not primary"), "{error}");
+        assert_eq!(server.primary_route("default").unwrap().0, 2);
+        server
+            .with_brain_read_consistent(
+                "default",
+                crate::placement::ReadConsistency::BoundedStale {
+                    minimum_watermark: 0,
+                    maximum_age: Duration::from_secs(5),
+                },
+                |_| Ok(()),
+            )
+            .unwrap();
+        assert!(server
+            .with_brain_read_consistent(
+                "default",
+                crate::placement::ReadConsistency::Primary,
+                |_| Ok(()),
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("read consistency"));
+    }
+
+    #[test]
+    fn distributed_server_accepts_a_live_control_node_source() {
+        fn accepts(
+            _method: fn(
+                BrainServer,
+                Arc<crate::control::service::ControlNode>,
+            ) -> Result<BrainServer>,
+        ) {
+        }
+        accepts(BrainServer::with_control_node);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn local_or_environment_key_is_rejected_when_control_node_is_attached() {
+        use crate::control::service::{
+            BootstrapMode, ControlNodeConfig, DistributedProductionConfig, PlatformBootstrapSource,
+        };
+
+        let env =
+            crate::test_env::EnvGuard::acquire(&["FLUCTLIGHT_API_KEYS", "FLUCTLIGHT_REQUIRE_AUTH"]);
+        env.set("FLUCTLIGHT_API_KEYS", "default:local-only:admin");
+        env.set("FLUCTLIGHT_REQUIRE_AUTH", "true");
+        let dir = tempfile::tempdir().unwrap();
+        let standalone = BrainServer::open(dir.path().join("standalone")).unwrap();
+        assert!(standalone
+            .authorize_request_context(Some("local-only"), None)
+            .await
+            .unwrap()
+            .is_some());
+
+        let distributed = BrainServer::open(dir.path().join("distributed"))
+            .unwrap()
+            .attach_distributed_control(DistributedProductionConfig {
+                node: ControlNodeConfig {
+                    node_id: 17,
+                    bind_addr: "127.0.0.1:0".into(),
+                    data_dir: dir.path().join("control"),
+                    cluster_pepper: vec![17; 32],
+                    tls_identity: control_identity(17),
+                    cluster_name: "distributed-auth-source-test".into(),
+                },
+                bootstrap: BootstrapMode::Single,
+                platform_bootstrap: Some(PlatformBootstrapSource::File(bootstrap_file(
+                    dir.path(),
+                    "auth-bootstrap",
+                    "control-platform-key",
+                ))),
+            })
+            .await
+            .unwrap();
+
+        assert!(distributed
+            .authorize_request_context(Some("local-only"), None)
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn automatic_distributed_startup_fails_closed_on_invalid_config() {
+        use crate::control::network::TlsIdentity;
+        use crate::control::service::{
+            BootstrapMode, ControlNodeConfig, DistributedProductionConfig,
+        };
+
+        let dir = tempfile::tempdir().unwrap();
+        let server = BrainServer::open(dir.path().join("brain.flct")).unwrap();
+        assert!(!server.control_ready());
+        let config = DistributedProductionConfig {
+            node: ControlNodeConfig {
+                node_id: 1,
+                bind_addr: "127.0.0.1:0".into(),
+                data_dir: dir.path().join("control"),
+                cluster_pepper: Vec::new(),
+                tls_identity: TlsIdentity {
+                    node_id: 1,
+                    certificate_chain_der: Vec::new(),
+                    private_key_der: Vec::new(),
+                    ca_certificate_der: Vec::new(),
+                    server_name: String::new(),
+                },
+                cluster_name: "phase-3".into(),
+            },
+            bootstrap: BootstrapMode::Single,
+            platform_bootstrap: None,
+        };
+
+        let error = match server.attach_distributed_control(config).await {
+            Ok(_) => panic!("invalid distributed config must not become ready"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("pepper"), "{error}");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn valid_config_automatically_starts_control_and_marks_ready() {
+        use crate::control::service::{
+            BootstrapMode, ControlNodeConfig, DistributedProductionConfig, PlatformBootstrapSource,
+        };
+
+        let dir = tempfile::tempdir().unwrap();
+        let server = BrainServer::open(dir.path().join("brain.flct")).unwrap();
+        let server = server
+            .attach_distributed_control(DistributedProductionConfig {
+                node: ControlNodeConfig {
+                    node_id: 9,
+                    bind_addr: "127.0.0.1:0".into(),
+                    data_dir: dir.path().join("control"),
+                    cluster_pepper: vec![9; 32],
+                    tls_identity: control_identity(9),
+                    cluster_name: "phase-3-startup".into(),
+                },
+                bootstrap: BootstrapMode::Single,
+                platform_bootstrap: Some(PlatformBootstrapSource::File(bootstrap_file(
+                    dir.path(),
+                    "valid-bootstrap",
+                    "valid-platform-key",
+                ))),
+            })
+            .await
+            .unwrap();
+
+        assert!(server.control_ready());
+        assert_eq!(server.control_node_id(), Some(9));
+    }
 }
