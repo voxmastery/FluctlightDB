@@ -11,6 +11,21 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Codec migration could permanently strand recall (release-blocking for legacy brains).**
+  `derive::drain` flipped `life.neuron_codec` to FLCT1 after *any* successful re-key batch
+  instead of after the queue emptied. Cues are derived under the recorded codec, so a partial
+  drain plus a checkpoint (a graceful shutdown checkpoints) persisted "current codec, no
+  drift" — the next load rebuilt no queue and every engram still keyed under the legacy codec
+  became silently unreachable. Reproduced on a 12,917-engram production copy under the 0.5.20
+  release binary: one write drained 4, restart, recall dropped from 5/5 hits to 0 (active
+  neurons 2800 → 22). The flip now waits for an empty queue, and an engram written while
+  migration is in flight is queued for re-key so the flip cannot strand it either.
+  **Do not migrate a pre-FLCT1 brain onto 0.5.20; use a build with this fix.** Regression
+  tests: `partial_drain_must_not_flip_codec_and_reload_requeues`,
+  `engram_written_mid_migration_is_not_stranded`.
+
 ---
 
 ## [0.5.20] - 2026-09-03
