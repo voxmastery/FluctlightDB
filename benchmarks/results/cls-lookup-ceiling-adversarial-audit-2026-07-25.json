@@ -1,0 +1,20 @@
+{
+  "name": "cls-lookup-ceiling-adversarial-audit",
+  "date": "2026-07-25",
+  "n": 50,
+  "distractors": 40,
+  "clean_lookup_topk_acc": 0.0,
+  "clean_oracle_all_acc": 1.0,
+  "clean_schema_acc": 1.0,
+  "noisy_lookup_topk_acc": 0.0,
+  "noisy_oracle_all_acc": 1.0,
+  "noisy_schema_acc": 1.0,
+  "noisy_both_supports_in_topk": 0.0,
+  "cf_schema_dark_retention_rate": 1.0,
+  "bridge_no_hallucination": true,
+  "beats_topk_lookup_clean": true,
+  "beats_topk_lookup_noisy": true,
+  "is_join_not_invention": true,
+  "interesting_ceiling_claim": true,
+  "strict_cf_schema_ok": true
+}

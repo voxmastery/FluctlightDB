@@ -164,7 +164,7 @@ fn manifesto_audit_checklist() {
         .experience(Episode::new("user prefers terse answers", "prefs", 0.7))
         .unwrap();
     let preplay = agent_brain.preplay("user preference", 2);
-    let verified = agent_brain.verified_context(3);
+    let _verified = agent_brain.verified_context(3);
     check!(
         "10. Agent infrastructure (preplay + verified_context)",
         preplay.path.len() <= 2 && !agent_brain.stage_report().stage.is_empty()

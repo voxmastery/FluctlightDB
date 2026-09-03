@@ -77,38 +77,47 @@ pub fn tenant_dir(base: &Path, tenant_id: &str) -> PathBuf {
 /// Ensure resolved path stays under `base/tenants` (after canonicalize when possible).
 pub fn assert_locus_contained(base: &Path, dir: &Path) -> Result<(), String> {
     let tenants_root = base.join("tenants");
-    let root = std::fs::canonicalize(&tenants_root).unwrap_or(tenants_root);
-    let candidate = if dir.exists() {
-        std::fs::canonicalize(dir).map_err(|e| e.to_string())?
+    let root_exists = tenants_root.exists();
+    let root = if root_exists {
+        std::fs::canonicalize(&tenants_root).map_err(|e| e.to_string())?
     } else {
-        // Parent may exist; compare lexicographic prefix on cleaned paths.
-        let cleaned = dir.components().collect::<PathBuf>();
-        cleaned
+        tenants_root.clone()
     };
-    if !candidate.starts_with(&root) {
-        // Allow not-yet-created hashed dir directly under tenants_root.
-        let parent_ok = dir
-            .parent()
-            .map(|p| {
-                let p_can = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
-                p_can == root || p_can.starts_with(&root)
-            })
-            .unwrap_or(false);
-        if !parent_ok && !dir.starts_with(&root) {
-            return Err(format!(
-                "tenant locus escapes tenants root: {} (root={})",
-                dir.display(),
-                root.display()
-            ));
-        }
+    let contained = if dir.exists() {
+        std::fs::canonicalize(dir)
+            .map_err(|e| e.to_string())?
+            .starts_with(&root)
+    } else if !root_exists {
+        dir.parent() == Some(tenants_root.as_path())
+    } else {
+        dir.parent()
+            .and_then(|p| std::fs::canonicalize(p).ok())
+            .map(|p| p == root || p.starts_with(&root))
+            .unwrap_or(false)
+    };
+    if !contained {
+        return Err(format!(
+            "tenant locus escapes tenants root: {} (root={})",
+            dir.display(),
+            root.display()
+        ));
     }
     Ok(())
 }
 
 impl TenantConfig {
+    pub fn try_default_for(tenant_id: &str, base: &Path) -> Result<Self, String> {
+        let root = tenant_dir(base, tenant_id);
+        assert_locus_contained(base, &root)?;
+        Ok(Self::default_for_root(tenant_id, root))
+    }
+
     pub fn default_for(tenant_id: &str, base: &Path) -> Self {
         let root = tenant_dir(base, tenant_id);
-        let _ = assert_locus_contained(base, &root);
+        Self::default_for_root(tenant_id, root)
+    }
+
+    fn default_for_root(tenant_id: &str, root: PathBuf) -> Self {
         let brain_path =
             if crate::storage::format_from_env() == crate::storage::StorageFormat::V4Dir {
                 root.join("brain")
@@ -155,6 +164,11 @@ impl TenantConfig {
     pub fn ensure_dirs(&self) -> std::io::Result<()> {
         if let Some(parent) = self.brain_path.parent() {
             std::fs::create_dir_all(parent)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))?;
+            }
         }
         Ok(())
     }
@@ -204,6 +218,30 @@ mod tests {
     }
 
     #[test]
+    fn checked_tenant_config_supports_new_base_directory() {
+        let dir = tempdir().unwrap();
+        let base = dir.path().join("new-root");
+        let cfg = TenantConfig::try_default_for("agent_a", &base).unwrap();
+        assert!(cfg.brain_path.starts_with(base.join("tenants")));
+    }
+
+    #[test]
+    fn production_paths_do_not_use_unchecked_tenant_config() {
+        for (name, source) in [
+            ("serve.rs", include_str!("serve.rs")),
+            (
+                "fluctlight-cli/src/main.rs",
+                include_str!("../../fluctlight-cli/src/main.rs"),
+            ),
+        ] {
+            assert!(
+                !source.contains("TenantConfig::default_for"),
+                "{name} still bypasses tenant containment errors"
+            );
+        }
+    }
+
+    #[test]
     fn unsafe_tenant_id_never_joins_raw_path_segment() {
         let dir = tempdir().unwrap();
         let evil = "../PWNED";
@@ -211,6 +249,21 @@ mod tests {
         let s = cfg.brain_path.to_string_lossy();
         assert!(!s.contains("PWNED"), "{s}");
         assert!(s.contains(&locus_slug(evil)), "{s}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tenant_config_rejects_hashed_locus_symlink_escape() {
+        use std::os::unix::fs::symlink;
+
+        let base = tempdir().unwrap();
+        let outside = tempdir().unwrap();
+        let tenants = base.path().join("tenants");
+        std::fs::create_dir_all(&tenants).unwrap();
+        symlink(outside.path(), tenants.join(locus_slug("escaped-tenant"))).unwrap();
+
+        let err = TenantConfig::try_default_for("escaped-tenant", base.path()).unwrap_err();
+        assert!(err.contains("escapes tenants root"), "{err}");
     }
 
     #[test]
@@ -226,7 +279,10 @@ mod tests {
         let cfg = TenantConfig::default_for("tier_a", dir.path());
         assert_eq!(cfg.max_engrams, 42);
         assert_eq!(cfg.max_synapses, 1000);
-        assert!(cfg.brain_path.starts_with(&legacy) || cfg.brain_path.parent() == Some(legacy.as_path()));
+        assert!(
+            cfg.brain_path.starts_with(&legacy)
+                || cfg.brain_path.parent() == Some(legacy.as_path())
+        );
     }
 
     #[test]
@@ -235,5 +291,21 @@ mod tests {
         assert!(!is_safe_legacy_tenant_id("../x"));
         assert!(!is_safe_legacy_tenant_id("a/b"));
         assert!(!is_safe_legacy_tenant_id("C:\\foo"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn tenant_directories_are_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempdir().unwrap();
+        let cfg = TenantConfig::try_default_for("private", dir.path()).unwrap();
+        cfg.ensure_dirs().unwrap();
+        let mode = std::fs::metadata(cfg.brain_path.parent().unwrap())
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o700);
     }
 }

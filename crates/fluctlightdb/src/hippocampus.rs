@@ -121,10 +121,8 @@ impl Hippocampus {
             let jaccard = intersection / union;
             // Scale by recurrent gain: low ACh amplifies the completion pull.
             let score = jaccard * (0.3 + 0.7 * ca3_recurrent_gain);
-            if score > overlap_threshold {
-                if best.map_or(true, |(_, bs)| score > bs) {
-                    best = Some((engram, score));
-                }
+            if score > overlap_threshold && best.is_none_or(|(_, bs)| score > bs) {
+                best = Some((engram, score));
             }
         }
         best.map(|(e, _)| e)

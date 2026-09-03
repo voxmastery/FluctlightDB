@@ -93,6 +93,10 @@ def expand_queries(question: str, question_type: Optional[str] = None) -> list[s
     ]
     if tokens:
         queries.append(" ".join(tokens))
+    # HONEST MODE: only generic (query + keyword) expansion — no dataset-specific
+    # answer-content bridges (those overfit to LongMemEval-S and inflate recall).
+    if os.environ.get("LONGMEMEVAL_NO_BRIDGES"):
+        return queries
     ql = q.lower()
     if any(
         w in ql

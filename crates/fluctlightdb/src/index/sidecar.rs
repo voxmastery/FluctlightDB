@@ -128,11 +128,9 @@ impl SidecarIndex {
             Ok(id)
         })?;
         let mut out = Vec::new();
-        for row in rows {
-            if let Ok(id_str) = row {
-                if let Ok(id) = Uuid::parse_str(&id_str) {
-                    out.push(id);
-                }
+        for id_str in rows.flatten() {
+            if let Ok(id) = Uuid::parse_str(&id_str) {
+                out.push(id);
             }
         }
         Ok(out)
@@ -146,7 +144,7 @@ impl SidecarIndex {
         if h.is_empty() {
             return Ok(Vec::new());
         }
-        let ef = limit.max(50).min(256);
+        let ef = limit.clamp(50, 256);
         let results = h.search(cue_vector, limit, ef);
         let mut out = Vec::new();
         for r in results {

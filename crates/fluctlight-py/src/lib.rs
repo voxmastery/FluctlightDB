@@ -228,6 +228,22 @@ impl PyBrain {
         json_val_to_py(py, &self.inner.status())
     }
 
+    /// Agent-lane only: budgeted prompt pack (does not change activate ranking).
+    #[pyo3(signature = (cue,))]
+    fn activate_for_agent_prompt(&mut self, py: Python<'_>, cue: &str) -> PyResult<Py<PyAny>> {
+        json_val_to_py(py, &self.inner.activate_for_agent_prompt(cue))
+    }
+
+    /// Boot continuity without transcript paste (agent-lane).
+    #[pyo3(signature = (cue=None))]
+    fn session_boot_context(
+        &mut self,
+        py: Python<'_>,
+        cue: Option<&str>,
+    ) -> PyResult<Py<PyAny>> {
+        json_val_to_py(py, &self.inner.session_boot_context(cue))
+    }
+
     fn stage_report(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         json_val_to_py(py, &self.inner.stage_report())
     }
@@ -721,11 +737,10 @@ impl PyBrain {
     }
 
     #[staticmethod]
-    fn replicate_sync(primary: &str, replica: &str, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let status =
-            fluctlightdb::sync_once(std::path::Path::new(primary), std::path::Path::new(replica))
-                .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-        json_val_to_py(py, &status)
+    fn replicate_sync(_primary: &str, _replica: &str, _py: Python<'_>) -> PyResult<Py<PyAny>> {
+        Err(PyRuntimeError::new_err(
+            "filesystem-copy replication is quarantined; use distributed mTLS tenant replication",
+        ))
     }
 
     fn tau_crystallize_shard(&mut self, shard_id: &str) -> PyResult<String> {

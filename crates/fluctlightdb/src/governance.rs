@@ -148,6 +148,7 @@ impl FluctlightBrain {
 
     /// Scrub PII patterns from engram content and WM slots.
     pub fn scrub_pii(&mut self) -> Result<PiiScrubReport> {
+        self.reject_distributed_mutation("FluctlightBrain::scrub_pii")?;
         let mut report = PiiScrubReport::default();
         for e in &mut self.hippocampus.engrams {
             let scrubbed = scrub_pii(&e.episode.content);
@@ -177,6 +178,7 @@ impl FluctlightBrain {
 
     /// GDPR-style delete: remove engrams matching agent_id, context prefix, or content needle.
     pub fn delete_by_subject(&mut self, subject: &str) -> Result<DeleteBySubjectReport> {
+        self.reject_distributed_mutation("FluctlightBrain::delete_by_subject")?;
         let needle = subject.trim().to_lowercase();
         if needle.is_empty() {
             return Ok(DeleteBySubjectReport::default());
@@ -221,6 +223,7 @@ impl FluctlightBrain {
 
     /// Delete all non-core engrams for a tenant/agent id.
     pub fn delete_by_agent_id(&mut self, agent_id: &str) -> Result<u32> {
+        self.reject_distributed_mutation("FluctlightBrain::delete_by_agent_id")?;
         let needle = agent_id.trim().to_lowercase();
         let ids: Vec<Uuid> = self
             .hippocampus
@@ -252,6 +255,7 @@ impl FluctlightBrain {
 
     /// Forget engrams encoded before `tick` (non-core).
     pub fn forget_before_tick(&mut self, tick: u64) -> Result<u32> {
+        self.reject_distributed_mutation("FluctlightBrain::forget_before_tick")?;
         let n = forget_before(self, tick) as u32;
         self.audit("forget_before", format!("tick={tick}"), n);
         Ok(n)

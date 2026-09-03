@@ -169,6 +169,7 @@ impl RecallFabric {
         }
     }
 
+    #[allow(dead_code)]
     fn score_mem_at(&self, i: usize, ctx: &FabricCueCtx) -> f32 {
         let m = &self.mems[i];
         let lexical = jaccard(&ctx.cue_tokens, &m.tokens);
@@ -230,6 +231,7 @@ impl RecallFabric {
     }
 
     /// Score a pre-filtered id list with one cue encode (full fabric signals).
+    #[allow(dead_code)]
     pub(crate) fn score_shortlist(
         &self,
         ids: &[&str],

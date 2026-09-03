@@ -148,7 +148,9 @@ pub use recall_router::{RecallMode, TemporalFilter, UnifiedRecallHit, UnifiedRec
 pub use relation::{extract_relations, Relation};
 pub use replicate::open_replica_brain;
 pub use retention_policy::{RetentionPolicy, RetentionReport, RetentionState};
-pub use schema::{Schema, SchemaAwareActivation, SchemaStatus, SchemaStore};
+pub use schema::{
+    compose_schemas_for_cue, Schema, SchemaAwareActivation, SchemaStatus, SchemaStore,
+};
 pub use semantic::{SemanticField, DEFAULT_SEMANTIC_DIM};
 pub use separation_gate::SeparationGateResult;
 pub use serve::request_shutdown;

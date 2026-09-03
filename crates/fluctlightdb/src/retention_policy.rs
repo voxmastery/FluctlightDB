@@ -47,7 +47,7 @@ impl Default for RetentionPolicy {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct RetentionState {
     pub policy: RetentionPolicy,
     pub engram_ticks: HashMap<Uuid, u64>,
@@ -88,15 +88,6 @@ impl RetentionState {
             .unwrap_or(now_tick);
         let age_ticks = now_tick.saturating_sub(encoded);
         age_ticks > days as u64 * self.policy.ticks_per_day
-    }
-}
-
-impl Default for RetentionState {
-    fn default() -> Self {
-        Self {
-            policy: RetentionPolicy::default(),
-            engram_ticks: HashMap::new(),
-        }
     }
 }
 

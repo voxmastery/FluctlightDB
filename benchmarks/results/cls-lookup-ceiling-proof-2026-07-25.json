@@ -1,0 +1,15 @@
+{
+  "name": "cls-dual-hemisphere-lookup-ceiling",
+  "date": "2026-07-25",
+  "recombination_n": 50,
+  "lookup_accuracy": 0.0,
+  "schema_accuracy": 1.0,
+  "recombination_schema_floor": 0.8,
+  "recombination_margin": 0.1,
+  "recombination_passed": true,
+  "cf_cases": 20,
+  "cf_epsilon": 0.05,
+  "cf_mean_drop": 0.0,
+  "cf_passed": true,
+  "overall_passed": true
+}

@@ -17,7 +17,6 @@ use std::time::Duration;
 
 use fluctlightdb::brain::FluctlightBrain;
 use fluctlightdb::manifest::save_v4_dir;
-use fluctlightdb::replicate::{open_replica_brain, sync_once};
 use fluctlightdb::store::verify_path;
 use fluctlightdb::types::Episode;
 use fluctlightdb::wal::{self, WalEntry};
@@ -43,6 +42,7 @@ fn wal_append(path: &Path, seq: u64, content: &str) {
         seq,
         &WalEntry::Experience {
             episode: episode(content),
+            assigned_engram_id: None,
         },
     )
     .expect("wal append");
@@ -68,23 +68,22 @@ fn assert_brain_ok(path: &Path) {
 fn chaos_property_rounds_checkpoint_wal_tear_and_reopen() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("roundtrip.flct");
+    let mut next_seq = 1u64;
 
     for round in 0..8 {
         let mut brain = FluctlightBrain::open(&path).unwrap();
         brain
             .experience(episode(&format!("round {round} alpha")))
             .unwrap();
+        next_seq += 1;
         if round % 2 == 0 {
             brain.checkpoint().unwrap();
         }
         drop(brain);
 
         if round % 3 == 0 {
-            wal_append(
-                &path,
-                round as u64 + 100,
-                &format!("round {round} wal-only"),
-            );
+            wal_append(&path, next_seq, &format!("round {round} wal-only"));
+            next_seq += 1;
         }
         if round % 4 == 0 {
             tear_wal_tail(&path);
@@ -92,7 +91,7 @@ fn chaos_property_rounds_checkpoint_wal_tear_and_reopen() {
 
         let loaded = FluctlightBrain::open(&path).unwrap();
         assert!(
-            loaded.hippocampus.engrams.len() >= 1,
+            !loaded.hippocampus.engrams.is_empty(),
             "round {round}: expected recoverable engrams"
         );
         assert_brain_ok(&path);
@@ -101,25 +100,39 @@ fn chaos_property_rounds_checkpoint_wal_tear_and_reopen() {
 
 #[test]
 fn chaos_replicate_primary_with_torn_wal_replica_still_loads() {
+    use fluctlightdb::placement::DurabilityPolicy;
+    use fluctlightdb::replicate::{open_replica_brain, CheckpointTransfer, ReplicaStore};
+    use fluctlightdb::wal::WalIdentity;
+
     let dir = tempdir().unwrap();
     let primary = dir.path().join("primary");
     let replica = dir.path().join("replica");
+    let identity = WalIdentity {
+        tenant_uuid: uuid::Uuid::from_u128(91),
+        writer_epoch: 1,
+        fence_generation: 1,
+        durability: DurabilityPolicy::Local,
+    };
 
     let mut brain = FluctlightBrain::new();
+    brain.set_wal_identity(Some(identity));
     brain.experience(episode("replicate baseline")).unwrap();
     save_v4_dir(&brain, &primary).unwrap();
     drop(brain);
 
+    // Torn WAL on the primary must not poison a verified checkpoint install.
     wal_append(&primary, 1, "post-snapshot wal line");
     tear_wal_tail(&primary);
 
-    let status = sync_once(&primary, &replica).expect("sync_once");
-    assert!(status.wal_segments >= 1, "expected WAL segments copied");
+    let transfer = CheckpointTransfer::from_active(&primary, identity).unwrap();
+    ReplicaStore::new(&replica, identity)
+        .install_checkpoint(transfer)
+        .expect("verified checkpoint install");
 
     let loaded = open_replica_brain(&replica).expect("replica open");
     assert!(
-        loaded.hippocampus.engrams.len() >= 1,
-        "replica should load after primary WAL tear"
+        !loaded.hippocampus.engrams.is_empty(),
+        "replica should load from verified checkpoint despite primary WAL tear"
     );
 }
 
@@ -188,7 +201,7 @@ fn chaos_subprocess_sigkill_mid_write() {
 
     let loaded = FluctlightBrain::open(&path).expect("reopen after kill");
     assert!(
-        loaded.hippocampus.engrams.len() >= 1,
+        !loaded.hippocampus.engrams.is_empty(),
         "expected at least one recovered engram after SIGKILL"
     );
     assert_brain_ok(&path);

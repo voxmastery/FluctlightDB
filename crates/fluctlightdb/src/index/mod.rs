@@ -38,6 +38,7 @@ fn semantic_seed_limit(cap: usize) -> usize {
         .unwrap_or_else(|| SEMANTIC_SEED_LIMIT.max(cap).min(512))
 }
 
+#[allow(clippy::large_enum_variant)]
 enum IndexBackend {
     Sidecar(SidecarIndex),
     Memory(Mutex<LexicalIndex>),
@@ -202,7 +203,7 @@ impl RecallIndex {
     ) -> Result<Vec<Uuid>> {
         // Callers may exceed DEFAULT_CANDIDATE_CAP (e.g. k=150 bench runs), but an
         // unbounded cap lets one recall allocate the whole store; hard-limit it.
-        let cap = cap.max(1).min(MAX_CANDIDATE_CAP);
+        let cap = cap.clamp(1, MAX_CANDIDATE_CAP);
         let lex_limit = lexical_seed_limit(cap);
         let sem_limit = semantic_seed_limit(cap);
 

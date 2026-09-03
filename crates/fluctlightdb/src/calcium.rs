@@ -424,8 +424,10 @@ mod tests {
 
     #[test]
     fn calcium_decays_to_zero_without_spikes() {
-        let mut spine = CalciumSpine::default();
-        spine.ca = 0.8; // start elevated
+        let mut spine = CalciumSpine {
+            ca: 0.8,
+            ..CalciumSpine::default()
+        };
         let mut w = 0.5_f32;
         for _ in 0..1000 {
             spine.tick(&mut w, 0.1);

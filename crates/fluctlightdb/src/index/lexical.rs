@@ -66,7 +66,7 @@ impl LexicalIndex {
             }
         }
         let mut ranked: Vec<(Uuid, usize)> = scores.into_iter().collect();
-        ranked.sort_by(|a, b| b.1.cmp(&a.1));
+        ranked.sort_by_key(|item| std::cmp::Reverse(item.1));
         Ok(ranked.into_iter().take(limit).map(|(id, _)| id).collect())
     }
 }

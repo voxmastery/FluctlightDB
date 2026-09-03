@@ -26,6 +26,8 @@ These are the APIs agent developers should pin to. Breaking changes require a **
 | **Recall Fabric** | `FLUCTLIGHT_FABRIC=1`, lattice, phase_parse, chronos | Opt-in env flag; off by default |
 | **Governance / snapshot** | `brain_snapshot`, `governance`, `retention_policy`, `wm_ring` | New in 0.5.x; API may evolve |
 | **Auth / multi-tenant** | `auth.rs`, `tenant.rs`, `auth_store.rs` | **Adversarial tests in CI** (`tests/auth_tenant.rs`, `tests/serve_integration.rs`); **not** third-party audited for production multi-tenant |
+| **Distributed control** | Cargo feature `distributed` (OpenRaft, placement, quorum replication) | Opt-in; Phase 5 readiness remains fail-closed without ops evidence |
+| **CORTEX simulation** | Cargo feature `cortex-sim`, doctrine in `docs/superpowers/specs/2026-07-22-cortex-extreme-production-doctrine.md` | Deterministic fencing/failover oracles — **not** a production readiness claim |
 | **Benchmark harnesses** | `benchmarks/*.py`, frozen JSON filenames | Metrics are frozen claims; harness flags change |
 
 ## Version alignment

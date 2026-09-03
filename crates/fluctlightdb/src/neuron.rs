@@ -244,8 +244,10 @@ mod tests {
 
     #[test]
     fn membrane_decays_to_rest_without_input() {
-        let mut n = LIFNeuron::default();
-        n.v = -60.0; // depolarised above rest
+        let mut n = LIFNeuron {
+            v: -60.0,
+            ..LIFNeuron::default()
+        };
         for _ in 0..200 {
             n.decay(1.0);
         }

@@ -22,7 +22,7 @@ pub struct CompactReport {
     pub semantic_centroids: usize,
 }
 
-pub fn compact_brain(brain: &mut FluctlightBrain) -> CompactReport {
+pub(crate) fn compact_brain(brain: &mut FluctlightBrain) -> CompactReport {
     let life_id = brain.life.life_id;
     let threshold = brain.development.stage.prune_threshold();
 
@@ -189,6 +189,10 @@ fn dedupe_synapses(graph: &mut BrainGraph) -> u32 {
             true
         }
     });
+    // retain() shifts every position after the first removal, so both the (from,to) map and the
+    // adjacency lists point at the wrong synapses until they are rebuilt. This was already stale
+    // for synapse_index before adjacency existed.
+    graph.rebuild_index();
     deduped
 }
 
