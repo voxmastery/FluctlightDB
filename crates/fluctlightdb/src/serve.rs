@@ -124,6 +124,24 @@ fn max_hot_tenants() -> usize {
         .max(16)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ServerMode {
+    Production,
+    Development,
+    Invalid,
+}
+
+impl ServerMode {
+    fn from_env() -> Self {
+        match std::env::var("FLUCTLIGHT_SERVER_MODE").as_deref() {
+            Ok(value) if value.eq_ignore_ascii_case("development") => Self::Development,
+            Ok(value) if value.eq_ignore_ascii_case("production") => Self::Production,
+            Ok(_) => Self::Invalid,
+            Err(_) => Self::Production,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct BrainServer {
     pool: Arc<RwLock<BrainPool>>,
@@ -132,6 +150,7 @@ pub struct BrainServer {
     metrics: Arc<Metrics>,
     idempotency: Arc<RwLock<HashSet<String>>>,
     read_only: bool,
+    mode: ServerMode,
 }
 
 struct TenantSlot {
@@ -180,6 +199,7 @@ impl BrainServer {
             metrics,
             idempotency: Arc::new(RwLock::new(HashSet::new())),
             read_only: false,
+            mode: ServerMode::from_env(),
         })
     }
 
@@ -241,7 +261,7 @@ impl BrainServer {
         let cfg = if tenant_id == pool.default_tenant {
             TenantConfig::with_brain_path(tenant_id, &pool.tenant_root, self.default_path.clone())
         } else {
-            TenantConfig::default_for(tenant_id, &pool.tenant_root)
+            TenantConfig::try_default_for(tenant_id, &pool.tenant_root).map_err(Error::Store)?
         };
         // Reuse an already-open brain for the same path (auth tenant id may differ
         // from the slot key used at serve startup). Never open the same path twice:
@@ -333,8 +353,28 @@ impl BrainServer {
         Ok(())
     }
 
+    pub fn validate_serve_config(&self, addr: &str) -> Result<()> {
+        #[cfg(feature = "distributed")]
+        if std::env::var("FLUCTLIGHT_DISTRIBUTED")
+            .is_ok_and(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        {
+            crate::control::service::ensure_production_ready().map_err(Error::Store)?;
+        }
+        if self.mode == ServerMode::Invalid {
+            return Err(Error::Store(
+                "FLUCTLIGHT_SERVER_MODE must be 'production' or 'development'".into(),
+            ));
+        }
+        if self.mode == ServerMode::Production && !self.auth.require_auth {
+            return Err(Error::Store(
+                "production mode requires authentication; set FLUCTLIGHT_REQUIRE_AUTH=true and configure the active authentication source".into(),
+            ));
+        }
+        enforce_bind_auth(addr, &self.auth)
+    }
+
     pub fn serve(&self, addr: &str) -> Result<()> {
-        enforce_bind_auth(addr, &self.auth)?;
+        self.validate_serve_config(addr)?;
         // SAFETY: POSIX signal handlers for graceful shutdown on SIGTERM/SIGINT.
         // Registers process-global handlers; no Rust invariants are violated beyond
         // setting an AtomicBool. Not exercised under Miri (Unix-only, signal API).
@@ -749,7 +789,7 @@ fn dispatch(
         "/api/v1/experience" | "/experience" => {
             require_writable(server)?;
             require_role(auth, Role::Write)?;
-            let cfg = tenant_config_for(server, tenant_id);
+            let cfg = tenant_config_for(server, tenant_id)?;
             let timer = Timer::start();
             let rag = rag_from_api(&api_body);
             let provenance = provenance_from_api(&api_body);
@@ -781,7 +821,7 @@ fn dispatch(
         "/api/v1/ingest-chunk" | "/ingest-chunk" => {
             require_writable(server)?;
             require_role(auth, Role::Write)?;
-            let cfg = tenant_config_for(server, tenant_id);
+            let cfg = tenant_config_for(server, tenant_id)?;
             let content = api_body
                 .content
                 .ok_or_else(|| Error::Store("missing content".into()))?;
@@ -1505,7 +1545,8 @@ fn dispatch(
                 .tenant_id
                 .clone()
                 .ok_or_else(|| Error::Store("missing tenant_id".into()))?;
-            let cfg = TenantConfig::default_for(&tid, &default_tenant_root());
+            let cfg =
+                TenantConfig::try_default_for(&tid, &default_tenant_root()).map_err(Error::Store)?;
             cfg.ensure_dirs().map_err(Error::Io)?;
             let _ = FluctlightBrain::open(&cfg.brain_path)?;
             let store =
@@ -1615,15 +1656,15 @@ fn provenance_from_api(api_body: &ApiRequest) -> Option<crate::types::Provenance
     })
 }
 
-fn tenant_config_for(server: &BrainServer, tenant_id: &str) -> TenantConfig {
+fn tenant_config_for(server: &BrainServer, tenant_id: &str) -> Result<TenantConfig> {
     if tenant_id == "default" {
-        TenantConfig::with_brain_path(
+        Ok(TenantConfig::with_brain_path(
             tenant_id,
             &default_tenant_root(),
             server.default_path.clone(),
-        )
+        ))
     } else {
-        TenantConfig::default_for(tenant_id, &default_tenant_root())
+        TenantConfig::try_default_for(tenant_id, &default_tenant_root()).map_err(Error::Store)
     }
 }
 
