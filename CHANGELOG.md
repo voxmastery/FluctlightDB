@@ -46,6 +46,23 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
   tonight by `FLUCTLIGHT_SLEEP_DOWNSCALE` (default 0.98), so never-reinforced edges decay
   through the prune threshold instead of saturating at the 1.0 clamp.
 
+### Serve: async rewrite (adopted from the deploy lineage)
+
+- The HTTP server is now axum/tower end to end: absolute request timeouts
+  (`FLUCTLIGHT_REQUEST_TIMEOUT_MS`, default 30s), load-shedding dispatch gate
+  (`FLUCTLIGHT_MAX_CONNECTIONS` permits, instant 503 instead of queueing), request ids on
+  every response, hyper's strict HTTP parsing (duplicate/conflicting framing headers are
+  rejected), byte-accurate body framing, `/live` + `/ready` endpoints, and graceful
+  shutdown that drains in-flight requests. The old hand-rolled blocking TCP loop is gone.
+- `FLUCTLIGHT_TENANT_ROOT` overrides the default tenant root (`$HOME/.fluctlight`) —
+  needed for test isolation and useful for ops.
+- **WAL torn-tail hardening.** A kill -9 mid-append leaves the active segment without a
+  trailing newline; the next `wal::append` used to write onto that line, merging the torn
+  bytes into the new record — a tolerated torn tail became unrecoverable interior
+  corruption on the following replay. Appends now write a separator first, and replay
+  truncates an unparseable torn tail from disk once it has been skipped. Found by the
+  jepsen chaos suite (`chaos_property_rounds_checkpoint_wal_tear_and_reopen`).
+
 ### Added
 
 - **Distributed control plane** behind the `distributed` Cargo feature: openraft-based
