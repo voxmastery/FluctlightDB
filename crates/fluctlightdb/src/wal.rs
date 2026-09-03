@@ -469,6 +469,19 @@ fn append_record(brain_path: &Path, record: WalRecord) -> Result<()> {
     }
     let line = serde_json::to_string(&record).map_err(|e| Error::Serde(e.to_string()))?;
     let mut file = open_append_private(&path)?;
+    // A crash can leave the active segment without a trailing newline (torn
+    // record). Never write onto that line: the merged bytes would corrupt the
+    // record written after the tear and fail the next replay.
+    if fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false) {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut tail = File::open(&path)?;
+        tail.seek(SeekFrom::End(-1))?;
+        let mut byte = [0u8; 1];
+        tail.read_exact(&mut byte)?;
+        if byte[0] != b'\n' {
+            writeln!(file)?;
+        }
+    }
     writeln!(file, "{line}")?;
     crate::wal_sync::append_and_sync(brain_path, &mut file, line.len() + 1)?;
     Ok(())
@@ -592,6 +605,7 @@ pub fn replay_with_corruption_skip(
     let segments = list_segments(brain_path);
     let final_segment = segments.len().saturating_sub(1);
     let mut lines: Vec<(String, bool)> = Vec::new();
+    let mut torn_repair: Option<(PathBuf, u64)> = None;
     for (segment_index, path) in segments.into_iter().enumerate() {
         let raw = fs::read_to_string(&path)?;
         let torn_tail = segment_index == final_segment && !raw.as_bytes().ends_with(b"\n");
@@ -602,6 +616,8 @@ pub fn replay_with_corruption_skip(
                 .map(|line| (line.to_owned(), false)),
         );
         if torn_tail && lines.len() > start {
+            let torn_len = lines.last().unwrap().0.len() as u64;
+            torn_repair = Some((path, raw.len() as u64 - torn_len));
             lines.last_mut().unwrap().1 = true;
         }
     }
@@ -611,6 +627,14 @@ pub fn replay_with_corruption_skip(
         let record: WalRecord = match serde_json::from_str(&line) {
             Ok(record) => record,
             Err(_error) if index == last && torn_tail => {
+                // Repair the tear on disk so a later append cannot merge a new
+                // record into the torn bytes (which would turn a tolerated torn
+                // tail into unrecoverable interior corruption).
+                if let Some((path, keep_len)) = torn_repair.take() {
+                    if let Ok(file) = fs::OpenOptions::new().write(true).open(&path) {
+                        let _ = file.set_len(keep_len);
+                    }
+                }
                 skipped += 1;
                 continue;
             }
