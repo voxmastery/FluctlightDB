@@ -11,6 +11,56 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+---
+
+## [0.5.20] - 2026-09-03
+
+> **Version note.** 0.5.11–0.5.19 were never published to PyPI or tagged. 0.5.14–0.5.18 were
+> local serve builds; 0.5.19 (and a staged 0.5.20 binary) were production deploy builds cut from
+> an out-of-tree lineage during the July serve outage, carrying fixes main did not have. This
+> release merges that lineage back into main and supersedes all of them.
+
+### Production serve fixes (July outage, ported from the 0.5.19 deploy lineage)
+
+- **CAB tenant self-lock.** An authed request could resolve its tenant to the same brain
+  directory the server already holds the exclusive flock on; `get_brain` re-opened it and
+  busy-spun against our own lock for up to 120s — while holding the pool write lock, wedging
+  every tenant. `get_brain` now reuses the already-open brain for the same path.
+- **`refresh_if_stale` no longer re-opens on mtime drift.** Serve holds the exclusive store
+  lock, so in-memory state is authoritative; the re-open self-deadlocked the pool the same way.
+- **Legacy Cortex segment reader** (`legacy_cortex`). Brains checkpointed before the
+  schemas/eligibility fields hit a bincode EOF and refused to load; the fallback mirrors
+  `legacy_hippocampus`: current layout first, then pre-schemas, then facts-only.
+- **Hot-path compaction is rate-limited** (default 1 per 600s; `FLUCTLIGHT_HOTPATH_COMPACT=0`
+  disables). `experience()` previously ran a full compact whenever synapse pressure ≥ 0.7,
+  which on a degraded graph held the write lock for minutes per write.
+
+### Graph scalability (from the production 64.8M-synapse post-mortem)
+
+- **Local plasticity.** `co_activate` and `stdp_sequential` walk indexed adjacency —
+  O(active edges) instead of sweeping every synapse.
+- **Synaptic competition.** Per-neuron out-degree cap (`FLUCTLIGHT_MAX_OUT_DEGREE`, default
+  256) with weakest-sibling eviction; total synapses are bounded at neurons × cap by
+  construction, so the production graph explosion cannot recur.
+- **Sleep homeostatic downscaling** (SHY). Each sleep multiplies every synapse not replayed
+  tonight by `FLUCTLIGHT_SLEEP_DOWNSCALE` (default 0.98), so never-reinforced edges decay
+  through the prune threshold instead of saturating at the 1.0 clamp.
+
+### Added
+
+- **Distributed control plane** behind the `distributed` Cargo feature: openraft-based
+  control service, placement, quorum replication, linearizability checker; three-node
+  cluster, placement-routing and tenant-replication test suites. Experimental — see
+  `docs/STABILITY.md`.
+- **cortex-sim** deterministic simulation runtime (clock/fs/net/rng) behind the
+  `cortex-sim` feature, plus checkpoint fault-injection and async-serve-boundary tests.
+- **CLS lookup-ceiling proofs** (held-out slot composition, adversarial audit) with frozen
+  benchmark JSONs; BM25 and LongMemEval preference baselines.
+- Maintenance binaries: `graphprune` (histogram / prune-below / top-N), `segprobe`,
+  `stageprobe`.
+- `docs/THREAT_MODEL.md`, phase-5 production runbook, release/load gates, rerank-server
+  sidecar.
+
 ### Fixed
 
 - **`semantic_top_k` returned the k *worst* candidates.** `BinaryHeap` is a max-heap, so `peek()` yields the largest element; the eviction branch bound it as `min` and popped it, discarding the best candidate on every improvement. Survivors were then sorted by `id.to_string()`, throwing away the ranking. `hybrid_candidates` compounded it by truncating a `HashSet` in hash order — and with seed limits reaching 512 against a cap of 128, that overflow is the normal case. Candidate selection is now rank-ordered end to end. Affects the in-memory index backend (path-less brains); the SQLite sidecar path uses HNSW and was unaffected.

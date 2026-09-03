@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fluctlightdb"
-version = "0.5.10"
+version = "0.5.20"
 description = "Embedded memory engine for AI agents — third data model (experience/activate), provenance, benchmarks. Goal: SQLite for agent memory."
 readme = "README.md"
 requires-python = ">=3.9"
