@@ -3,7 +3,7 @@ members = ["crates/fluctlightdb", "crates/fluctlight-cli", "crates/fluctlight-py
 resolver = "2"
 
 [workspace.package]
-version = "0.5.20"
+version = "0.5.21"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Ganesh S"]
