@@ -5,4 +5,5 @@
 ignore = [
   "RUSTSEC-2025-0141", # bincode 1.x is the on-disk engram wire format; bincode 2 is a breaking storage change
   "RUSTSEC-2026-0186", # transitive via fast-hnsw/memmap2 0.9.10 until upstream fix; mmap paths covered by Miri CI
+  "RUSTSEC-2026-0235", # rkyv 0.7 via openraft(=0.9.24, distributed feature, off by default)->byte-unit->rust_decimal; rkyv archives are never parsed anywhere in this codebase
 ]
