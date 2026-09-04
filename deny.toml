@@ -10,6 +10,7 @@ db-urls = ["https://github.com/RustSec/advisory-db"]
 ignore = [
   { id = "RUSTSEC-2025-0141", reason = "bincode 1.x is the on-disk engram wire format; migration to bincode 2 is a breaking storage change tracked in SECURITY.md" },
   { id = "RUSTSEC-2026-0186", reason = "transitive via fast-hnsw/memmap2 0.9.10 until upstream fix — mmap paths in Miri CI" },
+  { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7 via openraft(=0.9.24, distributed feature, off by default) -> byte-unit -> rust_decimal; rkyv archive deserialization is never used in this codebase" },
 ]
 unmaintained = "all"
 unsound = "all"
