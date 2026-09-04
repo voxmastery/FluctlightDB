@@ -671,24 +671,23 @@ mod tests {
         let path = dir.path().join("swarm.flct");
         let mut brain = FluctlightBrain::open(&path).unwrap();
         let swarm_id = uuid::Uuid::new_v4();
-        let result = brain
-            .apply_swarm_transaction(SwarmTransaction::Begin(BeginSwarm {
-                transaction_id: uuid::Uuid::new_v4(),
-                swarm_id,
-                project_id: "fluctlight".into(),
-                objective_digest: "sha256:objective".into(),
-                repository_identity: "repo".into(),
-                base_commit: "abc123".into(),
-                policy_version: "v1".into(),
-                roster: vec![WorkerSlot {
-                    slot_id: "slot-a".into(),
-                    role: "worker".into(),
-                    agent_id: None,
-                    worktree: None,
-                    status: WorkerStatus::Declared,
-                }],
-                allocations: std::collections::HashMap::new(),
-            }));
+        let result = brain.apply_swarm_transaction(SwarmTransaction::Begin(BeginSwarm {
+            transaction_id: uuid::Uuid::new_v4(),
+            swarm_id,
+            project_id: "fluctlight".into(),
+            objective_digest: "sha256:objective".into(),
+            repository_identity: "repo".into(),
+            base_commit: "abc123".into(),
+            policy_version: "v1".into(),
+            roster: vec![WorkerSlot {
+                slot_id: "slot-a".into(),
+                role: "worker".into(),
+                agent_id: None,
+                worktree: None,
+                status: WorkerStatus::Declared,
+            }],
+            allocations: std::collections::HashMap::new(),
+        }));
 
         assert!(result.is_err());
         assert!(brain.swarm.runs.is_empty());

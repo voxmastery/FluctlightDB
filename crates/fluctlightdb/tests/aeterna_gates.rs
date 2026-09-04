@@ -56,7 +56,11 @@ fn session_boot_after_reopen_has_continuity() {
     assert!(!boot.prompt_block.is_empty());
     assert!(
         boot.core_snippets.iter().any(|c| c.contains("agent"))
-            || boot.lines.iter().any(|l| l.gist.contains("dark") || l.full_content.as_ref().map(|c| c.contains("dark")).unwrap_or(false))
+            || boot.lines.iter().any(|l| l.gist.contains("dark")
+                || l.full_content
+                    .as_ref()
+                    .map(|c| c.contains("dark"))
+                    .unwrap_or(false))
     );
 }
 

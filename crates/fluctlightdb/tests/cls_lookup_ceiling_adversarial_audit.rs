@@ -44,9 +44,15 @@ struct Case {
 }
 
 fn bank() -> Vec<Case> {
-    let people = ["Alice", "Bob", "Cara", "Dev", "Eve", "Finn", "Gita", "Hiro", "Ivy", "Jade"];
-    let cities = ["Berlin", "Tokyo", "Lagos", "Seoul", "Lisbon", "Nairobi", "Oslo", "Perth", "Quito", "Riga"];
-    let langs = ["Rust", "Go", "Zig", "Kotlin", "Swift", "Elixir", "Julia", "Nim", "Crystal", "OCaml"];
+    let people = [
+        "Alice", "Bob", "Cara", "Dev", "Eve", "Finn", "Gita", "Hiro", "Ivy", "Jade",
+    ];
+    let cities = [
+        "Berlin", "Tokyo", "Lagos", "Seoul", "Lisbon", "Nairobi", "Oslo", "Perth", "Quito", "Riga",
+    ];
+    let langs = [
+        "Rust", "Go", "Zig", "Kotlin", "Swift", "Elixir", "Julia", "Nim", "Crystal", "OCaml",
+    ];
     let mut out = Vec::with_capacity(N);
     for i in 0..N {
         let p = people[i % people.len()];
@@ -180,8 +186,17 @@ fn adversarial_audit_lookup_ceiling_claim() {
         // Negative: schema must not invent entity tokens absent from supports.
         // Relation predicates (works_in, uses_lang) are structural labels, not entities.
         const STRUCTURAL: &[&str] = &[
-            "works_in", "uses_lang", "compose_stack", "via", "project", "works", "uses",
-            "stack", "what", "does", "rel",
+            "works_in",
+            "uses_lang",
+            "compose_stack",
+            "via",
+            "project",
+            "works",
+            "uses",
+            "stack",
+            "what",
+            "does",
+            "rel",
         ];
         for s in clean.cortex.schemas.active() {
             let support_blob = format!("{}\n{}", case.e1, case.e2);
@@ -198,9 +213,11 @@ fn adversarial_audit_lookup_ceiling_claim() {
 
         // Stored co-occurrence of required tokens in ONE statement must be false
         // (otherwise we are still doing sleep-time join, not query-time compose).
-        let stored_join = clean.cortex.schemas.active().any(|s| {
-            contains_all(&s.statement, &req)
-        });
+        let stored_join = clean
+            .cortex
+            .schemas
+            .active()
+            .any(|s| contains_all(&s.statement, &req));
         assert!(
             !stored_join,
             "stored schema already joins required tokens — not beyond-lookup compose"
@@ -288,8 +305,10 @@ fn adversarial_audit_lookup_ceiling_claim() {
     let both_rate = both_in_topk as f64 / n;
     let cf_rate = cf_schema_ok as f64 / 20.0;
 
-    let beats_clean = clean_schema_acc + 1e-9 >= clean_lookup_acc + 0.10 && clean_schema_acc >= 0.80;
-    let beats_noisy = noisy_schema_acc + 1e-9 >= noisy_lookup_acc + 0.10 && noisy_schema_acc >= 0.50;
+    let beats_clean =
+        clean_schema_acc + 1e-9 >= clean_lookup_acc + 0.10 && clean_schema_acc >= 0.80;
+    let beats_noisy =
+        noisy_schema_acc + 1e-9 >= noisy_lookup_acc + 0.10 && noisy_schema_acc >= 0.50;
     let is_join = clean_oracle_acc >= 0.999;
     // Interesting = under distractors, schema still finds composition while top-k often fails
     let interesting = beats_noisy && noisy_lookup_acc < 0.70;

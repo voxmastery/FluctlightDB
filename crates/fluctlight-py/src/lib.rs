@@ -236,11 +236,7 @@ impl PyBrain {
 
     /// Boot continuity without transcript paste (agent-lane).
     #[pyo3(signature = (cue=None))]
-    fn session_boot_context(
-        &mut self,
-        py: Python<'_>,
-        cue: Option<&str>,
-    ) -> PyResult<Py<PyAny>> {
+    fn session_boot_context(&mut self, py: Python<'_>, cue: Option<&str>) -> PyResult<Py<PyAny>> {
         json_val_to_py(py, &self.inner.session_boot_context(cue))
     }
 

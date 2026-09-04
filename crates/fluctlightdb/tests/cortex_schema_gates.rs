@@ -32,9 +32,7 @@ fn sleep_crystallizes_theme_schema_from_supports() {
         "Preference recorded: dark mode theme across all IDE windows",
     ];
     for ep in episodes {
-        brain
-            .experience(Episode::new(ep, "prefs", 0.8))
-            .unwrap();
+        brain.experience(Episode::new(ep, "prefs", 0.8)).unwrap();
     }
     assert!(
         brain.hippocampus.engrams.len() >= 2,
@@ -60,9 +58,7 @@ fn double_sleep_does_not_duplicate_active_theme_schemas() {
         "Preference recorded: dark mode theme across all IDE windows",
     ];
     for ep in episodes {
-        brain
-            .experience(Episode::new(ep, "prefs", 0.8))
-            .unwrap();
+        brain.experience(Episode::new(ep, "prefs", 0.8)).unwrap();
     }
     brain.sleep().unwrap();
     brain.sleep().unwrap();
@@ -90,10 +86,7 @@ fn schema_lane_beats_lookup_on_recombination_cue() {
         brain
             .cortex
             .schemas
-            .upsert_active(Schema::new(
-                "Alice works on Rust project in Berlin",
-                ids,
-            ))
+            .upsert_active(Schema::new("Alice works on Rust project in Berlin", ids))
             .unwrap();
     }
     let with = brain.activate_with_schemas("What stack does Alice use in Berlin?");

@@ -16,6 +16,7 @@ pub mod brain_snapshot;
 pub mod budget;
 pub mod cache;
 pub mod calcium;
+pub mod capture_gate;
 pub mod checkpoint_fault;
 pub mod checkpoint_policy;
 pub mod chorus;
@@ -35,16 +36,17 @@ pub mod crystallize;
 pub mod dentate;
 pub mod derive;
 pub mod development;
+pub mod eligibility;
 pub mod engram;
 pub mod error;
 pub mod fabric_runtime;
 pub mod forgetting;
 pub mod fovea;
 pub mod governance;
-pub mod homeostasis;
 pub mod graph;
 pub mod graph_export;
 pub mod hippocampus;
+pub mod homeostasis;
 pub mod id;
 pub mod index;
 pub mod late_interaction;
@@ -76,8 +78,6 @@ pub mod recall_router;
 pub mod relation;
 pub mod replicate;
 pub mod retention_policy;
-pub mod capture_gate;
-pub mod eligibility;
 pub mod schema;
 pub mod segment;
 pub mod semantic;
@@ -113,7 +113,6 @@ pub use brain_snapshot::{
     export_snapshot_json, import_snapshot, import_snapshot_json, BrainSnapshot,
     SnapshotImportReport, SNAPSHOT_FORMAT, SNAPSHOT_VERSION,
 };
-pub use homeostasis::HomeostasisReport;
 pub use cache::ActivationCache;
 pub use chorus::{
     ChorusConfig, ChorusField, ChorusHit, ChorusImprintInput, ChorusRecallOpts, ChorusSleepReport,
@@ -133,6 +132,7 @@ pub use forgetting::{interference, LoadController, MemoryTrace};
 pub use fovea::{scan_file, scan_text, FoveaConfig, FoveaPacket};
 pub use governance::{AuditEntry, DeleteBySubjectReport, GovernanceState, PiiScrubReport};
 pub use graph_export::GraphExport;
+pub use homeostasis::HomeostasisReport;
 pub use index::RecallIndex;
 pub use lattice::{Axis, GridCode, Lattice, LatticeCode, LatticeStore};
 pub use life::{CoreMemory, LifeState};

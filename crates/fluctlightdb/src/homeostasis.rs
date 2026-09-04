@@ -95,7 +95,10 @@ pub fn estimate_tokens(text: &str) -> usize {
 pub fn count_generation_dirs(brain_path: &Path) -> Option<usize> {
     let gens = brain_path.join("generations");
     let rd = std::fs::read_dir(gens).ok()?;
-    Some(rd.filter(|e| e.as_ref().map(|x| x.path().is_dir()).unwrap_or(false)).count())
+    Some(
+        rd.filter(|e| e.as_ref().map(|x| x.path().is_dir()).unwrap_or(false))
+            .count(),
+    )
 }
 
 pub fn agent_prompt_max_engrams() -> usize {

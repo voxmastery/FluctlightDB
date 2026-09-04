@@ -41,7 +41,6 @@ pub struct BrainGraph {
     adjacency_ready: bool,
 }
 
-
 /// Per-neuron out-degree cap for synaptic competition. Cortical neurons keep a bounded synapse
 /// budget; unbounded fan-out is what let one runaway loop mint 64.8M edges. 0 disables.
 fn max_out_degree() -> usize {
@@ -207,11 +206,7 @@ impl BrainGraph {
     /// while consolidation re-strengthens what mattered. Runs only inside sleep — never on the
     /// experience hot path — so the full sweep is acceptable (ms at bounded graph sizes).
     /// Returns how many synapses were scaled.
-    pub fn homeostatic_downscale(
-        &mut self,
-        protected: &HashSet<NeuronId>,
-        factor: f32,
-    ) -> u32 {
+    pub fn homeostatic_downscale(&mut self, protected: &HashSet<NeuronId>, factor: f32) -> u32 {
         let factor = factor.clamp(0.5, 1.0);
         if factor >= 1.0 {
             return 0;
@@ -320,7 +315,11 @@ mod tests {
             let mut slow_graph = g.clone();
             slow_graph.adjacency.clear();
             slow_graph.adjacency_ready = false;
-            assert_eq!(fast, sorted_neighbors(&slow_graph, NeuronId(n)), "neuron {n}");
+            assert_eq!(
+                fast,
+                sorted_neighbors(&slow_graph, NeuronId(n)),
+                "neuron {n}"
+            );
             assert!(!fast.is_empty(), "neuron {n} should have edges");
         }
     }
@@ -334,11 +333,17 @@ mod tests {
         // bincode, not JSON: neuron_regions is keyed by NeuronId and JSON demands string keys.
         // bincode is what store.rs actually persists with, so this exercises the real load path.
         let round: BrainGraph = bincode::deserialize(&bincode::serialize(&g).unwrap()).unwrap();
-        assert!(!round.adjacency_ready, "serde must not resurrect the index flag");
+        assert!(
+            !round.adjacency_ready,
+            "serde must not resurrect the index flag"
+        );
         assert_eq!(sorted_neighbors(&round, NeuronId(1)).len(), 2);
         let mut rebuilt = round.clone();
         rebuilt.rebuild_index();
-        assert_eq!(sorted_neighbors(&rebuilt, NeuronId(1)), sorted_neighbors(&round, NeuronId(1)));
+        assert_eq!(
+            sorted_neighbors(&rebuilt, NeuronId(1)),
+            sorted_neighbors(&round, NeuronId(1))
+        );
     }
 
     /// prune_below() shifts positions; adjacency must not point at the wrong synapses afterwards.
@@ -350,7 +355,11 @@ mod tests {
         wire(&mut g, 1, 4, 0.8);
         g.prune_below(0.1);
         let got = sorted_neighbors(&g, NeuronId(1));
-        assert_eq!(got, vec![(1, 2), (1, 4)], "weak edge should be gone, rest intact");
+        assert_eq!(
+            got,
+            vec![(1, 2), (1, 4)],
+            "weak edge should be gone, rest intact"
+        );
         for (s, to) in g.neighbors(NeuronId(1)) {
             assert_eq!(s.to, to, "adjacency index points at a mismatched synapse");
         }
@@ -367,14 +376,12 @@ mod tests {
         assert!((g.synapses[0].weight - 0.8).abs() < 1e-5);
     }
 
-
-
     /// B: sleep downscaling decays un-replayed synapses but protects tonight's replay set.
     #[test]
     fn homeostatic_downscale_protects_replayed() {
         let mut g = BrainGraph::default();
-        wire(&mut g, 1, 2, 1.0);   // replayed pair — protected
-        wire(&mut g, 3, 4, 1.0);   // idle — must decay
+        wire(&mut g, 1, 2, 1.0); // replayed pair — protected
+        wire(&mut g, 3, 4, 1.0); // idle — must decay
         let protected: HashSet<NeuronId> = [NeuronId(1), NeuronId(2)].into_iter().collect();
 
         let scaled = g.homeostatic_downscale(&protected, 0.98);
@@ -385,7 +392,10 @@ mod tests {
                 .map(|(s, _)| s.weight)
                 .unwrap()
         }
-        assert!((w(&g, 1, 2) - 1.0).abs() < 1e-6, "replayed synapse untouched");
+        assert!(
+            (w(&g, 1, 2) - 1.0).abs() < 1e-6,
+            "replayed synapse untouched"
+        );
         assert!((w(&g, 3, 4) - 0.98).abs() < 1e-6, "idle synapse decayed");
 
         // repeated idle nights walk it down toward the prune threshold, never below floor
@@ -420,7 +430,10 @@ mod tests {
         wire(&mut g, from, 9002, 0.90);
         assert_eq!(g.neighbors(NeuronId(from)).count(), 256, "cap must hold");
         assert!(g.neighbors(NeuronId(from)).any(|(_, to)| to.0 == 9002));
-        assert!(!g.neighbors(NeuronId(from)).any(|(_, to)| to.0 == 1000), "weakest evicted");
+        assert!(
+            !g.neighbors(NeuronId(from)).any(|(_, to)| to.0 == 1000),
+            "weakest evicted"
+        );
 
         // synapse_index stays consistent: re-adding the evicted edge dedups correctly
         let count_before = g.synapse_count();
@@ -441,8 +454,15 @@ mod tests {
         let mut g = BrainGraph::default();
         let mut x: u64 = 7;
         for i in 0..50_000u64 {
-            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-            wire(&mut g, i % 8, (x >> 33) % 100_000, 0.30 + ((i % 60) as f32) * 0.01);
+            x = x
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            wire(
+                &mut g,
+                i % 8,
+                (x >> 33) % 100_000,
+                0.30 + ((i % 60) as f32) * 0.01,
+            );
         }
         assert!(
             g.synapse_count() <= 8 * 256,
@@ -456,9 +476,13 @@ mod tests {
         let mut g = BrainGraph::default();
         let mut x: u64 = 0x2545F4914F6CDD1D;
         for _ in 0..n_syn {
-            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            x = x
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let from = (x >> 33) % n_neurons;
-            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            x = x
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let to = (x >> 33) % n_neurons;
             wire(&mut g, from, to, 0.30);
         }
@@ -487,7 +511,11 @@ mod tests {
             v.sort_unstable();
             v
         };
-        assert_eq!(key(&fast), key(&slow), "indexed plasticity diverged from sweep");
+        assert_eq!(
+            key(&fast),
+            key(&slow),
+            "indexed plasticity diverged from sweep"
+        );
     }
 
     /// Same equivalence for STDP consolidation.
@@ -537,5 +565,4 @@ mod tests {
             "expected >10x from locality; sweep={slow:?} indexed={fast:?}"
         );
     }
-
 }

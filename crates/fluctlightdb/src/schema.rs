@@ -135,52 +135,27 @@ fn try_atomic_schema(content: &str, support: Uuid) -> Option<Schema> {
     // A works in B / A lives in B
     if words.len() >= 4 && lower[1] == "works" && lower[2] == "in" {
         return Some(atomic_schema(
-            "works_in",
-            words[0],
-            words[3],
-            content,
-            support,
-            0.8,
+            "works_in", words[0], words[3], content, support, 0.8,
         ));
     }
     if words.len() >= 4 && lower[1] == "lives" && lower[2] == "in" {
         return Some(atomic_schema(
-            "works_in",
-            words[0],
-            words[3],
-            content,
-            support,
-            0.8,
+            "works_in", words[0], words[3], content, support, 0.8,
         ));
     }
     if words.len() >= 3 && lower[1] == "joined" {
         return Some(atomic_schema(
-            "works_in",
-            words[0],
-            words[2],
-            content,
-            support,
-            0.75,
+            "works_in", words[0], words[2], content, support, 0.75,
         ));
     }
     if words.len() >= 3 && lower[1] == "owns" {
         return Some(atomic_schema(
-            "works_in",
-            words[0],
-            words[2],
-            content,
-            support,
-            0.75,
+            "works_in", words[0], words[2], content, support, 0.75,
         ));
     }
     if words.len() >= 3 && lower[1] == "mentors" {
         return Some(atomic_schema(
-            "works_in",
-            words[0],
-            words[2],
-            content,
-            support,
-            0.75,
+            "works_in", words[0], words[2], content, support, 0.75,
         ));
     }
 
@@ -336,10 +311,7 @@ pub fn crystallize_from_engrams(store: &mut SchemaStore, engrams: &[crate::engra
         if (key == "theme" || key.starts_with("theme:")) && ids.len() < 2 {
             continue;
         }
-        let statement = statements
-            .get(&key)
-            .cloned()
-            .unwrap_or_else(|| key.clone());
+        let statement = statements.get(&key).cloned().unwrap_or_else(|| key.clone());
         let mut schema = Schema::new(statement, ids);
         schema.key = key;
         if let Some(prev) = store.active_head_for_key(&schema.key) {
@@ -388,14 +360,9 @@ mod tests {
             .upsert_active(Schema::new("theme=dark preference", vec![a]))
             .unwrap();
         let new = store
-            .upsert_active(
-                Schema::new("theme=dark preference v2", vec![a]).superseding(old),
-            )
+            .upsert_active(Schema::new("theme=dark preference v2", vec![a]).superseding(old))
             .unwrap();
-        assert_eq!(
-            store.active_head_for_key("theme:dark").unwrap().id,
-            new
-        );
+        assert_eq!(store.active_head_for_key("theme:dark").unwrap().id, new);
         assert!(store.get(old).unwrap().status == SchemaStatus::Superseded);
     }
 
