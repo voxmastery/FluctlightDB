@@ -9,7 +9,7 @@ use crate::tokenize::{tokenize_rich, RichToken};
 use crate::types::Episode;
 
 /// Granule cells per EC token — sparse expansion (~2–4% of pool in biology).
-const GRANULES_PER_TOKEN: u32 = 2;
+pub(crate) const GRANULES_PER_TOKEN: u32 = 2;
 const OVERLAP_THRESHOLD: f32 = 0.28;
 /// Upper bound on artificial separator neurons the DG will append to push a new
 /// engram's code away from an existing one. `derive::content_dg` recomputes exactly this

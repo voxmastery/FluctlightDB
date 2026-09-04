@@ -50,3 +50,8 @@ libc = "0.2"
 [dev-dependencies]
 tempfile = "3"
 rcgen = "=0.13.2"
+
+[[bin]]
+name = "fluctlight-rekey"
+path = "src/bin/rekey.rs"
+test = false

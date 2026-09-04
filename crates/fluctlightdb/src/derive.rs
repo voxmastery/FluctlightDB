@@ -279,3 +279,210 @@ mod tests {
         assert_eq!(content_dg(&g, CURRENT_CODEC), g.dg_neurons);
     }
 }
+
+/// What [`migrate_codec`] did, for the operator log.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CodecMigrationReport {
+    pub engrams: u64,
+    pub seed_ids_mapped: u64,
+    pub pair_ids_mapped: u64,
+    pub engram_ids_unmapped: u64,
+    pub graph_endpoints_rewritten: u64,
+    pub graph_endpoints_unmapped: u64,
+    pub cortex_keys_remapped: u64,
+}
+
+/// Whole-brain, weight-preserving codec migration (offline operator path).
+///
+/// [`drain`] re-derives each engram's ensemble and wires FRESH chains at init
+/// weight — correct for drift repair, but on a long-lived brain it strands every
+/// LEARNED synapse weight on the old ids: measured on a 13k-engram production
+/// copy, activation scores collapsed from hundreds to ~2-3 and top-5 overlap
+/// with the pre-migration brain went to 0-1/5. Memory without its learning.
+///
+/// This path instead derives the exact old→new id map from the same seed
+/// families the ids came from (every neuron id is a pure function of persisted
+/// text/ids/ticks) and rewrites ids IN PLACE across the hippocampus, graph and
+/// cortex — synapse weights, regions and structure untouched. The result is an
+/// isomorphic brain: recall under new-codec cues scores identically to the old
+/// brain under old-codec cues.
+///
+/// Only valid while stored ids are still reproducible under the recorded codec
+/// (`life.codec_probes` match). A DRIFTED brain (hash moved underneath the
+/// data) cannot be mapped — its old ids are not derivable — and must take the
+/// [`drain`] path.
+pub fn migrate_codec(
+    brain: &mut crate::brain::FluctlightBrain,
+) -> Result<CodecMigrationReport, String> {
+    use crate::id::CURRENT_CODEC;
+    use std::collections::HashMap;
+
+    let old = brain.life.neuron_codec;
+    if old == CURRENT_CODEC {
+        return Err("brain is already on the current codec".into());
+    }
+    let expected_probes = crate::life::codec_probes_for(old);
+    if !brain.life.codec_probes.is_empty() && brain.life.codec_probes != expected_probes {
+        return Err(
+            "codec probes do not reproduce under the recorded codec (drifted brain) — \
+             old ids are not derivable, use the re-key drain path"
+                .into(),
+        );
+    }
+
+    let mut map: HashMap<NeuronId, NeuronId> = HashMap::new();
+    let mut seed_ids_mapped = 0u64;
+    let mut pair_ids_mapped = 0u64;
+
+    // Pass 1: seed-derived ids (tokens, granules, separators) for every engram.
+    for e in &brain.hippocampus.engrams {
+        let rich = crate::tokenize::tokenize_rich(
+            &e.episode.content,
+            &e.episode.context,
+            e.episode.outcome.as_deref(),
+        );
+        let life = e.life_id.to_string();
+        for t in &rich {
+            let o = NeuronId::from_seeds_with(old, &["ec", &t.surface]);
+            let n = NeuronId::from_seeds_with(CURRENT_CODEC, &["ec", &t.surface]);
+            if map.insert(o, n).is_none() {
+                seed_ids_mapped += 1;
+            }
+            for g in 0..crate::dentate::GRANULES_PER_TOKEN {
+                let seeds = ["dg", life.as_str(), t.surface.as_str(), &g.to_string()[..]];
+                let o = NeuronId::from_seeds_with(old, &seeds);
+                let n = NeuronId::from_seeds_with(CURRENT_CODEC, &seeds);
+                if map.insert(o, n).is_none() {
+                    seed_ids_mapped += 1;
+                }
+            }
+        }
+        let id = e.id.to_string();
+        let tick = e.encoded_at_tick.to_string();
+        for attempt in 0..crate::dentate::MAX_SEPARATOR_ATTEMPTS {
+            let a = attempt.to_string();
+            let seeds = ["sep", id.as_str(), a.as_str(), tick.as_str()];
+            let o = NeuronId::from_seeds_with(old, &seeds);
+            let n = NeuronId::from_seeds_with(CURRENT_CODEC, &seeds);
+            if map.insert(o, n).is_none() {
+                seed_ids_mapped += 1;
+            }
+        }
+    }
+
+    // Pass 2: CA3 pair ids from each engram's STORED adjacency (encode-time order).
+    for e in &brain.hippocampus.engrams {
+        for w in e.dg_neurons.windows(2) {
+            if let (Some(&a), Some(&b)) = (map.get(&w[0]), map.get(&w[1])) {
+                let o = NeuronId::from_pair_with(old, w[0], w[1]);
+                let n = NeuronId::from_pair_with(CURRENT_CODEC, a, b);
+                if map.insert(o, n).is_none() {
+                    pair_ids_mapped += 1;
+                }
+            }
+        }
+        if e.ec_neurons.len() >= 2 {
+            if let (Some(&a), Some(&b)) = (map.get(&e.ec_neurons[0]), map.get(&e.ec_neurons[1])) {
+                let o = NeuronId::from_pair_with(old, e.ec_neurons[0], e.ec_neurons[1]);
+                let n = NeuronId::from_pair_with(CURRENT_CODEC, a, b);
+                if map.insert(o, n).is_none() {
+                    pair_ids_mapped += 1;
+                }
+            }
+        }
+    }
+
+    // Rewrite engram ensembles in place (order kept — dg adjacency is meaningful).
+    let mut engram_ids_unmapped = 0u64;
+    for e in &mut brain.hippocampus.engrams {
+        for set in [&mut e.neurons, &mut e.ec_neurons, &mut e.dg_neurons] {
+            for nid in set.iter_mut() {
+                match map.get(nid) {
+                    Some(n) => *nid = *n,
+                    None => engram_ids_unmapped += 1,
+                }
+            }
+        }
+    }
+
+    // Rewrite the graph: endpoints and regions move, weights and structure do not.
+    let mut graph_endpoints_rewritten = 0u64;
+    let mut graph_endpoints_unmapped = 0u64;
+    for s in &mut brain.graph.synapses {
+        for end in [&mut s.from, &mut s.to] {
+            match map.get(end) {
+                Some(n) => {
+                    *end = *n;
+                    graph_endpoints_rewritten += 1;
+                }
+                None => graph_endpoints_unmapped += 1,
+            }
+        }
+    }
+    brain.graph.neuron_regions = std::mem::take(&mut brain.graph.neuron_regions)
+        .into_iter()
+        .map(|(nid, r)| (map.get(&nid).copied().unwrap_or(nid), r))
+        .collect();
+    brain.graph.rebuild_index();
+
+    // Cortex consolidation strengths follow their neurons.
+    let mut cortex_keys_remapped = 0u64;
+    brain.cortex.token_strength = std::mem::take(&mut brain.cortex.token_strength)
+        .into_iter()
+        .map(|(nid, s)| {
+            map.get(&nid)
+                .map(|n| {
+                    cortex_keys_remapped += 1;
+                    (*n, s)
+                })
+                .unwrap_or((nid, s))
+        })
+        .collect();
+
+    // Semantic EC projections are pure functions of the stored vectors — re-derive.
+    let sem_targets: Vec<(uuid::Uuid, uuid::Uuid, Vec<f32>)> = brain
+        .hippocampus
+        .engrams
+        .iter()
+        .filter_map(|e| {
+            brain
+                .semantic
+                .engram_vectors
+                .get(&e.id)
+                .map(|v| (e.id, e.life_id, v.clone()))
+        })
+        .collect();
+    for (eid, lid, v) in sem_targets {
+        brain.semantic.register_engram(eid, lid, v, CURRENT_CODEC);
+    }
+
+    // The recent-separation window carries ensemble vecs too.
+    for sep in &mut brain.recent_separations {
+        for set in [
+            &mut sep.ec_neurons,
+            &mut sep.dg_neurons,
+            &mut sep.ca3_neurons,
+        ] {
+            for nid in set.iter_mut() {
+                if let Some(n) = map.get(nid) {
+                    *nid = *n;
+                }
+            }
+        }
+    }
+
+    brain.life.neuron_codec = CURRENT_CODEC;
+    brain.life.codec_probes = crate::life::codec_probes_for(CURRENT_CODEC);
+    brain.rekey_pending.clear();
+    brain.invalidate_activation_cache();
+
+    Ok(CodecMigrationReport {
+        engrams: brain.hippocampus.engrams.len() as u64,
+        seed_ids_mapped,
+        pair_ids_mapped,
+        engram_ids_unmapped,
+        graph_endpoints_rewritten,
+        graph_endpoints_unmapped,
+        cortex_keys_remapped,
+    })
+}
