@@ -61,7 +61,11 @@ fn agent_prompt_records_tokens_without_changing_activate() {
 fn session_boot_context_returns_prompt_block() {
     let mut brain = FluctlightBrain::new();
     brain
-        .experience(Episode::new("I am ServerBrain continuity organ", "identity", 0.9))
+        .experience(Episode::new(
+            "I am ServerBrain continuity organ",
+            "identity",
+            0.9,
+        ))
         .unwrap();
     let boot = brain.session_boot_context(Some("identity"));
     assert!(!boot.prompt_block.is_empty());

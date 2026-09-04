@@ -262,7 +262,11 @@ impl FluctlightBrain {
     ///
     /// No-op when Somnus is debug-disabled or semantic sleep already sealed this tick.
     /// Never mutates the recall graph. Seals on earlier of tick cadence or WAL pressure.
-    fn maybe_somnus_autonomic_seal(&mut self, checkpoint: bool, already_sealed: bool) -> Result<bool> {
+    fn maybe_somnus_autonomic_seal(
+        &mut self,
+        checkpoint: bool,
+        already_sealed: bool,
+    ) -> Result<bool> {
         if !checkpoint || already_sealed || !crate::somnus::somnus_enabled() {
             return Ok(false);
         }
@@ -2144,7 +2148,10 @@ mod tests {
 fn hotpath_compact_allowed() -> bool {
     use std::sync::atomic::{AtomicU64, Ordering};
     static LAST: AtomicU64 = AtomicU64::new(0);
-    if std::env::var("FLUCTLIGHT_HOTPATH_COMPACT").map(|v| v == "0").unwrap_or(false) {
+    if std::env::var("FLUCTLIGHT_HOTPATH_COMPACT")
+        .map(|v| v == "0")
+        .unwrap_or(false)
+    {
         return false;
     }
     let now = std::time::SystemTime::now()
@@ -2153,7 +2160,9 @@ fn hotpath_compact_allowed() -> bool {
         .unwrap_or(0);
     let last = LAST.load(Ordering::Relaxed);
     let min_gap = std::env::var("FLUCTLIGHT_HOTPATH_COMPACT_GAP_SECS")
-        .ok().and_then(|v| v.parse().ok()).unwrap_or(600);
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(600);
     if now.saturating_sub(last) < min_gap {
         return false;
     }

@@ -25,7 +25,11 @@ pub fn capture_schemas(
     let snapshot = store.clone();
     let before_active: Vec<_> = store
         .active()
-        .filter(|s| cf_probe_keys.iter().any(|k| s.key == *k || s.statement.to_lowercase().contains(k)))
+        .filter(|s| {
+            cf_probe_keys
+                .iter()
+                .any(|k| s.key == *k || s.statement.to_lowercase().contains(k))
+        })
         .map(|s| (s.id, s.statement.clone(), s.support_engram_ids.clone()))
         .collect();
 

@@ -226,7 +226,8 @@ fn partial_drain_must_not_flip_codec_and_reload_requeues() {
     fluctlightdb::derive::drain(&mut brain, 4);
     assert!(brain.rekey_pending_count() > 0);
     assert_eq!(
-        brain.life.neuron_codec, 0,
+        brain.life.neuron_codec,
+        0,
         "codec flipped with {} engrams still pending",
         brain.rekey_pending_count()
     );

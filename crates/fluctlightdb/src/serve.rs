@@ -1640,8 +1640,7 @@ fn process_request(
             }),
         ),
         Err(Error::Swarm(
-            crate::swarm::SwarmError::SwarmNotFound(_)
-            | crate::swarm::SwarmError::SlotNotFound(_),
+            crate::swarm::SwarmError::SwarmNotFound(_) | crate::swarm::SwarmError::SlotNotFound(_),
         )) => json_response(
             StatusCode::NOT_FOUND,
             serde_json::json!({"error": "swarm resource not found"}),

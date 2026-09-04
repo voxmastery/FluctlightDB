@@ -95,7 +95,9 @@ fn pack_prompt_block(core: &[String], lines: &[PromptMemoryLine]) -> String {
         }
     }
     if !lines.is_empty() {
-        parts.push("## Activated memory (full or gist+id — expand gist-only via expand_engrams)".into());
+        parts.push(
+            "## Activated memory (full or gist+id — expand gist-only via expand_engrams)".into(),
+        );
         for (i, line) in lines.iter().enumerate() {
             let ver = if line.verified { " [verified]" } else { "" };
             match &line.full_content {
@@ -156,7 +158,8 @@ pub fn pack_lossless(
     let mut used = core_tokens;
     // Reserve gist tokens for all lines first so index always fits.
     for line in &lines {
-        used = used.saturating_add(estimate_tokens(&line.gist).saturating_add(8)); // id + meta
+        used = used.saturating_add(estimate_tokens(&line.gist).saturating_add(8));
+        // id + meta
     }
 
     let mut full_recalls = Vec::new();
@@ -205,8 +208,7 @@ impl FluctlightBrain {
         let core_tokens: usize = core_snippets.iter().map(|s| estimate_tokens(s)).sum();
 
         let full: ActivationResult = self.activate(cue);
-        let (lines, recalls, compressed) =
-            pack_lossless(&full.recalls, token_budget, core_tokens);
+        let (lines, recalls, compressed) = pack_lossless(&full.recalls, token_budget, core_tokens);
         let expandable_ids: Vec<Uuid> = lines
             .iter()
             .filter(|l| l.full_content.is_none())
@@ -328,9 +330,7 @@ mod tests {
         let full_before = brain.activate("dark mode");
         let bundle = brain.activate_for_agent_prompt("dark mode");
         let full_after = brain.activate("dark mode");
-        let ids = |r: &ActivationResult| {
-            r.recalls.iter().map(|x| x.engram_id).collect::<Vec<_>>()
-        };
+        let ids = |r: &ActivationResult| r.recalls.iter().map(|x| x.engram_id).collect::<Vec<_>>();
         assert_eq!(ids(&full_before), ids(&full_after));
         assert_eq!(bundle.lines.len(), full_before.recalls.len());
         assert!(!bundle.truncated);
@@ -360,7 +360,9 @@ mod tests {
         } else {
             let expanded = brain.expand_engrams(&bundle.expandable_ids);
             assert_eq!(expanded.len(), bundle.expandable_ids.len());
-            assert!(expanded.iter().all(|e| e.content.len() > e.content.chars().take(10).count()));
+            assert!(expanded
+                .iter()
+                .all(|e| e.content.len() > e.content.chars().take(10).count()));
         }
     }
 }

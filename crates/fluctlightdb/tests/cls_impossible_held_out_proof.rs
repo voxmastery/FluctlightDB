@@ -125,9 +125,9 @@ fn impossible_held_out_slot_composition_proof() {
     ];
 
     let held_people = [
-        "Alice", "Bob", "Cara", "Dev", "Eve", "Finn", "Gita", "Hiro", "Ivy", "Jade",
-        "Kai", "Lena", "Mira", "Nia", "Omar", "Pia", "Reed", "Suki", "Tara", "Uri",
-        "Vera", "Wade", "Xena", "Yuri", "Zara", "Axel", "Bryn", "Cleo", "Dale", "Echo",
+        "Alice", "Bob", "Cara", "Dev", "Eve", "Finn", "Gita", "Hiro", "Ivy", "Jade", "Kai", "Lena",
+        "Mira", "Nia", "Omar", "Pia", "Reed", "Suki", "Tara", "Uri", "Vera", "Wade", "Xena",
+        "Yuri", "Zara", "Axel", "Bryn", "Cleo", "Dale", "Echo",
     ];
     assert_eq!(held_people.len(), HELD_OUT);
 
@@ -225,9 +225,8 @@ fn impossible_held_out_slot_composition_proof() {
     let lookup_acc = lookup_hits as f64 / n;
     let stored_acc = stored_cooccur as f64 / n;
     let schema_acc = compose_hits as f64 / n;
-    let recombo_ok = schema_acc >= SCHEMA_FLOOR
-        && schema_acc + 1e-9 >= lookup_acc + MARGIN
-        && stored_acc < 1e-9;
+    let recombo_ok =
+        schema_acc >= SCHEMA_FLOOR && schema_acc + 1e-9 >= lookup_acc + MARGIN && stored_acc < 1e-9;
 
     // CF battery (schema-active dark retention; no episode bailout)
     let mut drops = Vec::new();

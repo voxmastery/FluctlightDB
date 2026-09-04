@@ -22,9 +22,7 @@ fn untagged_material_does_not_alter_schemas() {
         "Preference recorded: dark mode theme across all IDE windows",
     ];
     for ep in episodes {
-        brain
-            .experience(Episode::new(ep, "prefs", 0.9))
-            .unwrap();
+        brain.experience(Episode::new(ep, "prefs", 0.9)).unwrap();
     }
     brain.sleep().unwrap();
     let n = brain.cortex.schemas.active().count();

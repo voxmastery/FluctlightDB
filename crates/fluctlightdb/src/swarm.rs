@@ -293,9 +293,7 @@ impl SwarmState {
         }
         let transaction_id = transaction.id();
         let result = match transaction {
-            SwarmTransaction::Begin(request) => {
-                SwarmApplyResult::Began(self.begin_run(request)?)
-            }
+            SwarmTransaction::Begin(request) => SwarmApplyResult::Began(self.begin_run(request)?),
             SwarmTransaction::Claim(request) => self.claim_slot(request)?,
             SwarmTransaction::Cite(request) => self.cite_memories(request)?,
             SwarmTransaction::Report(request) => self.report_attempt(request)?,
@@ -518,10 +516,7 @@ impl SwarmState {
         }))
     }
 
-    fn record_evidence(
-        &mut self,
-        request: RecordEvidence,
-    ) -> Result<SwarmApplyResult, SwarmError> {
+    fn record_evidence(&mut self, request: RecordEvidence) -> Result<SwarmApplyResult, SwarmError> {
         let (memory_ids, receipt) = {
             let run = self.run_mut(request.swarm_id)?;
             let attempt = run

@@ -68,12 +68,35 @@ fn fixture_bank() -> Vec<RecomboCase> {
             &["{p}", "{lang}"],
         ),
     ];
-    let people = ["Alice", "Bob", "Cara", "Dev", "Eve", "Finn", "Gita", "Hiro", "Ivy", "Jade"];
-    let cities = ["Berlin", "Tokyo", "Lagos", "Seoul", "Lisbon", "Nairobi", "Oslo", "Perth", "Quito", "Riga"];
-    let langs = ["Rust", "Go", "Zig", "Kotlin", "Swift", "Elixir", "Julia", "Nim", "Crystal", "OCaml"];
-    let teams = ["RedTeam", "BlueCell", "NovaCrew", "OrbitLab", "PulseUnit", "QuarkPod", "RidgeSquad", "SigmaWing", "TideGroup", "UmbraForce"];
+    let people = [
+        "Alice", "Bob", "Cara", "Dev", "Eve", "Finn", "Gita", "Hiro", "Ivy", "Jade",
+    ];
+    let cities = [
+        "Berlin", "Tokyo", "Lagos", "Seoul", "Lisbon", "Nairobi", "Oslo", "Perth", "Quito", "Riga",
+    ];
+    let langs = [
+        "Rust", "Go", "Zig", "Kotlin", "Swift", "Elixir", "Julia", "Nim", "Crystal", "OCaml",
+    ];
+    let teams = [
+        "RedTeam",
+        "BlueCell",
+        "NovaCrew",
+        "OrbitLab",
+        "PulseUnit",
+        "QuarkPod",
+        "RidgeSquad",
+        "SigmaWing",
+        "TideGroup",
+        "UmbraForce",
+    ];
     let roles = ["interns", "analysts", "operators", "builders", "reviewers"];
-    let svcs = ["billing-api", "dispatch-api", "ingest-api", "ledger-api", "notify-api"];
+    let svcs = [
+        "billing-api",
+        "dispatch-api",
+        "ingest-api",
+        "ledger-api",
+        "notify-api",
+    ];
 
     let mut out = Vec::with_capacity(RECOMBINATION_N);
     for i in 0..RECOMBINATION_N {

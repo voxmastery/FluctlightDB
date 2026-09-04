@@ -3,8 +3,16 @@ import unittest
 
 from fluctlightdb import swarm_mcp
 
+try:
+    import mcp  # noqa: F401
+
+    HAVE_MCP = True
+except ImportError:
+    HAVE_MCP = False
+
 
 class TestSwarmMcp(unittest.TestCase):
+    @unittest.skipUnless(HAVE_MCP, "mcp extra not installed (pip install 'fluctlightdb[mcp]')")
     def test_build_server_supports_installed_mcp_sdk(self) -> None:
         build_server = getattr(swarm_mcp, "build_server", None)
         self.assertTrue(callable(build_server), "swarm_mcp must expose build_server")

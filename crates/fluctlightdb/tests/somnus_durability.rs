@@ -34,18 +34,19 @@ fn somnus_on_without_user_env() {
 
     for _ in 0..20 {
         brain.tick().unwrap();
-        brain.experience(Episode {
-            content: "wake trace".into(),
-            context: "somnus".into(),
-            outcome: None,
-            salience_hint: 0.4,
-            semantic_vector: None,
-            agent_id: None,
-            tenant_id: None,
-            rag: None,
-            provenance: None,
-        })
-        .unwrap();
+        brain
+            .experience(Episode {
+                content: "wake trace".into(),
+                context: "somnus".into(),
+                outcome: None,
+                salience_hint: 0.4,
+                semantic_vector: None,
+                agent_id: None,
+                tenant_id: None,
+                rag: None,
+                provenance: None,
+            })
+            .unwrap();
     }
     assert_eq!(
         count_gens(&path),

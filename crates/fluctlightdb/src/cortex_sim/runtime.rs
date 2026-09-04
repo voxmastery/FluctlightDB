@@ -17,12 +17,31 @@ pub type TraceHash = [u8; 32];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SimEvent {
-    Boot { node: NodeId },
-    Experience { node: NodeId, content: String, accepted: bool },
-    Partition { node: NodeId },
-    Promote { from: NodeId, to: NodeId, generation: u64, ok: bool },
-    StaleWriteRejected { node: NodeId, generation: u64 },
-    Activate { node: NodeId, hits: usize },
+    Boot {
+        node: NodeId,
+    },
+    Experience {
+        node: NodeId,
+        content: String,
+        accepted: bool,
+    },
+    Partition {
+        node: NodeId,
+    },
+    Promote {
+        from: NodeId,
+        to: NodeId,
+        generation: u64,
+        ok: bool,
+    },
+    StaleWriteRejected {
+        node: NodeId,
+        generation: u64,
+    },
+    Activate {
+        node: NodeId,
+        hits: usize,
+    },
     TraceNote(String),
 }
 
@@ -103,7 +122,11 @@ impl CortexRuntime {
         hasher.finalize().into()
     }
 
-    pub fn experience(&mut self, node: NodeId, content: impl Into<String>) -> Result<(), PlacementError> {
+    pub fn experience(
+        &mut self,
+        node: NodeId,
+        content: impl Into<String>,
+    ) -> Result<(), PlacementError> {
         let content = content.into();
         self.clock.advance(1_000 + self.rng.gen_range(500));
         let fence = WriteFence {
@@ -122,10 +145,8 @@ impl CortexRuntime {
                 let watermark = entry.log.len() as u64;
                 self.placement.durable_watermarks.insert(node, watermark);
                 self.placement.committed_watermark = watermark;
-                self.fs.write(
-                    format!("node-{node}/log-{watermark}"),
-                    content.as_bytes(),
-                );
+                self.fs
+                    .write(format!("node-{node}/log-{watermark}"), content.as_bytes());
                 let _ = self.net.send(node, node, format!("ack:{watermark}"));
                 self.record(SimEvent::Experience {
                     node,
@@ -161,14 +182,15 @@ impl CortexRuntime {
         self.record(SimEvent::Partition { node });
     }
 
-    pub fn promote(&mut self, candidate: NodeId, new_generation: u64) -> Result<(), PlacementError> {
+    pub fn promote(
+        &mut self,
+        candidate: NodeId,
+        new_generation: u64,
+    ) -> Result<(), PlacementError> {
         self.clock.advance(2_000);
         let previous = self.placement.primary.unwrap_or(0);
         let expected = self.placement.generation;
-        match self
-            .placement
-            .promote(candidate, expected, new_generation)
-        {
+        match self.placement.promote(candidate, expected, new_generation) {
             Ok(next) => {
                 self.placement = next;
                 let primary_log = self
@@ -213,12 +235,7 @@ impl CortexRuntime {
         let hits = self
             .nodes
             .get(&node)
-            .map(|n| {
-                n.log
-                    .iter()
-                    .filter(|entry| entry.contains(cue))
-                    .count()
-            })
+            .map(|n| n.log.iter().filter(|entry| entry.contains(cue)).count())
             .unwrap_or(0);
         self.record(SimEvent::Activate { node, hits });
         hits
@@ -244,7 +261,11 @@ impl CortexRuntime {
         self.experience(1, content)
             .expect("primary must accept first experience");
         // Replicate to followers before partition (quorum path).
-        let log = self.nodes.get(&1).map(|n| n.log.clone()).unwrap_or_default();
+        let log = self
+            .nodes
+            .get(&1)
+            .map(|n| n.log.clone())
+            .unwrap_or_default();
         for id in [2u64, 3] {
             if let Some(node) = self.nodes.get_mut(&id) {
                 node.log = log.clone();
@@ -289,8 +310,7 @@ mod tests {
 
     #[test]
     fn failover_scenario_fences_stale_primary_and_preserves_experience() {
-        let mut runtime =
-            CortexRuntime::bootstrap_three_node(7, uuid::Uuid::from_u128(99));
+        let mut runtime = CortexRuntime::bootstrap_three_node(7, uuid::Uuid::from_u128(99));
         runtime.run_failover_scenario("agent learned dark mode");
         assert_eq!(runtime.local_state(2), PlacementState::Primary);
         assert!(runtime
