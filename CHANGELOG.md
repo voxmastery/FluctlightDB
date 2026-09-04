@@ -11,6 +11,14 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+---
+
+## [0.5.21] - 2026-09-03
+
+Also carries the codex swarm memory merge (durable swarm transactions in the WAL, swarm
+coordinator HTTP API under `/api/v1/swarm/*`, swarm error mapping) — merged after the 0.5.20
+artifacts were cut.
+
 ### Fixed
 
 - **Codec migration could permanently strand recall (release-blocking for legacy brains).**
