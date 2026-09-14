@@ -66,3 +66,4 @@ papers/arxiv-v1/figures/04-longmemeval-e2e-by-type.pdf
 
 # Prebuilt release binaries — fetch from GitHub Releases, do not commit.
 fluctlight-0.5.*
+graphprune-0.5.*
