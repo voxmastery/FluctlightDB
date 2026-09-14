@@ -46,7 +46,7 @@ Recent agent-memory systems converge on the same pattern: **pre-filter candidate
 2. **`connect_index()`** — sets `FLUCTLIGHT_VECTOR_FAST=1` → **0 hops** (pure hybrid scoring; Chroma-class speed for IR).
 3. **`activation_cache`** — repeat cues avoid re-spread (Letta-style hot recall).
 4. **`activate-lite` HTTP** — top-1 JSON (~200 bytes) for remote agents.
-5. **`activate_batch`** — one lock, many cues (ServerBrain / multi-tool turns).
+5. **`activate_batch`** — one lock, many cues (agent / multi-tool turns).
 
 ## Setup (agent fast path)
 

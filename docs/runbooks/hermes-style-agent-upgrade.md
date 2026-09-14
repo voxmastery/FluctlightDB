@@ -1,15 +1,15 @@
 # Hermes-style agent + Fluctlight upgrade
 
-How to cut a new FluctlightDB version next to an agent (ServerBrain today;
-Hermes Agent is the architecture we steal from) without another 40-minute
-silent open or a WAL/codec split-brain.
+How to cut a new FluctlightDB version next to an agent (Hermes Agent is the
+architecture we steal from) without another 40-minute silent open or a
+WAL/codec split-brain.
 
-**Incident that forced this note:** 2026-09-08 ServerBrain cutover 0.5.19 →
-0.5.21 on `~/.fluctlight/tenants/serverbrain-v2/brain`. Serve sat at 100% CPU
-for 45+ minutes with no `:8792`. Offline `fluctlight-rekey` never printed
-`opened:`. We recovered by parking `CURRENT` + WAL + `tau.seg` + sidecar and
-booting the **root snapshot** (3,066 engrams vs 13,614). Full generation is
-still on disk, not loaded.
+**Incident that forced this note:** 2026-09-08, a production agent tenant was
+cut over 0.5.19 → 0.5.21. Serve sat at 100% CPU for 45+ minutes with no
+listener. Offline `fluctlight-rekey` never printed `opened:`. We recovered by
+parking `CURRENT` + WAL + `tau.seg` + sidecar and booting the **root
+snapshot** (3,066 engrams vs 13,614). Full generation is still on disk, not
+loaded.
 
 ---
 
@@ -22,29 +22,28 @@ is a **narrow waist + fat edges** agent:
 |-------|--------|----------------------------------------|
 | Core | `AIAgent` loop only (`run_agent.py`) | Agent code must not embed a Fluctlight version |
 | Memory | `MemoryProvider` ABC + one active plugin | Agent talks **HTTP only**; never `FluctlightBrain::open` on the live path |
-| Skills | `SKILL.md` at the edge, imported | ServerBrain's `~/.sbridge/skills/hermes/*` stay independent of engine version |
-| Session | SQLite + FTS5, not the memory plugin | `bridge-sessions.json` / chat history ≠ the brain |
+| Skills | `SKILL.md` at the edge, imported | The agent's skill directory stays independent of engine version |
+| Session | SQLite + FTS5, not the memory plugin | Chat/session history ≠ the brain |
 | Config | `hermes_cli/config.py` migrates | One pin file, one `FLUCTLIGHT_BIN`, no glob-newest |
 | Gateway | one process, many platforms | One `fluctlight-serve`; CLI/mindloop/set-goal must not take the store lock |
 
 Hermes memory plugins (`plugins/memory/<name>/`) implement `initialize`,
 `is_available` (no network), and tool schemas. Fluctlight should stay that
 kind of **swap-in provider**: pin the binary, health-check `/ready`, then
-flip the agent. Do not upgrade by editing six systemd drop-ins and hoping
-`_newest_fluctlight_bin()` agrees.
+flip the agent. Do not upgrade by editing six systemd drop-ins and hoping a
+"newest binary on disk" helper agrees.
 
-ServerBrain already imports Hermes skills (`sb-import-hermes-skills.sh` →
-`serverbrain_learning.py`). That is the skill edge. It is **not** a Hermes
-runtime and not a claw/ZeroClaw fork.
+Importing Hermes skills into an agent is a change at the **skill edge**. It
+is not a Fluctlight runtime change and is never a reason to bump the engine.
 
 ---
 
 ## The brain is one atom
 
-A v4 tenant is **not** “the directory”. These must move together:
+A v4 tenant is **not** "the directory". These must move together:
 
 1. `CURRENT` → `generations/gen-…/`
-2. That generation’s `*.seg` (especially `hippocampus.seg`, `tau.seg`)
+2. That generation's `*.seg` (especially `hippocampus.seg`, `tau.seg`)
 3. `wal/` whose next seq matches the generation manifest `wal_seq`
 4. `recall_index.sqlite*` (sidecar; rebuilt on every open if present)
 
@@ -64,15 +63,16 @@ Parking `CURRENT` without parking `wal/` is how we hit that on 2026-09-08.
 
 ## Why 0.5.x cutovers hurt
 
-Observed on this host:
+Observed in the field:
 
-- **Many binaries, no single pin.** systemd `0.5.19`, CLI glob → `0.5.21`,
-  `fluctlight-current` → `0.5.17`, pip SDK `0.5.10`, `/usr/local/bin` `0.5.17`.
+- **Many binaries, no single pin.** systemd on `0.5.19`, CLI glob resolving
+  `0.5.21`, a `fluctlight-current` symlink on `0.5.17`, pip SDK `0.5.10`,
+  and `/usr/local/bin` on `0.5.17` — all at once.
 - **CLI opens the live brain.** Mindloop `set-goal` and `fluctlight-rekey`
   take the exclusive flock. Serve cannot bind while they run.
 - **`--version` hangs.** Use `fluctlight` with no args (help) or
   `timeout 3 … help`.
-- **Open is unbounded.** Active gen had a **400 MB `tau.seg`**. Sidecar
+- **Open is unbounded.** The active gen had a **400 MB `tau.seg`**. Sidecar
   rebuilds HNSW (`ef_construction=200`) for every `engram_vec` row on open.
   No `/live` until both finish. 0.5.19 then grew to 15 GB with
   `FLUCTLIGHT_FABRIC=1` and OOM-looped (restart 70).
@@ -80,8 +80,8 @@ Observed on this host:
   fixes the flip. Incremental `drain` still wipes learned synapse weights.
   Offline `target/release/fluctlight-rekey` (HEAD after 0.5.21) is the
   weight-preserving path — and it must finish `open()` first.
-- **Named `fluctlight-0.5.20` on disk (Aug 19) is not the published 0.5.20.**
-  Do not run it.
+- **A binary named for a version is not proof of that version.** Check
+  provenance before running anything you did not build or download yourself.
 
 ---
 
@@ -91,7 +91,7 @@ Observed on this host:
 
 ```bash
 # /etc/fluctlight/version  — or the serve drop-in only
-FLUCTLIGHT_BIN=/home/ambugo/fluctlightdb/fluctlight-0.5.21
+FLUCTLIGHT_BIN=/opt/fluctlight/bin/fluctlight-0.5.21
 ```
 
 Set that env on **serve, stream, drill, and the agent**. Do not use
@@ -101,7 +101,7 @@ Set that env on **serve, stream, drill, and the agent**. Do not use
 ### 1. Preflight (copy, do not touch live)
 
 ```bash
-export FLUCTLIGHT_BRAIN_PATH=~/.fluctlight/tenants/serverbrain-v2/brain
+export FLUCTLIGHT_BRAIN_PATH=~/.fluctlight/tenants/<tenant>/brain
 export FLUCTLIGHT_BIN=/path/to/fluctlight-X.Y.Z
 ./scripts/preflight-serve.sh
 rsync -a "$FLUCTLIGHT_BRAIN_PATH/" /tmp/fl-upgrade-copy/
@@ -139,14 +139,14 @@ the old one cannot read.
 
 ---
 
-## Agent wiring (ServerBrain)
+## Agent wiring
 
 | Do | Do not |
 |----|--------|
 | Agent → `FLUCTLIGHT_SERVE_URL` HTTP | Agent CLI `fluctlight set-goal --path <live>` |
-| `FLUCTLIGHT_BIN` in every unit | `_newest_fluctlight_bin()` as the serve pin |
-| `FLUCTLIGHT_BRAIN` = serve `--path` | Bridge env pointing at `tenants/default` while serve uses `serverbrain-v2` |
-| Hermes skills in `~/.sbridge/skills` | Re-import Hermes as a reason to bump Fluctlight |
+| `FLUCTLIGHT_BIN` in every unit | A "newest binary on disk" helper as the serve pin |
+| `FLUCTLIGHT_BRAIN` = serve `--path` | Agent env on one tenant while serve runs another |
+| Agent skills in the agent's own skill dir | Re-importing skills as a reason to bump Fluctlight |
 | Watchdog only after `/ready` | Watchdog restarting a still-opening serve |
 
 Mindloop / CLOOP must use HTTP or a **copy**. Exclusive `open()` on the live

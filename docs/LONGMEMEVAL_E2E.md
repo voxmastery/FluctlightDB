@@ -38,7 +38,7 @@ bash scripts/run-longmemeval-e2e-500.sh 500
 ## Smoke test
 
 ```bash
-source /home/ambugo/litellm/.env
+source ~/litellm/.env
 PYTHONPATH=benchmarks python3 -c "from cloud_llm import smoke_test; print(smoke_test('gemini'))"
 ```
 

@@ -11,7 +11,7 @@ if ! flock -n 9; then
   exit 1
 fi
 
-export LITELLM_ENV_FILE="${LITELLM_ENV_FILE:-/home/ambugo/litellm/.env}"
+export LITELLM_ENV_FILE="${LITELLM_ENV_FILE:-${HOME}/litellm/.env}"
 if [[ -f "$LITELLM_ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090

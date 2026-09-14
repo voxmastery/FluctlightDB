@@ -6,7 +6,6 @@ docs/
 embed-server/
 sdks/
 scripts/fluctlight-prod-bench.py
-scripts/ground-wallet-truth.py
 scripts/reingest-feed.py
 systemd/
 .maturin/

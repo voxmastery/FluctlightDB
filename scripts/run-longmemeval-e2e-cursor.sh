@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# LongMemEval E2E via Cursor Cloud Agents API (Auto + CURSOR_API_KEY from serverbrain).
+# LongMemEval E2E via Cursor Cloud Agents API (Auto + CURSOR_API_KEY from the Cursor env file).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-export CURSOR_ENV_FILE="${CURSOR_ENV_FILE:-/opt/ambugo/serverbrain/.env}"
+export CURSOR_ENV_FILE="${CURSOR_ENV_FILE:-${HOME}/.cursor/.env}"
 if [[ -f "$CURSOR_ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090

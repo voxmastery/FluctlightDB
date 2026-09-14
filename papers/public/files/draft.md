@@ -2,7 +2,7 @@
 
 **A brain-native database engine for long-term agent memory**
 
-**Author:** Ganesh S — Independent Researcher · voxmastery@ambugo.tech  
+**Author:** Ganesh S — Independent Researcher · voxmastery@gmail.com  
 **ORCID:** [0009-0006-7758-4114](https://orcid.org/0009-0006-7758-4114)  
 **Date:** July 2026 · **Draft:** arxiv-v1
 

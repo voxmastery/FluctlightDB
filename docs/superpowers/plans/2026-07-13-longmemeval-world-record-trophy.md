@@ -143,7 +143,7 @@ def test_summarize_ks():
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/ambugo/fluctlightdb/benchmarks && python3 -m pytest test_longmemeval_scoreboard.py -v`
+Run: `cd /path/to/fluctlightdb/benchmarks && python3 -m pytest test_longmemeval_scoreboard.py -v`
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'longmemeval_scoreboard'` (or import errors)
 
@@ -373,14 +373,14 @@ if __name__ == "__main__":
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/ambugo/fluctlightdb/benchmarks && python3 -m pytest test_longmemeval_scoreboard.py -v`
+Run: `cd /path/to/fluctlightdb/benchmarks && python3 -m pytest test_longmemeval_scoreboard.py -v`
 
 Expected: all PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/ambugo/fluctlightdb
+cd /path/to/fluctlightdb
 git add benchmarks/longmemeval_scoreboard.py benchmarks/test_longmemeval_scoreboard.py
 git commit -m "$(cat <<'EOF'
 bench: LongMemEval BM25 vs Fluctlight scoreboard + claim gates
@@ -404,7 +404,7 @@ Existing behavior already writes `hit_at_{k}` when `--report-ks` is set (`eval_o
 
 ```bash
 # Requires LONGMEMEVAL data path; adjust --data if needed
-cd /home/ambugo/fluctlightdb
+cd /path/to/fluctlightdb
 python3 benchmarks/longmemeval_bench.py \
   --mode index --granularity session --metric session \
   --fast --top-k 8 --report-ks 1,3,5,8 --limit 2 \

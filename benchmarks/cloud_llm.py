@@ -12,7 +12,7 @@ from typing import Any
 
 UA = "curl/8.5.0 FluctlightDB-bench/1.0"
 ENV_CANDIDATES = (
-    Path("/home/ambugo/litellm/.env"),
+    Path.home() / "litellm" / ".env",
     Path(os.environ.get("LITELLM_ENV_FILE", "")),
 )
 

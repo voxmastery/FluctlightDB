@@ -13,7 +13,7 @@ from pathlib import Path
 CURSOR_API_BASE = os.environ.get("CURSOR_API_BASE", "https://api.cursor.com").rstrip("/")
 CURSOR_AUTO_MODEL = "default"  # GET /v1/models → displayName Auto, alias auto
 CURSOR_ENV_CANDIDATES = (
-    Path("/opt/ambugo/serverbrain/.env"),
+    Path(os.environ.get("CURSOR_ENV_FILE", "")),
     Path.home() / ".cursor" / ".env",
 )
 
@@ -92,7 +92,7 @@ def cursor_auto_chat(
     key = api_key or load_cursor_api_key()
     if not key:
         raise RuntimeError(
-            "CURSOR_API_KEY required (export or set CURSOR_ENV_FILE=/opt/ambugo/serverbrain/.env)"
+            "CURSOR_API_KEY required (export or set CURSOR_ENV_FILE=/path/to/cursor.env)"
         )
     model_id = resolve_cursor_model(model)
     created = cursor_api_request(

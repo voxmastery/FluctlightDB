@@ -13,8 +13,8 @@ brain/
 Online migration:
 
 ```bash
-fluctlight compact --path ~/.fluctlight/serverbrain.flct
-# future: fluctlight migrate-v4 --path ~/.fluctlight/serverbrain.flct --out ~/.fluctlight/tenants/default/brain_v4
+fluctlight compact --path ~/.fluctlight/brain.flct
+# future: fluctlight migrate-v4 --path ~/.fluctlight/brain.flct --out ~/.fluctlight/tenants/default/brain_v4
 ```
 
 Library API: `manifest::migrate_v3_file_to_v4(v3_path, v4_dir)`.

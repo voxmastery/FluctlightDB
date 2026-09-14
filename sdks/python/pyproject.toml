@@ -11,7 +11,7 @@ requires-python = ">=3.9"
 dependencies = ["PyYAML>=6.0", "filelock>=3.13"]
 license = "MIT OR Apache-2.0"
 license-files = ["LICENSE", "LICENSE-APACHE"]
-authors = [{ name = "Ganesh S", email = "voxmastery@ambugo.tech" }]
+authors = [{ name = "Ganesh S", email = "voxmastery@gmail.com" }]
 keywords = [
   "ai-agents",
   "agent-memory",

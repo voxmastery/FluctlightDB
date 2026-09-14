@@ -7,7 +7,7 @@ and sleep — not activate().
 
 Usage:
   python benchmarks/profile_recall_path.py
-  FLUCTLIGHT_SERVE_URL=https://search.ambugo.help/brain python benchmarks/profile_recall_path.py
+  FLUCTLIGHT_SERVE_URL=https://your-host.example/brain python benchmarks/profile_recall_path.py
 """
 
 from __future__ import annotations

@@ -374,7 +374,7 @@ let MOTION = !matchMedia('(prefers-reduced-motion: reduce)').matches;
 const THEME = {light:false, bloom:0.78, emissiveFloor:0.9, bg:'#04060d', accent:'#7c5cff', accent2:'#22d3ee',
   good:'#37e0a6', warn:'#ffd166', bad:'#ff5d73', star:'#3a4a80'};
 
-/** When served under a path prefix (e.g. /brain on search.ambugo.help), API calls must stay under it. */
+/** When served under a path prefix (e.g. /brain behind a reverse proxy), API calls must stay under it. */
 function mountBase(){
   const p = location.pathname.replace(/\/$/, '');
   if (p === '/brain' || p.endsWith('/brain')) return p;

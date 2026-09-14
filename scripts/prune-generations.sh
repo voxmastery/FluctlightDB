@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Keep only the newest N v4 generations for a brain (default: CURRENT + extras up to KEEP).
 set -euo pipefail
-BRAIN="${1:-${FLUCTLIGHT_BRAIN_PATH:-$HOME/.fluctlight/tenants/serverbrain-v2/brain}}"
+BRAIN="${1:-${FLUCTLIGHT_BRAIN_PATH:-$HOME/.fluctlight/tenants/default/brain}}"
 KEEP="${FLUCTLIGHT_GENERATION_KEEP:-3}"
 GENS="$BRAIN/generations"
 CURRENT_FILE="$BRAIN/CURRENT"

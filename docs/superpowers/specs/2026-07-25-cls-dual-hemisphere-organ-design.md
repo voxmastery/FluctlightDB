@@ -124,7 +124,7 @@ All C gates green; organ-complete claim for A+B+C allowed in docs (still not AGI
 - Each gate = automated test (Rust integration and/or pinned Python fixture).  
 - Pre-register recombination/CF metrics before implementing scorers.  
 - Fail-closed: gate red ⇒ phase not mergeable.  
-- Prove on fixtures first; ServerBrain soak is optional evidence, not a substitute for gates.
+- Prove on fixtures first; a production soak is optional evidence, not a substitute for gates.
 
 ## Theory references (non-exhaustive)
 

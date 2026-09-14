@@ -93,7 +93,7 @@ mod tests {
 - [ ] **Step 2: Run tests — expect FAIL (module missing)**
 
 ```bash
-cd /home/ambugo/fluctlightdb && cargo test -p fluctlightdb schema:: --lib
+cd /path/to/fluctlightdb && cargo test -p fluctlightdb schema:: --lib
 ```
 
 Expected: compile error or FAIL

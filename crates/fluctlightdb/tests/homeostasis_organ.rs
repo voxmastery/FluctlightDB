@@ -62,7 +62,7 @@ fn session_boot_context_returns_prompt_block() {
     let mut brain = FluctlightBrain::new();
     brain
         .experience(Episode::new(
-            "I am ServerBrain continuity organ",
+            "I am the continuity organ",
             "identity",
             0.9,
         ))
