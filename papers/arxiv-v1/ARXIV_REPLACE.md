@@ -43,7 +43,15 @@ v1 remains permanently accessible — correct practice for a correction, not a p
 5. Submit. Moderation is typically same-day; announcements go out Sun–Fri 20:00 ET, so expect
    v2 live within about one business day.
 
-### Generating the plain-text abstract
+### The plain-text abstract
+
+Ready to paste: **`papers/arxiv-v1/abstract-plain.txt`** (single line, no LaTeX, no hard wraps).
+
+Do **not** copy the abstract out of `main.pdf` — text extraction inserts a hard line break
+roughly every 90 characters and leaves stray spaces before punctuation (`predicate ;`,
+`query .`) where italics were rendered.
+
+Regenerate it after any edit to the abstract in `main.tex`:
 
 ```bash
 sed -n '/\\begin{abstract}/,/\\end{abstract}/p' papers/arxiv-v1/main.tex \
