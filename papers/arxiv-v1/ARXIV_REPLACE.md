@@ -47,6 +47,13 @@ v1 remains permanently accessible — correct practice for a correction, not a p
 
 Ready to paste: **`papers/arxiv-v1/abstract-plain.txt`** (single line, no LaTeX, no hard wraps).
 
+**arXiv caps the abstract metadata field at 1,920 characters.** The paper's own abstract is 2,241
+and is rejected as-is, so this file is a trimmed variant: every corrected number is kept
+(96.8% @k=150 raw, 72.6% @k=5, 97.6%/97.4% LongMemEval, BEIR 0.646, the 18% provenance
+disclosure) and only prose was cut — the mpnet variants, one framing clause, and some
+explanatory asides. It lands at 1,879 characters. Re-check the count after any edit:
+`wc -c papers/arxiv-v1/abstract-plain.txt`.
+
 Do **not** copy the abstract out of `main.pdf` — text extraction inserts a hard line break
 roughly every 90 characters and leaves stray spaces before punctuation (`predicate ;`,
 `query .`) where italics were rendered.
