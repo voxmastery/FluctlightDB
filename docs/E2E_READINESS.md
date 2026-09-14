@@ -15,7 +15,7 @@ Must show **READY** with muon retrieval smoke at **100% session@8** on 3 questio
 ## Recommended 500-question command
 
 ```bash
-source /home/ambugo/litellm/.env   # or export OPENAI_API_KEY
+source ~/litellm/.env   # or export OPENAI_API_KEY
 export PYTHONUNBUFFERED=1
 export FLUCTLIGHT_EMBED_URL=http://127.0.0.1:8794   # optional; muon path uses 0 embed HTTP
 

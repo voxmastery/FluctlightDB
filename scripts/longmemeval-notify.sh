@@ -2,24 +2,15 @@
 # Ping owner Telegram when LongMemEval checkpoint reaches 500 (or results file updates).
 set -euo pipefail
 CHECKPOINT="${CHECKPOINT:-/tmp/longmemeval-checkpoint.jsonl}"
-RESULTS="${RESULTS:-/home/ambugo/fluctlightdb/benchmarks/results/longmemeval-$(date +%Y-%m-%d).json}"
-OWNER_CHAT="${SB_OWNER_CHAT:-6153332713}"
+RESULTS="${RESULTS:-benchmarks/results/longmemeval-$(date +%Y-%m-%d).json}"
+OWNER_CHAT="${TELEGRAM_CHAT_ID:?TELEGRAM_CHAT_ID must be set}"
 POLL_SEC="${POLL_SEC:-45}"
 TARGET="${TARGET:-500}"
 
 send_tg() {
   local text="$1"
   local token
-  token=$(python3 - <<'PY'
-import os, sys
-sys.path.insert(0, "/opt/ambugo/serverbrain-v2")
-try:
-    import serverbrain_common as sb
-    print(sb.telegram_token())
-except Exception:
-    print(os.environ.get("TELEGRAM_BOT_TOKEN", ""))
-PY
-)
+  token="${TELEGRAM_BOT_TOKEN:-}"
   [ -n "$token" ] || { echo "no telegram token"; return 1; }
   curl -s --max-time 30 -X POST "https://api.telegram.org/bot${token}/sendMessage" \
     --data-urlencode "chat_id=${OWNER_CHAT}" \

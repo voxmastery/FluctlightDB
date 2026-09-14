@@ -37,7 +37,7 @@ fi
 
 # Load GEMINI_API_KEY into the shell from litellm .env if missing
 if [[ -z "${GEMINI_API_KEY:-}" && -z "${OPENAI_API_KEY:-}" ]]; then
-  for envfile in /home/ambugo/litellm/.env "${HOME}/.env"; do
+  for envfile in "${HOME}/litellm/.env" "${HOME}/.env"; do
     if [[ -f "$envfile" ]]; then
       while IFS= read -r line || [[ -n "$line" ]]; do
         line="${line%%#*}"

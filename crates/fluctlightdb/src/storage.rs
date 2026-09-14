@@ -27,7 +27,7 @@ pub fn is_v4_path(path: &Path) -> bool {
 
 pub fn default_brain_path() -> PathBuf {
     match format_from_env() {
-        StorageFormat::V3File => default_tenant_root().join("serverbrain.flct"),
+        StorageFormat::V3File => default_tenant_root().join("brain.flct"),
         StorageFormat::V4Dir => default_tenant_brain_dir("default"),
     }
 }

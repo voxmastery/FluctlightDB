@@ -27,13 +27,13 @@ Use **one** GitHub-linked identity so the repo shows a single contributor graph.
 
 ```bash
 git config user.name "Voxmastery"
-git config user.email "roppashreeganesh@gmail.com"
+git config user.email "voxmastery@gmail.com"
 # or from repo clone:
 ./scripts/setup-git-identity.sh
 ./scripts/setup-git-hooks.sh
 ```
 
-Do not commit with host-specific emails (e.g. server `@hstgr.cloud` addresses) — GitHub counts those as separate contributors.
+Do not commit with host-specific emails (e.g. server or VPS addresses) — GitHub counts those as separate contributors.
 
 **Project health:** Solo maintainer today — see [MAINTAINER.md](MAINTAINER.md) for bus-factor status and how to become a co-maintainer.
 
