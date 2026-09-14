@@ -33,9 +33,9 @@ cat > "$PUBLIC/index.html" << 'HTML'
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>FluctlightDB — Research Paper (Preprint)</title>
-  <meta name="description" content="FluctlightDB: a brain-native memory engine for AI agents. 99.0% LoCoMo evidence recall, 97.6% LongMemEval-S session recall@8, 97.4% LongMemEval E2E QA." />
+  <meta name="description" content="FluctlightDB: a brain-native memory engine for AI agents. 96.8% LoCoMo raw evidence recall @k=150 (72.6% @k=5, no neighbor expansion), 97.6% LongMemEval-S session recall@8, 97.4% LongMemEval E2E QA." />
   <meta property="og:title" content="FluctlightDB: A Memory Model of Data for AI Agents" />
-  <meta property="og:description" content="Candidate third data model for agent memory — 99.0% LoCoMo, 97.6% LongMemEval-S retrieval, 97.4% E2E QA, BEIR 0.646 nDCG@10, FAMB 100%." />
+  <meta property="og:description" content="Candidate third data model for agent memory — 96.8% LoCoMo @k=150 raw (72.6% @k=5), 97.6% LongMemEval-S retrieval, 97.4% E2E QA, BEIR 0.646 nDCG@10." />
   <meta property="og:type" content="article" />
   <link rel="stylesheet" href="assets/style.css" />
 </head>
@@ -43,7 +43,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
   <header class="topbar">
     <div>
       <h1>FluctlightDB · Research Paper</h1>
-      <div class="sub">Preprint · arXiv cs.DB (pending) · July 2026</div>
+      <div class="sub">Preprint · <a href="https://arxiv.org/abs/2608.12365">arXiv:2608.12365</a> (cs.DB) · July 2026</div>
     </div>
     <nav class="nav" id="nav">
       <a href="#draft" data-page="draft" class="active">Draft</a>
@@ -58,7 +58,8 @@ cat > "$PUBLIC/index.html" << 'HTML'
     <aside class="panel">
       <h2>Frozen metrics</h2>
       <ul id="metrics-sidebar">
-        <li>LoCoMo evidence recall <span class="metric">99.0%</span></li>
+        <li>LoCoMo evidence recall @150 <span class="metric">96.8%</span></li>
+        <li>LoCoMo evidence recall @5 <span class="metric">72.6%</span></li>
         <li>LongMemEval-S session@8 <span class="metric">97.6%</span></li>
         <li>LongMemEval-S E2E QA <span class="metric">97.4%</span></li>
         <li>LongMemEval preference@8 <span class="metric">96.7%</span></li>
@@ -75,7 +76,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
         <li><span class="tag">RETRIEVAL</span> LoCoMo + LongMemEval complete</li>
         <li><span class="tag">E2E</span> LongMemEval 97.4% certified</li>
         <li><span class="tag">PREPRINT</span> Public draft</li>
-        <li><span class="tag">ARXIV</span> Submission pending</li>
+        <li><span class="tag">ARXIV</span> <a href="https://arxiv.org/abs/2608.12365">arXiv:2608.12365</a> — v1 predates the LoCoMo correction; v2 pending</li>
       </ul>
     </aside>
 
