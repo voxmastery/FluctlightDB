@@ -87,7 +87,8 @@ Systemd units: `systemd/fluctlight-replicate.service`, `systemd/fluctlight-repli
 ./scripts/fluctlight-restore.sh   # restore from backup
 ```
 
-Runbooks: `docs/runbooks/backup-restore.md`, `docs/runbooks/serve-crash-recovery.md`.
+Runbooks: `docs/runbooks/backup-restore.md`, `docs/runbooks/serve-crash-recovery.md`,
+`docs/runbooks/hermes-style-agent-upgrade.md` (pin + preflight when serve sits next to an agent).
 
 ## Industrial agent wiring
 
