@@ -88,6 +88,10 @@ Before any upgrade:
 1. Read [CHANGELOG.md](../CHANGELOG.md) for the target release.
 2. Run your integration tests + `python -m unittest tests.test_quickstart` (or your own recall smoke).
 3. Take a brain snapshot / `checkpoint()` before migrating storage.
+4. If Fluctlight sits next to an agent (ServerBrain / Hermes-style), follow
+   [`runbooks/hermes-style-agent-upgrade.md`](runbooks/hermes-style-agent-upgrade.md)
+   and `scripts/preflight-serve.sh`. Pin **one** `FLUCTLIGHT_BIN`. Never let
+   the agent CLI `open()` the live tenant during cutover.
 
 **0.x policy:** Patch (`0.5.x`) = bug fixes, no intentional stable-API breaks. Minor (`0.6.0`) may add opt-in features. **1.0** will mark a longer stability window after external usage and co-maintainer coverage — not a date commitment.
 
