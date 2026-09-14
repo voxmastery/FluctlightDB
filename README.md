@@ -2,7 +2,7 @@
 
 **Embedded memory database for AI agents** — `experience()` / `activate()` / `checkpoint()`, Rust core, one brain directory per agent.
 
-[![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB) · [Paper DOI](https://doi.org/10.5281/zenodo.20949890)
+[![PyPI](https://img.shields.io/pypi/v/fluctlightdb)](https://pypi.org/project/fluctlightdb/) · [GitHub](https://github.com/voxmastery/FluctlightDB) · [Paper DOI](https://doi.org/10.5281/zenodo.20949890) · [arXiv:2608.12365](https://arxiv.org/abs/2608.12365)
 
 > **Codex Community Hackathon:** [Fluctlight Swarm Memory — problem, architecture, and one-command demo](HACKATHON.md)
 
