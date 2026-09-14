@@ -58,7 +58,7 @@ Earlier concat-bridge harness remains as a weaker regression:
 Does **not** set `production_ready`.
 
 **Ops brain path:** backup/replicate/drill scripts resolve
-`serverbrain-v2` before `default` when env is unset (`scripts/resolve-brain.sh`).
+the `default` tenant when env is unset (`scripts/resolve-brain.sh`).
 
 ## Embedded quick path
 
@@ -88,7 +88,7 @@ Before any upgrade:
 1. Read [CHANGELOG.md](../CHANGELOG.md) for the target release.
 2. Run your integration tests + `python -m unittest tests.test_quickstart` (or your own recall smoke).
 3. Take a brain snapshot / `checkpoint()` before migrating storage.
-4. If Fluctlight sits next to an agent (ServerBrain / Hermes-style), follow
+4. If Fluctlight sits next to an agent (Hermes-style), follow
    [`runbooks/hermes-style-agent-upgrade.md`](runbooks/hermes-style-agent-upgrade.md)
    and `scripts/preflight-serve.sh`. Pin **one** `FLUCTLIGHT_BIN`. Never let
    the agent CLI `open()` the live tenant during cutover.

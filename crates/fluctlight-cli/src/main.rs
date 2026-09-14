@@ -242,7 +242,7 @@ fn main() {
 
     if args[1] == "migrate-v4" {
         let src = parse_flag_path(&args, "--from")
-            .unwrap_or_else(|| dirs_home().join(".fluctlight").join("serverbrain.flct"));
+            .unwrap_or_else(|| dirs_home().join(".fluctlight").join("brain.flct"));
         let dst = parse_flag_path(&args, "--out")
             .unwrap_or_else(|| fluctlightdb::default_tenant_brain_dir("default"));
         if !src.exists() {

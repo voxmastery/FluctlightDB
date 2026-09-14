@@ -11,6 +11,24 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+### Changed
+
+- **V3 default brain filename is now `brain.flct`** (renamed from a
+  deployment-specific name).
+  Only affects the legacy V3 path (`FLUCTLIGHT_STORAGE=v3|file|flct`) and the
+  `migrate-v4 --from` default. Existing V3 files are not renamed — pass
+  `--path` / `--from`, or set `FLUCTLIGHT_BRAIN_PATH`, to point at a legacy file.
+- Ops scripts and docs no longer assume a deployment-specific tenant or host
+  paths. `scripts/resolve-brain.sh` now resolves `FLUCTLIGHT_BRAIN_PATH` →
+  `FLUCTLIGHT_PRIMARY_BRAIN` → the `default` tenant.
+- `scripts/longmemeval-notify.sh` reads `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`
+  from the environment instead of importing an external agent module.
+
+### Removed
+
+- `scripts/ground-wallet-truth.py` — agent-wallet integration specific to one
+  deployment, unreferenced by the rest of the repo.
+
 ---
 
 ## [0.5.21] - 2026-09-03

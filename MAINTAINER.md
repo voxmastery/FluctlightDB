@@ -8,7 +8,7 @@ FluctlightDB is **early-stage open source**. This page states facts reviewers an
 |------|--------|
 | Active maintainers | **1** (solo) |
 | Git contributors (all time) | **Voxmastery** (~116 commits) + **Ganesh** (1 commit) — same person, two Git identities before identity normalization |
-| Copyright holder | Ganesh S (`voxmastery@ambugo.tech`) |
+| Copyright holder | Ganesh S (`voxmastery@gmail.com`) |
 | Public GitHub org | [voxmastery](https://github.com/voxmastery) |
 
 **Risk:** If the sole maintainer is unavailable, releases, security fixes, and review throughput stop until a co-maintainer is onboarded.

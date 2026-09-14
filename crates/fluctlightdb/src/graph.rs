@@ -22,7 +22,7 @@ pub struct BrainGraph {
     /// every time: cost `hops * |active| * |synapses|`. Measured on a 4k-engram brain with real
     /// token overlap, activate() went 13ms -> 486ms as the graph grew, while the same brain with
     /// spreading disabled stayed flat at 4-9ms. Production (10.6k engrams / 328k synapses) was
-    /// taking 5-30s and blowing ServerBrain's 6s recall cap, which is what left the bot with no
+    /// taking 5-30s and blowing the agent's 6s recall cap, which is what left it with no
     /// memory at all.
     ///
     /// Not serialised: it is derived state, rebuilt by `rebuild_index()`. While

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 GIT_NAME="${FLUCTLIGHT_GIT_NAME:-Voxmastery}"
-GIT_EMAIL="${FLUCTLIGHT_GIT_EMAIL:-roppashreeganesh@gmail.com}"
+GIT_EMAIL="${FLUCTLIGHT_GIT_EMAIL:-voxmastery@gmail.com}"
 
 git config user.name "$GIT_NAME"
 git config user.email "$GIT_EMAIL"

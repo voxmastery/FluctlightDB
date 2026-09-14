@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 BACKUP="${1:?usage: fluctlight-restore.sh BACKUP_DIR}"
-BRAIN="${FLUCTLIGHT_BRAIN_PATH:-$HOME/.fluctlight/serverbrain.flct}"
+BRAIN="${FLUCTLIGHT_BRAIN_PATH:-$HOME/.fluctlight/brain.flct}"
 echo "Stopping fluctlight-serve (if running)..."
 systemctl stop fluctlight-serve 2>/dev/null || true
 TMP="${BRAIN}.restore.tmp"

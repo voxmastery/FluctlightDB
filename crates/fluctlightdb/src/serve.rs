@@ -162,7 +162,7 @@ struct BrainPool {
 impl BrainServer {
     pub fn open(path: PathBuf) -> Result<Self> {
         // Prefer the tenant directory name (…/tenants/<id>/brain) so auth-scoped
-        // keys like `serverbrain-v2:…:admin` hit the already-open exclusive brain
+        // keys like `<tenant>:…:admin` hit the already-open exclusive brain
         // instead of trying to open the same path a second time (self-deadlock).
         let tenant = path
             .parent()
