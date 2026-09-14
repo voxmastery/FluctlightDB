@@ -55,3 +55,8 @@ rcgen = "=0.13.2"
 name = "fluctlight-rekey"
 path = "src/bin/rekey.rs"
 test = false
+
+[[bin]]
+name = "fluctlight-dumpgraph"
+path = "src/bin/dumpgraph.rs"
+test = false
