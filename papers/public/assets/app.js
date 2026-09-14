@@ -131,12 +131,19 @@ Promise.all([
 fetch('data/results.json')
   .then((r) => r.json())
   .then((d) => {
-    const loc = d?.mode_index?.locomo_full;
+    // Schema is the frozen paper JSON (top-level `locomo`), not the old
+    // `mode_index.locomo_full` shape — that key never existed here, so this
+    // block silently returned and the page kept showing the hardcoded fallback.
+    const loc = d?.locomo;
     if (!loc) return;
+    const k5 = loc.recall_at_k?.['5'];
+    const lme = d?.longmemeval_s;
     document.getElementById('metrics-sidebar').innerHTML = `
-      <li>LoCoMo evidence recall <span class="metric">${(loc.mean_evidence_recall * 100).toFixed(1)}%</span></li>
-      <li>BEIR SciFact nDCG@10 <span class="metric">${d.mode_index.beir_scifact.ndcg_at_10}</span></li>
-      <li>FAMB macro (index) <span class="metric">${(d.mode_index.famb.macro * 100).toFixed(0)}%</span></li>
-      <li>LongMemEval-S <span class="metric">deferred</span></li>`;
+      <li>LoCoMo evidence recall @${loc.top_k ?? 150} <span class="metric">${(loc.mean_evidence_recall * 100).toFixed(1)}%</span></li>
+      ${k5 ? `<li>LoCoMo evidence recall @5 <span class="metric">${k5}%</span></li>` : ''}
+      ${lme?.session_recall_at_8 ? `<li>LongMemEval-S session@8 <span class="metric">${(lme.session_recall_at_8 * 100).toFixed(1)}%</span></li>` : ''}
+      ${lme?.e2e?.overall_accuracy ? `<li>LongMemEval-S E2E QA <span class="metric">${(lme.e2e.overall_accuracy * 100).toFixed(1)}%</span></li>` : ''}
+      <li>BEIR SciFact nDCG@10 <span class="metric">${d.beir_scifact.systems.fluctlightdb_chorus.ndcg_at_10}</span></li>
+      <li>FAMB macro (internal) <span class="metric">${(d.famb.agent_macro * 100).toFixed(0)}%</span></li>`;
   })
   .catch(() => {});

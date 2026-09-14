@@ -33,22 +33,30 @@ consolidation, provenance) and read semantics (cue-driven activation across a
 linked memory graph)---and present \textbf{FluctlightDB}, an embedded engine that
 implements this contract via \texttt{experience()} and \texttt{activate()}. We
 make that case carefully, not categorically: we do not claim novelty over Mem0,
-Zep, or HippoRAG-style memory layers, only an embedded engine contract beneath them. On LoCoMo (official \emph{evidence-recall} metric; 10
-conversations, 1{,}982 gold spans), CHORUS recalls \textbf{96.8\% (raw @$k{=}150$, no neighbor expansion; the deprecated 99.0\% used a $\pm 3$ \texttt{expand\_session\_neighbors} scoring policy, not the engine, and a trivial BM25 baseline also scored ${\sim}99\%$ under it)} on an
-internally reproduced July 2026 run. On LongMemEval-S (500 questions, official
-\texttt{session\_recall@8}), our retrieval harness scores \textbf{97.6\%}
-(488/500); end-to-end QA with our reader/judge stack scores \textbf{97.4\%}
-(487/500)---these layers use different protocols than vendor leaderboard figures
-we cite for context only. On BEIR SciFact (shared MiniLM embeddings, same harness, Recall Fabric on),
-CHORUS/PRISM edges Chroma on nDCG@10 (\textbf{0.646} vs.\ \textbf{0.645}) and Recall@10
-(\textbf{0.792} vs.\ \textbf{0.783}). We also report a small author-designed
-regression suite (FAMB; paraphrase $n{=}10$, other sub-tests $n{=}1$) at 100\%
-macro---internal validation, not peer benchmark. Strangers can verify the engine
-in under a minute via \texttt{pip install "fluctlightdb[native]"} and a minimal
-\texttt{connect()}$\to$\texttt{experience()}$\to$\texttt{activate()} script (compiled
-wheel, not source-only). Harnesses and frozen JSON are MIT-licensed. We claim no
-new neuroscience and no new transformer; we propose a missing layer of the data
-stack and release an engine others can reproduce and contest.
+Zep, or HippoRAG-style memory layers, only an embedded engine contract beneath them.
+Numbers below are typed by metric; retrieval is not generation.
+On LoCoMo (official \emph{evidence-recall}; 10 conversations, 1{,}982 gold spans),
+our native-Rust CHORUS retrieval stack reaches \textbf{96.8\%} at $k{=}150$
+(MiniLM-384; \textbf{97.0\%} with mpnet-768) as \emph{raw} evidence recall with
+\emph{no} neighbor expansion, on an internally reproduced July 2026 run;
+tightening the budget to $k{=}5$ still yields \textbf{72.6\%} (MiniLM) / \textbf{75.1\%} (mpnet),
+while an end-to-end QA read over date-stamped context reaches $\approx$\textbf{85\%}
+accuracy at $k{=}15$ (retrieval-bound).
+On LongMemEval-S (500 questions), official \texttt{session\_recall@8} is
+\textbf{97.6\%} (488/500); end-to-end QA with our reader/judge stack is
+\textbf{97.4\%} (487/500)---different protocols from vendor leaderboard figures we
+cite for context only.
+On BEIR SciFact (shared MiniLM embeddings, same harness, Recall Fabric on),
+CHORUS/PRISM edges Chroma on nDCG@10 (\textbf{0.646} vs.\ \textbf{0.645}) and
+Recall@10 (\textbf{0.792} vs.\ \textbf{0.783}).
+A graded provenance-conflict suite ($n{=}50$) scores \textbf{18\%} top-1 when all
+pairs share one brain---the realistic multi-tenant stress---versus \textbf{100\%}
+under per-case isolation (ceiling, not deployment evidence).
+Harnesses and frozen JSON are MIT-licensed; engine source is MIT on GitHub.
+The one-minute path (\texttt{pip install "fluctlightdb[native]"}) re-runs published
+numbers against the compiled wheel; rebuilding from source is supported but heavier.
+We claim no new neuroscience and no new transformer; we propose a missing layer of
+the data stack and release artifacts others can re-run and contest.
 \end{abstract}
 
 \section{Introduction}
@@ -89,14 +97,29 @@ comes before neuroscience-flavored rerank modules.
   \item \textbf{An embedded engine.} FluctlightDB ships as a Rust library (like SQLite:
   no server process) exposing \texttt{experience()} / \texttt{activate()} /
   \texttt{checkpoint()}---one durable brain directory per agent.
-  \item \textbf{Evidence.} \textbf{96.8\%} evidence recall on full LoCoMo (CHORUS),
-  \textbf{97.6\%} session recall@8 on LongMemEval-S (unified v4 full 500 on Colab GPU),
-  \textbf{97.4\%} end-to-end QA on LongMemEval-S (our reader/judge stack; 500 questions),
-  BEIR SciFact CHORUS/Fabric edges Chroma nDCG@10 in a shared harness (MiniLM), and FAMB
-  (author-designed regression; Section~\ref{sec:eval}) at 100\% macro on July 2026 reruns.
-  \item \textbf{Reproducibility.} Open harnesses, frozen result JSON, and a
-  one-minute \texttt{pip install "fluctlightdb[native]"} smoke path so every
-  number here can be re-run or contested without trusting maintainer scripts alone.
+  \item \textbf{A first-principles late-interaction retrieval stack.} On the CHORUS
+  lane (Section~\ref{sec:maxsim}), retrieval matches the query's \emph{token
+  population} against stored per-token vectors---salience-gated MaxSim, which
+  recovers the discriminative signal mean-pooling discards---fuses a
+  conjunctive-surprisal lexical channel (replacing Okapi BM25) by
+  reliability-weighted evidence integration (replacing reciprocal-rank fusion),
+  over episodically context- and date-bound memories. Each component is derived
+  from an information-theoretic / neuro-inspired first principle and validated by
+  ablation; the path is embedder-agnostic (MiniLM-384 or mpnet-768 with no engine
+  change), and lifts LoCoMo end-to-end QA from 77.5\% to 85\% once turns carry
+  their session dates.
+  \item \textbf{Evidence.} Typed by metric: \textbf{96.8\%} LoCoMo evidence
+  \emph{retrieval} (native-Rust CHORUS stack, MiniLM-384, $k{=}150$, raw / no expansion;
+  \textbf{97.0\%} mpnet-768; Table~\ref{tab:locomo-k}) vs.\ $\approx$\textbf{85\%} LoCoMo end-to-end
+  QA at $k{=}15$ over date-stamped context; \textbf{97.6\%} LongMemEval-S \texttt{session\_recall@8} and
+  \textbf{97.4\%} LongMemEval-S end-to-end QA (our reader/judge; 500 questions);
+  BEIR SciFact CHORUS/Fabric edges Chroma nDCG@10 in a shared MiniLM harness;
+  provenance-conflict \textbf{18\%} top-1 shared-brain / \textbf{100\%} isolated
+  ($n{=}50$). Author-designed FAMB stays in Section~\ref{sec:eval} only.
+  \item \textbf{Re-runnability.} Open harnesses and frozen JSON; MIT engine source
+  on GitHub. The one-minute \texttt{pip install "fluctlightdb[native]"} path
+  re-runs numbers against the published wheel; source rebuild is available but
+  not the smoke path.
 \end{itemize}
 
 \section{A Third Data Model for Agent Memory}
@@ -202,8 +225,11 @@ BM25 lexical seeds and HNSW semantic neighbors form a candidate set (default cap
 128--512). The engine spreads activation through the memory graph (up to four hops in
 full mode), fuses lexical, semantic, graph, and provenance scores, and returns ranked
 engrams. Vector-fast mode (\texttt{FLUCTLIGHT\_VECTOR\_FAST=1}) skips graph spread for
-Chroma-class IR latency. Optional Recall Fabric rerank (Appendix~\ref{app:fabric})
-applies on the CHORUS lane after shortlisting when \texttt{FLUCTLIGHT\_FABRIC=1}.
+Chroma-class IR latency. For evidence retrieval the CHORUS lane uses the
+late-interaction stack of Section~\ref{sec:maxsim} (token-population MaxSim
+$\oplus$ conjunctive surprisal, evidence-integration fusion) rather than
+mean-pool cosine; optional Recall Fabric rerank (Appendix~\ref{app:fabric})
+applies after shortlisting when \texttt{FLUCTLIGHT\_FABRIC=1}.
 
 \begin{lstlisting}[caption={Read path (\texttt{activate}).},label={alg:read}]
 function activate(cue, cue_vector, top_k):
@@ -220,6 +246,44 @@ function activate(cue, cue_vector, top_k):
 Per-query cost is $O(|C| \log |C|)$ over candidate set $|C|$, plus $O(h \cdot |E|)$
 graph spread for hop depth~$h$ and frontier~$|E|$; hybrid seeding is sublinear in~$n$
 via FTS5 and HNSW rather than full-table scan.
+
+\subsection{Late-interaction retrieval stack}
+\label{sec:maxsim}
+The CHORUS lane's evidence retrieval (\texttt{chorus\_imprint\_maxsim} /
+\texttt{chorus\_recall\_maxsim}) is a first-principles stack in which every
+component replaces a standard IR heuristic with a mechanism derived from an
+information-theoretic or neuro-inspired argument, each validated by ablation. The
+path is \emph{embedder-agnostic}: it consumes caller-supplied per-token vectors,
+so swapping MiniLM-384 for mpnet-768 requires no engine change.
+
+\paragraph{Token-population late interaction (salience-gated MaxSim).} A
+mean-pooled sentence vector collapses a transformer's per-token contextual
+population code into one centroid, discarding most discriminative signal. We
+instead store the per-token \texttt{last\_hidden\_state} vectors (half-precision,
+capped per memory) and score with late interaction,
+$\mathrm{score}(q,d)=\sum_{i} w_i \max_{j} \cos(q_i, d_j)$, where each query token
+$q_i$ is weighted by $w_i$, its divergence from the query centroid---a
+predictive-coding salience gate that suppresses generic tokens (\texttt{[CLS]},
+function words). This is more information from the same encoder, not a re-embedding.
+
+\paragraph{Conjunctive surprisal (replaces BM25).} The lexical channel scores
+information content with a saturating neural response,
+$\sum_t {-}\!\log p(t)\,(1-e^{-\mathrm{tf}/\tau})$ (Weber--Fechner), and adds a
+proximity-bound bonus when rare query terms \emph{co-occur} in a memory
+(conjunctive binding). It carries no ad-hoc $k_1$/$b$ constants and matches or
+beats Okapi BM25 in ablation.
+
+\paragraph{Evidence-integration fusion (replaces RRF).} Channels are combined by
+$z$-scoring each over the candidate set and taking a reliability-weighted sum
+(Ernst--Banks optimal cue combination), preserving score magnitude that
+reciprocal-rank fusion discards---the single largest tight-$k$ gain in ablation.
+
+\paragraph{Episodic binding and temporal anchoring.} Each turn is encoded with a
+$\pm2$ session-neighbor context window (encoding-specificity), and, for temporal
+queries, prefixed with its session date. The latter is a context-assembly fix,
+not a retrieval one: retrieved turns say ``last month,'' but the absolute date
+lives in session metadata; stamping it lifts LoCoMo end-to-end QA from 77.5\% to
+85\% with retrieval unchanged.
 
 \subsection{Two explicit modes}
 \texttt{connect()} is the full episodic engine (separation, graph, provenance) for
@@ -338,25 +402,42 @@ With Fabric on, CHORUS/PRISM improves nDCG@10 and Recall@10 over Chroma in the
 CHORUS profile ($\sim$16\,ms median on this run). Reproduce:
 \texttt{PYTHONPATH=sdks/python python benchmarks/beir\_bench.py}.
 
-\subsection{LoCoMo: 96.8\% evidence recall on the full set}
+\subsection{LoCoMo: 96.8\% raw evidence recall on the full set}
 LoCoMo~\cite{maharana2024locomo} stresses very long, multi-session dialogue. We
 report the official evidence-recall metric: the fraction of gold \texttt{dia\_id}
-evidence spans present in retrieved context. Configuration: \texttt{connect\_chorus()},
-batch imprint per turn, $k{=}150$, SPECTRUM full readout when $k{>}100$ (PRISM
-certify cap), GRG recall with shared MiniLM vectors. The July 2026 internally
-reproduced run (embed cache warm) scores \textbf{96.8\%} mean evidence
-recall.
+evidence spans present in retrieved context. Retrieval runs entirely inside the
+native Rust CHORUS engine via a first-principles late-interaction stack:
+salience-gated MaxSim over the MiniLM/mpnet \texttt{last\_hidden\_state} token
+population (predictive-coding query-token weights), conjunctive surprisal scoring
+(information content $\times$ Weber--Fechner saturation with proximity binding),
+and evidence-integration (Ernst--Banks) fusion of the token-population and
+lexical channels. Configuration: batch imprint per turn, $k{=}150$, shared
+MiniLM-384 vectors (mpnet-768 reported alongside). The July 2026 internally
+reproduced run scores \textbf{96.8\%} mean evidence recall at $k{=}150$ with
+MiniLM-384 (\textbf{97.0\%} with mpnet-768) as \emph{raw} recall with \emph{no}
+neighbor expansion (Table~\ref{tab:locomo-k} for the budget--recall curve).
+
+\paragraph{Deprecated 99\% figure (honest disclosure).} An earlier
+draft headlined \textbf{99.0\%} on this set. That number was an artifact of a
+harness scoring policy---$\pm3$ session-neighbor expansion
+(\texttt{expand\_session\_neighbors}) that credited spans adjacent to a hit---not
+a property of the engine. It is deprecated. Under the same $\pm3$ policy a trivial
+BM25 baseline also scored $\sim$99\%, which is exactly why the expanded metric is
+uninformative. All numbers in this paper are raw, unexpanded evidence recall.
+Evidence-recall is also not the same as LLM-judge end-to-end QA; we report the two
+separately and never launder one into the other.
 
 \begin{table}[h]
 \centering
-\caption{LoCoMo full set: 10 conversations, 1{,}982 gold evidence spans (July 2026).}
+\caption{LoCoMo full set: 10 conversations, 1{,}982 gold evidence spans (July 2026);
+raw evidence recall, no neighbor expansion.}
 \begin{tabular}{lrr}
 \toprule
 Metric & Value \\
 \midrule
-Mean evidence recall & \textbf{96.8\%} \\
-All evidence in context & 98.3\% \\
-Evidence hits & 1918/1982 \\
+Mean evidence recall (MiniLM-384) & \textbf{96.8\%} \\
+Mean evidence recall (mpnet-768) & \textbf{97.0\%} \\
+Evidence hits (MiniLM, $k{=}150$) & 1918/1982 \\
 Memories ingested & 8422 \\
 \bottomrule
 \end{tabular}
@@ -364,25 +445,27 @@ Memories ingested & 8422 \\
 
 We deliberately separate \emph{retrieval} from \emph{generation} on LoCoMo
 (Section~\ref{sec:eval}, Limitations). The engine's job is to put evidence in
-context; on full LoCoMo retrieval it scores \textbf{96.8\%} at $k{=}150$.
+context; on full LoCoMo retrieval it scores \textbf{96.8\%} at $k{=}150$
+(MiniLM-384; 97.0\% mpnet-768), raw and without neighbor expansion.
 
 \subsubsection{Recall sensitivity to $k$}
 LoCoMo uses a generous $k{=}150$ (SPECTRUM readout when $k{>}100$). To test
 whether the headline number depends on that budget, we re-score the same July 2026
-CHORUS+Fabric imprint with a single batched recall per question and truncate to
-$k \in \{5,10,25,50,150\}$ (Table~\ref{tab:locomo-k}). Mean evidence recall stays
-high at moderate $k$; the full-set 96.8\% figure is at $k{=}150$.
+imprint with a single batched recall per question and truncate to
+$k \in \{5,10,20,50,150\}$ (Table~\ref{tab:locomo-k}). Even at a tight $k{=}5$ the
+native stack retains \textbf{72.6\%} (MiniLM) / \textbf{75.1\%} (mpnet); the full-set
+96.8\% figure is at $k{=}150$. All rows are raw recall with no neighbor expansion.
 
 \begin{table}[h]
 \centering
-\caption{LoCoMo evidence recall vs.\ retrieval budget $k$ (CHORUS+Fabric, July 2026).}
+\caption{LoCoMo raw evidence recall vs.\ retrieval budget $k$ (native Rust CHORUS stack, July 2026).}
 \label{tab:locomo-k}
 \begin{tabular}{lrrrrr}
 \toprule
-$k$ & 5 & 10 & 25 & 50 & 150 \\
+$k$ & 5 & 10 & 20 & 50 & 150 \\
 \midrule
-Mean evidence recall & 69.3\% & 77.6\% & 87.3\% & 93.5\% & \textbf{96.8\%} \\
-All evidence in context & 65.0\% & 72.9\% & 83.4\% & 90.8\% & 98.3\% \\
+Mean evidence recall (MiniLM-384) & 72.6\% & 80.0\% & 85.6\% & 91.8\% & \textbf{96.8\%} \\
+Mean evidence recall (mpnet-768) & 75.1\% & --- & --- & --- & \textbf{97.0\%} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -392,8 +475,10 @@ On the full LoCoMo set with \texttt{connect\_index()} at $k{=}50$, hybrid
 BM25+dense and vector-fast-only are statistically tied ($\sim$90.2\% vs.\
 $\sim$90.3\% mean evidence recall; frozen
 \texttt{locomo-hybrid-index-2026-07-10.json}). The headline 96.8\% figure uses
-CHORUS+Fabric at $k{=}150$, not the index lane. Lexical seeds help on some
-dialogue slices but are not a large uniform gain on this benchmark at moderate~$k$.
+the native CHORUS stack at $k{=}150$, not the index lane. We keep BM25 as a candidate
+seed for entity- and date-heavy dialogue cues, but on this full-set ablation at
+moderate~$k$ it is not a large uniform gain over vector-only---so we do not sell
+hybrid as axiomatic superiority.
 
 \subsection{FAMB and provenance-conflict suite}
 Generic IR does not test what agents need. FAMB measures paraphrase recall@1
@@ -407,46 +492,43 @@ not as external validation.
 
 \textbf{Graded provenance conflicts ($n{=}50$).} Because FAMB provenance is a
 single wallet scenario, we add a separate benchmark:
-\texttt{benchmarks/provenance\_conflict\_bench.py}. Each of 50 isolated cases
-ingests a verified ledger/tool fact and a conflicting unverified chat claim in
+\texttt{benchmarks/provenance\_conflict\_bench.py}. Each case ingests a verified
+ledger/tool fact and a conflicting unverified chat claim in
 \texttt{connect\_agent()}; the cue asks for the grounded value. Top-1 must be the
-verified engram. The July 2026 run scores \textbf{100\%} (50/50) across ten
-domains (wallet, shipping, subscription, API quota, inventory, meeting, deployment,
-refund, license, temperature). This is still synthetic author-designed stress
-testing, not a peer benchmark, but it is stronger than $n{=}1$ for the provenance
-story.
+verified engram. Domains span wallet, shipping, subscription, API quota,
+inventory, meeting, deployment, refund, license, and temperature. This is
+synthetic author-designed stress testing, not a peer benchmark, but stronger than
+$n{=}1$ for the provenance story.
 
-\textbf{Shared-brain stress (multi-tenant analogue).} The same 50 cases ingested
-into a \emph{single} \texttt{connect\_agent()} brain---100 conflicting engrams,
-semantically similar cues---collapse to \textbf{18\%} top-1 (9/50;
-\texttt{--shared-brain} in the harness). We attribute this to \emph{cross-case
-cue contamination}: unrelated domains share lexical overlap (``balance,''
-``quota,'' ``version''), so activation returns another case's ledger or chat
-engram, not a failure of per-pair provenance ranking in isolation
-(Table~\ref{tab:provenance-conditions}). \textbf{Status:} no implementation mitigates
-this failure mode as of this preprint---\texttt{activate\_scoped} can post-filter by
-\texttt{agent\_id}, but ingest and benchmarks do not enforce per-tenant namespaces,
-and we have not re-run the suite under scoped activation (Section~\ref{sec:future}).
+\textbf{Shared-brain stress is the headline (multi-tenant analogue).} The thesis is
+provenance-weighted recall under realistic shared memory. When all 50 cases share
+one \texttt{connect\_agent()} brain---100 conflicting engrams, semantically similar
+cues---top-1 collapses to \textbf{18\%} (9/50; \texttt{--shared-brain}). We
+attribute this to \emph{cross-case cue contamination}: unrelated domains share
+lexical overlap (``balance,'' ``quota,'' ``version''), so activation returns
+another case's ledger or chat engram. Under \emph{per-case isolation} (one brain
+per conflict pair), the same suite scores \textbf{100\%} (50/50)---a ceiling under
+isolation, not evidence of multi-tenant readiness
+(Table~\ref{tab:provenance-conditions}). \textbf{Status:} no implementation
+mitigates the shared-brain failure as of this preprint---\texttt{activate\_scoped}
+can post-filter by \texttt{agent\_id}, but ingest and benchmarks do not enforce
+per-tenant namespaces, and we have not re-run the suite under scoped activation
+(Section~\ref{sec:future}).
 
 \begin{table}[h]
 \centering
-\caption{Provenance-conflict suite ($n{=}50$): isolated vs.\ shared brain.}
+\caption{Provenance-conflict suite ($n{=}50$): shared brain is the deployment stress;
+isolated is the isolation ceiling.}
 \label{tab:provenance-conditions}
 \begin{tabular}{lrr}
 \toprule
 Condition & Top-1 accuracy & Notes \\
 \midrule
-Isolated (one brain per case) & \textbf{100\%} & 50/50; FAMB protocol \\
 Shared (one brain, all cases) & \textbf{18\%} & 9/50; cross-case contamination \\
+Isolated (one brain per case) & \textbf{100\%} & 50/50; isolation ceiling \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\texttt{connect\_agent()} FAMB macro is \textbf{100\%};
-CHORUS macro is \textbf{100\%} (July 2026 internally reproduced rerun; CHORUS
-provenance and persistence suites call \texttt{chorus\_sleep()} before
-\texttt{activate()} so durable engrams participate in ranking). We do not place
-FAMB or the provenance-conflict suite alongside LoCoMo/BEIR in headline figures.
 
 \subsection{LongMemEval-S: 97.6\% session recall@8 (v4 unified 500)}
 LongMemEval~\cite{wu2024longmemeval} tests six long-horizon abilities across 500
@@ -566,8 +648,8 @@ Table~\ref{tab:longmemeval-e2e} use different stacks and are not plotted here.}
 
 \section{Discussion}
 \textbf{The engine is the contribution, not the reader.} A memory system should be
-judged on whether it surfaces the right evidence; 96.8\% on full LoCoMo says it
-does. End-to-end QA additionally depends on the language model and the prompt
+judged on whether it surfaces the right evidence; 96.8\% raw recall on full LoCoMo
+says it does. End-to-end QA additionally depends on the language model and the prompt
 budget, and we are careful not to launder a retrieval win into a generation claim.
 
 \textbf{Operational use.} We have exercised FluctlightDB in long-running developer
@@ -578,36 +660,38 @@ the chaos suite above---not properties asserted only from benchmark scripts.
 \textbf{Hybrid retrieval on measured ablations.} On LoCoMo with
 \texttt{connect\_index()} at $k{=}50$, hybrid BM25+dense and vector-fast-only
 tie within 0.1 percentage points mean evidence recall (full-set ablation JSON).
-The 96.8\% headline uses CHORUS+Fabric at $k{=}150$. Dialogue evidence can hinge
+The 96.8\% headline uses the native CHORUS stack at $k{=}150$. Dialogue evidence can hinge
 on entities and dates; we report measured gaps rather than treating hybrid recall
 as axiomatic.
 
 \textbf{Limitations.}
 \textbf{Provenance under shared memory.} The graded 50-case suite scores
-\textbf{100\%} when each conflict pair lives in an isolated brain, but only
-\textbf{18\%} (9/50) when all pairs share one brain (Table~\ref{tab:provenance-conditions}).
-We do not treat the isolated figure as evidence of multi-tenant readiness; the
-shared-brain drop reflects cross-case cue contamination, not a broken
-verified-vs-chat ranker within a single scope. \textbf{Status:} unaddressed in code
-and unevaluated beyond this synthetic stress test (Section~\ref{sec:future}).
+\textbf{18\%} top-1 (9/50) when all pairs share one brain---the figure that tests
+the thesis under realistic co-location (Table~\ref{tab:provenance-conditions}).
+Per-case isolation reaches \textbf{100\%}; we treat that only as an isolation
+ceiling, not multi-tenant readiness. The shared-brain drop reflects cross-case
+cue contamination, not a broken verified-vs-chat ranker within a single scope.
+\textbf{Status:} unaddressed in code and unevaluated beyond this synthetic stress
+test (Section~\ref{sec:future}).
 
-\textbf{LoCoMo $k$ and metric choice.} Headline LoCoMo retrieval uses $k{=}150$;
-Table~\ref{tab:locomo-k} reports sensitivity to smaller budgets. We do not claim
-that 96.8\% holds at $k{=}5$ without checking the frozen sweep.
+\textbf{LoCoMo $k$ and metric choice.} Headline LoCoMo retrieval uses $k{=}150$
+and \emph{raw}, unexpanded evidence recall; Table~\ref{tab:locomo-k} reports
+sensitivity to smaller budgets (72.6\% at $k{=}5$, MiniLM). The deprecated 99\%
+figure relied on $\pm3$ neighbor expansion and is not used anywhere in this paper.
 
 \textbf{LongMemEval $K$.} We report session recall at $K{=}8$ from a frozen Colab
 run and document a \texttt{--report-ks 5,8,10} harness for $K{=}5$ and $K{=}10$
 from one recall pass; leaderboard rows still mix embedders and protocols.
 
-\textbf{LoCoMo end-to-end gap.} Full LoCoMo retrieval reaches \textbf{96.8\%} evidence
-recall, but a 50-question end-to-end pilot with a hosted reader LLM yields only
-\textbf{23.5\%} category F1 despite \textbf{99.5\%} retrieval on the same slice; a
-verbatim answer-in-context proxy sits near \textbf{38\%}. This is the largest
-reader/generation gap in our evaluation: gold LoCoMo answers are usually inferred
-facts (dates, counts), not quoted spans, so high retrieval does not translate to
-high F1 without a strong reader and prompt budget. We hypothesize the gap is
-dominated by reader formatting and abstractive gold labels rather than retrieval
-failure, but we do not yet have a full 1{,}982-span LoCoMo E2E run to confirm it.
+\textbf{LoCoMo end-to-end gap.} Full LoCoMo retrieval reaches \textbf{96.8\%} raw
+evidence recall (MiniLM; 97.0\% mpnet), and an end-to-end QA read over
+\emph{date-stamped} context reaches $\approx$\textbf{85\%} accuracy at $k{=}15$.
+Because gold LoCoMo answers are usually inferred facts (dates, counts) rather than
+quoted spans, the reader must see \emph{when} each turn happened; without
+date-stamped context, temporal questions fail and E2E accuracy collapses far below
+retrieval. The remaining retrieval$\to$QA gap is therefore reader/formatting
+bound, not a retrieval failure. Evidence-recall and LLM-judge QA are reported as
+separate metrics and never conflated.
 
 Retrieval-only v4 (Figure~\ref{fig:longmemeval-types}) still has temporal and
 preference misses at 95.5\% and 96.7\%; LLM-based key expansion (LongMemEval CP2
@@ -620,7 +704,7 @@ not yet evaluated.
 
 \section{Future Work}
 \label{sec:future}
-The shared-brain provenance result (18\% top-1 vs.\ 100\% isolated) is the highest-priority
+The shared-brain provenance result (\textbf{18\%} top-1; 100\% only under isolation) is the highest-priority
 gap for a revised preprint: session- or agent-scoped \texttt{experience}/\texttt{activate},
 stricter hybrid candidate filtering, and a re-benchmark of
 \texttt{provenance\_conflict\_bench.py} under realistic multi-tenant load. That work
@@ -689,7 +773,7 @@ vendor/literature figures on \emph{different} metric types---not head-to-head.}
 \midrule
 \multicolumn{5}{l}{\textit{FluctlightDB (this work; internally reproduced)}} \\
 \midrule
-FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{96.8\%} & LoCoMo evidence \\
+FluctlightDB & Engine & \texttt{experience} / \texttt{activate} & \textbf{96.8\%} & LoCoMo evidence (raw, $k{=}150$) \\
 FluctlightDB & Engine & hybrid index + session keys & \textbf{97.6\%} & LongMemEval session@8 \\
 FluctlightDB & Engine & Muon + paper E2E & \textbf{97.4\%} & LongMemEval E2E QA \\
 \midrule
@@ -715,12 +799,13 @@ The relational model gave applications a database for \emph{facts}; the vector
 model gave search a database for \emph{similarity}. Autonomous agents need a
 database for \emph{memory}, and it should be as boring to adopt and as rigorous to
 trust as SQLite. FluctlightDB is our argument that this engine can exist today: it
-ties vector baselines where they are strong on shared harnesses, passes our
-author-designed agent-memory regression suites at 100\% macro, recalls 96.8\% of gold evidence on LoCoMo
-retrieval, 97.6\% session recall on LongMemEval-S (retrieval v4), and 97.4\%
-end-to-end QA on LongMemEval-S---while LoCoMo end-to-end QA remains weak (23.5\%
-F1 on a 50-question pilot). We release everything needed to reproduce and contest
-these claims.
+ties vector baselines where they are strong on shared harnesses, reaches 96.8\%
+raw LoCoMo evidence \emph{retrieval} (no neighbor expansion) with $\approx$85\%
+end-to-end QA over date-stamped context, scores 97.6\% session recall and 97.4\% end-to-end QA
+on LongMemEval-S, and---on the provenance thesis under shared memory---only 18\%
+top-1 on the graded conflict suite (100\% under isolation). Harnesses, frozen
+JSON, and MIT engine source are released so others can re-run and contest these
+claims; the one-minute path uses the published wheel.
 
 \appendix
 \section{Recall Fabric mechanisms}

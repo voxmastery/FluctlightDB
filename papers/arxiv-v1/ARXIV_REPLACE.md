@@ -59,4 +59,9 @@ sed -n '/\\begin{abstract}/,/\\end{abstract}/p' papers/arxiv-v1/main.tex \
 
 - Update `CITATION.cff` — drop the "v1 carries the deprecated figure" note.
 - Update `benchmarks/results/paper-2026-07-09.json` `"arxiv"` field likewise.
+- In `scripts/sync-paper-public.sh`, drop "— v1 predates the LoCoMo correction; v2 pending"
+  from the ARXIV status line, then re-run the script and
+  `scripts/publish-paper-huggingface.sh`. **Edit the script, not `papers/public/index.html`** —
+  the HTML is generated from a heredoc inside it and any direct edit is overwritten on the
+  next sync. (That is how the retracted 99.0% survived in the published site for two months.)
 - `README.md` already links `arXiv:2608.12365` (version-agnostic, no change needed).
