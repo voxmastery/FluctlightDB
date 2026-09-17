@@ -152,6 +152,9 @@ pub struct ActivationResult {
     pub active_neurons: usize,
     pub hops: u32,
     pub myelinated: bool,
+    /// Present when activation ran through `activate_and_attend` (AST readout).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attention: Option<crate::attention_schema::AttentionSchemaReport>,
 }
 
 /// Report from one sleep / consolidation cycle.

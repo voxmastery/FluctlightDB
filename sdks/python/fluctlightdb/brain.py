@@ -623,6 +623,152 @@ class FluctlightBrain:
     ) -> None:
         self._brain.wm_push(content, context, salience, semantic_vector)
 
+    def redirect_attention(self, target: str) -> dict[str, Any]:
+        """Set the Graziano attention-schema spotlight (AST control path)."""
+        fn = getattr(self._brain, "redirect_attention", None)
+        if fn is None:
+            return {}
+        raw = fn(target)
+        return raw if isinstance(raw, dict) else {}
+
+    def release_attention(self) -> dict[str, Any]:
+        """Clear the modeled attention spotlight."""
+        fn = getattr(self._brain, "release_attention", None)
+        if fn is None:
+            return {}
+        raw = fn()
+        return raw if isinstance(raw, dict) else {}
+
+    def attention_report(self) -> dict[str, Any]:
+        """Introspective attention-schema readout ("I am attending to…")."""
+        fn = getattr(self._brain, "attention_report", None)
+        if fn is None:
+            return {}
+        raw = fn()
+        return raw if isinstance(raw, dict) else {}
+
+    def activate_and_attend(self, cue: str) -> dict[str, Any]:
+        """Activate recall, then update the attention schema from what fired."""
+        fn = getattr(self._brain, "activate_and_attend", None)
+        if fn is None:
+            return self.activate(cue)
+        raw = fn(cue)
+        return raw if isinstance(raw, dict) else {}
+
+    def predictive_cycle(self, *, with_preplay: bool = False) -> dict[str, Any]:
+        """Refresh top-down expectation from attention (+ optional preplay)."""
+        fn = getattr(self._brain, "predictive_cycle", None)
+        if fn is None:
+            return {}
+        raw = fn(with_preplay)
+        return raw if isinstance(raw, dict) else {}
+
+    def observe_prediction(self, observed: str) -> dict[str, Any]:
+        """Compare observation to expectation; returns surprisal report."""
+        fn = getattr(self._brain, "observe_prediction", None)
+        if fn is None:
+            return {}
+        raw = fn(observed)
+        return raw if isinstance(raw, dict) else {}
+
+    def encode_prediction_error(self, observed: str) -> dict[str, Any]:
+        """Encode a surprisal event as a hot prediction-error engram."""
+        fn = getattr(self._brain, "encode_prediction_error", None)
+        if fn is None:
+            return {}
+        raw = fn(observed)
+        return raw if isinstance(raw, dict) else {}
+
+    def prediction_report(self) -> str:
+        """Narrate the current top-down expectation."""
+        fn = getattr(self._brain, "prediction_report", None)
+        if fn is None:
+            return ""
+        return str(fn())
+
+    def dream_step(self) -> dict[str, Any]:
+        """Autonomous graph simulation step (no user query)."""
+        fn = getattr(self._brain, "dream_step", None)
+        if fn is None:
+            return {}
+        raw = fn()
+        return raw if isinstance(raw, dict) else {}
+
+    def predictive_flow(self, last_n: int = 12) -> str:
+        """Inner timeline narration from recent predictive moments."""
+        fn = getattr(self._brain, "predictive_flow", None)
+        if fn is None:
+            return ""
+        return str(fn(last_n))
+
+    def world_interpretation(self) -> Optional[str]:
+        """Latest proactive interpretation text, if any."""
+        fn = getattr(self._brain, "world_interpretation", None)
+        if fn is None:
+            return None
+        return fn()
+
+    def worldview_step(self) -> dict[str, Any]:
+        """Autonomous worldview cycle: cue → activate → beliefs → workspace."""
+        fn = getattr(self._brain, "worldview_step", None)
+        if fn is None:
+            return {}
+        raw = fn()
+        return raw if isinstance(raw, dict) else {}
+
+    def top_beliefs(self, k: int = 5) -> list[dict[str, Any]]:
+        """Top-k beliefs by confidence from the worldview agent."""
+        fn = getattr(self._brain, "top_beliefs", None)
+        if fn is None:
+            return []
+        raw = fn(k)
+        return raw if isinstance(raw, list) else []
+
+    def workspace_broadcast(self) -> Optional[dict[str, Any]]:
+        """Current global-workspace broadcast, if any."""
+        fn = getattr(self._brain, "workspace_broadcast", None)
+        if fn is None:
+            return None
+        raw = fn()
+        return raw if isinstance(raw, dict) else None
+
+    def worldview_report(self) -> str:
+        """Worldview agent narration (beliefs + questions + workspace)."""
+        fn = getattr(self._brain, "worldview_report", None)
+        if fn is None:
+            return ""
+        return str(fn())
+
+    def global_workspace_step(self) -> dict[str, Any]:
+        """Competition → present-moment merge → multi-receiver ignition broadcast."""
+        fn = getattr(self._brain, "global_workspace_step", None)
+        if fn is None:
+            return {}
+        raw = fn()
+        return raw if isinstance(raw, dict) else {}
+
+    def global_workspace_report(self) -> str:
+        """Global workspace / present-moment narration."""
+        fn = getattr(self._brain, "global_workspace_report", None)
+        if fn is None:
+            return ""
+        return str(fn())
+
+    def present_moment(self) -> Optional[dict[str, Any]]:
+        """Singular fused present moment (unified now), if any."""
+        fn = getattr(self._brain, "present_moment", None)
+        if fn is None:
+            return None
+        raw = fn()
+        return raw if isinstance(raw, dict) else None
+
+    def now_stream(self, last_n: int = 8) -> str:
+        """Recent present-moment stream narration."""
+        fn = getattr(self._brain, "now_stream", None)
+        if fn is None:
+            return ""
+        return str(fn(last_n))
+
     def wm_len(self) -> int:
         return int(self._brain.wm_len())
 

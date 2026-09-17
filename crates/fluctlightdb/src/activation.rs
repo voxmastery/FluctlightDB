@@ -198,6 +198,7 @@ pub fn activate_from_hybrid(
         active_neurons: activation.len(),
         hops: max_hops,
         myelinated: myelination > 0.5,
+        attention: None,
     }
 }
 

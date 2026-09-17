@@ -582,6 +582,107 @@ impl PyBrain {
             .wm_push(content, context, salience, semantic_vector);
     }
 
+    fn redirect_attention(&mut self, py: Python<'_>, target: &str) -> PyResult<Py<PyAny>> {
+        let report = self.inner.redirect_attention(target);
+        json_val_to_py(py, &report)
+    }
+
+    fn release_attention(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let report = self.inner.release_attention();
+        json_val_to_py(py, &report)
+    }
+
+    fn attention_report(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let report = self.inner.attention_report();
+        json_val_to_py(py, &report)
+    }
+
+    fn activate_and_attend(&mut self, py: Python<'_>, cue: &str) -> PyResult<Py<PyAny>> {
+        let result = self.inner.activate_and_attend(cue);
+        json_val_to_py(py, &result)
+    }
+
+    #[pyo3(signature = (with_preplay=false))]
+    fn predictive_cycle(&mut self, py: Python<'_>, with_preplay: bool) -> PyResult<Py<PyAny>> {
+        let report = self.inner.predictive_cycle(with_preplay);
+        json_val_to_py(py, &report)
+    }
+
+    fn observe_prediction(&mut self, py: Python<'_>, observed: &str) -> PyResult<Py<PyAny>> {
+        let report = self.inner.observe_prediction(observed);
+        json_val_to_py(py, &report)
+    }
+
+    fn encode_prediction_error(
+        &mut self,
+        py: Python<'_>,
+        observed: &str,
+    ) -> PyResult<Py<PyAny>> {
+        self.require_writable()?;
+        let report = self
+            .inner
+            .encode_prediction_error(observed)
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        json_val_to_py(py, &report)
+    }
+
+    fn prediction_report(&self) -> String {
+        self.inner.prediction_report()
+    }
+
+    fn dream_step(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let report = self.inner.dream_step();
+        json_val_to_py(py, &report)
+    }
+
+    #[pyo3(signature = (last_n=12))]
+    fn predictive_flow(&self, last_n: usize) -> String {
+        self.inner.predictive_flow(last_n)
+    }
+
+    fn world_interpretation(&self) -> Option<String> {
+        self.inner.world_interpretation()
+    }
+
+    fn worldview_step(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let report = self.inner.worldview_step(None);
+        json_val_to_py(py, &report)
+    }
+
+    #[pyo3(signature = (k=5))]
+    fn top_beliefs(&self, py: Python<'_>, k: usize) -> PyResult<Py<PyAny>> {
+        let beliefs = self.inner.top_beliefs(k);
+        json_val_to_py(py, &beliefs)
+    }
+
+    fn workspace_broadcast(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let ws = self.inner.workspace_broadcast();
+        json_val_to_py(py, &ws)
+    }
+
+    fn worldview_report(&self) -> String {
+        self.inner.worldview_report()
+    }
+
+    fn global_workspace_step(&mut self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let report = self.inner.global_workspace_step(None);
+        json_val_to_py(py, &report)
+    }
+
+    fn global_workspace_report(&self) -> String {
+        self.inner.global_workspace_report()
+    }
+
+    fn present_moment(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let now = self.inner.present_moment();
+        json_val_to_py(py, &now)
+    }
+
+    #[pyo3(signature = (last_n=8))]
+    fn now_stream(&self, last_n: usize) -> String {
+        self.inner.now_stream(last_n)
+    }
+
     fn wm_len(&self) -> usize {
         self.inner.wm_len()
     }
