@@ -71,3 +71,6 @@ graphprune-0.5.*
 # Local-only agent/planning state and the dev symlink to a prebuilt binary
 .hermes/
 fluctlight-current
+
+# Claude Code worktrees (EnterWorktree / SDD isolation)
+.claude/worktrees/
