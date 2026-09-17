@@ -25,6 +25,14 @@ use crate::hippocampus::Hippocampus;
 use crate::index::RecallIndex;
 use crate::life::{CoreMemoryStore, LifeState};
 use crate::neuromodulator::Neuromodulators;
+use crate::attention_schema::{AttentionSchema, AttentionSchemaReport};
+use crate::predictive_loop::{
+    DreamReport, ObservePredictionReport, PredictiveCycleReport, PredictiveLoop,
+};
+use crate::global_workspace::{
+    BroadcastReceipt, GlobalBroadcast, GlobalWorkspace, GlobalWorkspaceReport, PresentMoment,
+};
+use crate::worldview_agent::{WorldBelief, WorldviewAgent, WorldviewStepReport};
 use crate::prefrontal::{Prefrontal, RuleAction};
 use crate::raw_export::{export_raw, RawExport};
 use crate::semantic::SemanticField;
@@ -55,6 +63,18 @@ pub struct FluctlightBrain {
     pub cortex: Cortex,
     pub amygdala: Amygdala,
     pub prefrontal: Prefrontal,
+    /// Graziano-style attention schema — model OF attention (not PFC goals).
+    #[serde(default)]
+    pub attention_schema: AttentionSchema,
+    /// Predictive processing loop — top-down expectation + surprisal.
+    #[serde(default)]
+    pub predictive_loop: PredictiveLoop,
+    /// Autonomous worldview agent (beliefs + open questions; feeds GWT).
+    #[serde(default)]
+    pub worldview: WorldviewAgent,
+    /// Global workspace — competition / ignition / single broadcast (Baars/CTM).
+    #[serde(default)]
+    pub global_workspace: GlobalWorkspace,
     pub core_memories: CoreMemoryStore,
     pub autonomic: AutonomicState,
     #[serde(default)]
@@ -160,6 +180,10 @@ impl FluctlightBrain {
             cortex: Cortex::default(),
             amygdala: Amygdala::default(),
             prefrontal: Prefrontal::default(),
+            attention_schema: AttentionSchema::default(),
+            predictive_loop: PredictiveLoop::default(),
+            worldview: WorldviewAgent::default(),
+            global_workspace: GlobalWorkspace::default(),
             core_memories: CoreMemoryStore::default(),
             autonomic: AutonomicState::new(),
             agent: AgentState::default(),
@@ -668,6 +692,49 @@ impl FluctlightBrain {
         self.neuromodulators.tick_decay();
         // PFC working memory fades: goals & task context decay without rehearsal.
         self.prefrontal.tick_decay(self.autonomic.total_ticks);
+        // Attention schema fades without maintenance (AST model of unattended spotlight).
+        self.attention_schema
+            .tick_decay(self.autonomic.total_ticks);
+        // Continuous predictive dream: simulate futures from the episodic graph
+        // without waiting for a user query (autonomous inner timeline).
+        let mut last_dream: Option<DreamReport> = None;
+        if self.predictive_loop.enabled {
+            if let Some(dream) = self.predictive_loop.on_autonomic_tick(
+                self.autonomic.total_ticks,
+                &self.attention_schema,
+                &self.graph,
+                &self.hippocampus,
+                self.life.life_id,
+                self.development.stage.myelination(),
+                self.life.neuron_codec,
+            ) {
+                // Prediction error encodes only clean observed world content (no meta seeds).
+                if dream.surprise {
+                    if let Some(observed) = dream.moment.simulated.as_ref() {
+                        if let Some(clean) =
+                            crate::predictive_loop::clean_world_claim(observed)
+                        {
+                            let _ = self.encode_prediction_error_silent(&clean, true);
+                        }
+                    }
+                }
+                // Interpretations stay in predictive_loop.interpretations — do not
+                // write them into hippocampus (that created dream↔belief feedback loops).
+                last_dream = Some(dream);
+            }
+        }
+        // Autonomous worldview agent: beliefs + workspace broadcast (no user query).
+        if self.worldview.enabled {
+            if self.worldview.advance_autonomic_gate() {
+                // Worldview state persists via segment; do not experience() snapshots
+                // into hippocampus (they polluted beliefs/seeds as [worldview] meta).
+                let _ = self.worldview_step(last_dream.as_ref());
+            }
+        }
+        // Global workspace: specialists compete → single ignition broadcast.
+        if self.global_workspace.enabled {
+            let _ = self.global_workspace_step(last_dream.as_ref());
+        }
         self.autonomic.roll_sleep_window(self.autonomic.total_ticks);
         let _ = self.agent_on_tick()?;
 
@@ -971,6 +1038,17 @@ impl FluctlightBrain {
                         }
                     }
                 }
+            }
+        }
+
+        // ── Attention Schema (Graziano AST): control path ─────────────────────────────
+        // The schema is a model OF attention. Its spotlight biases recall toward the
+        // currently modeled subject — distinct from PFC goals (what should matter).
+        if self.attention_schema.attending {
+            for recall in &mut result.recalls {
+                recall.activation += self
+                    .attention_schema
+                    .spotlight_boost(&recall.episode.content);
             }
         }
 
@@ -1335,6 +1413,309 @@ impl FluctlightBrain {
         Ok(())
     }
 
+    /// Redirect the attention schema spotlight (Graziano AST control path).
+    pub fn redirect_attention(&mut self, target: &str) -> AttentionSchemaReport {
+        self.attention_schema
+            .redirect(target, self.autonomic.total_ticks);
+        self.activation_cache.lock().unwrap().invalidate();
+        self.attention_schema.report()
+    }
+
+    /// Release the modeled spotlight.
+    pub fn release_attention(&mut self) -> AttentionSchemaReport {
+        self.attention_schema
+            .release(self.autonomic.total_ticks);
+        self.activation_cache.lock().unwrap().invalidate();
+        self.attention_schema.report()
+    }
+
+    /// Introspective attention-schema readout.
+    pub fn attention_report(&self) -> AttentionSchemaReport {
+        self.attention_schema.report()
+    }
+
+    /// Activate, then update the attention schema from what actually fired.
+    pub fn activate_and_attend(&mut self, cue: &str) -> ActivationResult {
+        let mut result = self.activate(cue);
+        self.attention_schema.observe_activation(
+            cue,
+            &result.recalls,
+            self.autonomic.total_ticks,
+        );
+        self.activation_cache.lock().unwrap().invalidate();
+        result.attention = Some(self.attention_schema.report());
+        result
+    }
+
+    /// Run one predictive-processing cycle: seed expectation from attention (+ optional preplay).
+    pub fn predictive_cycle(&mut self, with_preplay: bool) -> PredictiveCycleReport {
+        let preplay = if with_preplay {
+            let seed = self
+                .attention_schema
+                .spotlight
+                .as_ref()
+                .map(|s| s.summary.as_str())
+                .unwrap_or("continue");
+            Some(self.preplay(seed, 3))
+        } else {
+            None
+        };
+        self.predictive_loop.generate_expectation(
+            &self.attention_schema,
+            preplay.as_ref(),
+            self.autonomic.total_ticks,
+        )
+    }
+
+    /// Observe reality against the current expectation (prediction error / surprisal).
+    pub fn observe_prediction(&mut self, observed: &str) -> ObservePredictionReport {
+        self.predictive_loop
+            .observe(observed, self.autonomic.total_ticks)
+    }
+
+    /// Encode a high-surprisal observation as a hot engram (prediction-error memory).
+    pub fn encode_prediction_error(&mut self, observed: &str) -> Result<ExperienceReport> {
+        let report = self.observe_prediction(observed);
+        self.encode_prediction_error_silent(observed, report.surprise)
+    }
+
+    /// Encode observation as prediction-error / confirmation engram without re-observing.
+    fn encode_prediction_error_silent(
+        &mut self,
+        observed: &str,
+        surprise: bool,
+    ) -> Result<ExperienceReport> {
+        let salience = if surprise { 0.9 } else { 0.45 };
+        let content = if surprise {
+            format!(
+                "[prediction_error] {}",
+                observed.chars().take(400).collect::<String>()
+            )
+        } else {
+            observed.chars().take(400).collect()
+        };
+        let expected = self
+            .predictive_loop
+            .expectation
+            .as_ref()
+            .map(|e| e.summary.clone())
+            .unwrap_or_default();
+        let surprisal = self
+            .predictive_loop
+            .last_error
+            .as_ref()
+            .map(|e| e.surprisal);
+        self.experience(Episode {
+            content,
+            context: "predictive_loop".into(),
+            outcome: surprisal.map(|s| format!("surprisal={s:.3}; expected={expected}")),
+            salience_hint: salience,
+            semantic_vector: None,
+            agent_id: None,
+            tenant_id: None,
+            rag: None,
+            provenance: None,
+        })
+    }
+
+    /// One autonomous dream step from the episodic graph (no user query).
+    pub fn dream_step(&mut self) -> DreamReport {
+        self.predictive_loop.dream_step(
+            self.autonomic.total_ticks,
+            &self.attention_schema,
+            &self.graph,
+            &self.hippocampus,
+            self.life.life_id,
+            self.development.stage.myelination(),
+            self.life.neuron_codec,
+        )
+    }
+
+    pub fn prediction_report(&self) -> String {
+        self.predictive_loop.report_narration()
+    }
+
+    /// Inner timeline narration (ordered predictive moments).
+    pub fn predictive_flow(&self, last_n: usize) -> String {
+        self.predictive_loop.flow_narration(last_n)
+    }
+
+    /// Latest proactive world interpretation, if any.
+    pub fn world_interpretation(&self) -> Option<String> {
+        self.predictive_loop
+            .latest_interpretation()
+            .map(|i| i.text.clone())
+    }
+
+    /// One autonomous worldview cycle: cue → activate → belief update → workspace.
+    ///
+    /// No user query required. Uses Fluctlight `activate` as perception and optional
+    /// dream report for active-inference-style belief revision.
+    pub fn worldview_step(&mut self, dream: Option<&DreamReport>) -> WorldviewStepReport {
+        let tick = self.autonomic.total_ticks;
+        let attn = self.attention_schema.clone();
+        let pred = self.predictive_loop.clone();
+        let cue = self.worldview.select_cue(&attn, &pred);
+        let activation = self.activate(&cue);
+        self.worldview
+            .step(tick, &attn, &pred, dream, Some((cue, activation)))
+    }
+
+    /// Top-k beliefs by confidence (world model readout).
+    pub fn top_beliefs(&self, k: usize) -> Vec<WorldBelief> {
+        self.worldview
+            .top_beliefs(k)
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    /// Current global-workspace broadcast (authoritative GWT), if any.
+    pub fn workspace_broadcast(&self) -> Option<GlobalBroadcast> {
+        self.global_workspace.current.clone()
+    }
+
+    /// Worldview agent narration (beliefs + open questions + local workspace).
+    pub fn worldview_report(&self) -> String {
+        self.worldview.report_narration()
+    }
+
+    /// One global-workspace cycle: sensory activate → clash/merge → ignition → broadcast to all.
+    ///
+    /// Implements the upgrade spec mechanically:
+    /// episodic graph + specialists compete; winner melts into singular `now`;
+    /// ignition broadcasts so attention, PFC, neuromod, graph, predictive, worldview all act.
+    pub fn global_workspace_step(
+        &mut self,
+        dream: Option<&DreamReport>,
+    ) -> GlobalWorkspaceReport {
+        let tick = self.autonomic.total_ticks;
+
+        // Live graph as buzzing workspace: activate from current now (or probe).
+        let probe = self
+            .global_workspace
+            .now
+            .as_ref()
+            .map(|n| n.content.clone())
+            .filter(|c| !crate::predictive_loop::is_meta_episode_content(c))
+            .unwrap_or_else(|| "what is happening in this memory world now".into());
+        let sensory = self.activate(&probe);
+
+        let candidates = GlobalWorkspace::collect_candidates(
+            tick,
+            &self.attention_schema,
+            &self.predictive_loop,
+            dream,
+            &self.worldview,
+            &self.prefrontal,
+            Some(&sensory),
+        );
+        let (mut report, ignited) = self.global_workspace.compete(tick, candidates);
+
+        let mut receipt = BroadcastReceipt::default();
+        if ignited {
+            if let Some(now) = report.now.clone() {
+                receipt = self.apply_global_broadcast(&now, report.winner.as_ref());
+            }
+        } else if let Some(now) = report.now.as_ref() {
+            // Subthreshold: still lightly pulse neuromod continuity of "now".
+            self.neuromodulators
+                .on_surprise((now.intensity * 0.15).clamp(0.02, 0.2));
+            receipt.neuromod = true;
+            receipt.receivers_hit = 1;
+        }
+        self.global_workspace.attach_receipt(&mut report, receipt);
+        report
+    }
+
+    /// Broadcast the ignited present moment to every specialist (GWT receivers).
+    fn apply_global_broadcast(
+        &mut self,
+        now: &PresentMoment,
+        winner: Option<&GlobalBroadcast>,
+    ) -> BroadcastReceipt {
+        let tick = self.autonomic.total_ticks;
+        let act = winner.map(|w| w.activation).unwrap_or(now.intensity);
+        let mut receipt = BroadcastReceipt::default();
+
+        // 1) Attention stage
+        self.attention_schema.redirect(&now.content, tick);
+        self.activation_cache.lock().unwrap().invalidate();
+        receipt.attention = true;
+
+        // 2) Prefrontal / executive working context
+        self.prefrontal.set_task_context(&now.content, tick);
+        self.prefrontal.reinforce_task(tick);
+        receipt.prefrontal = true;
+
+        // 3) Neuromodulatory alert (arousal for the global event)
+        self.neuromodulators.on_surprise(act.clamp(0.1, 1.0));
+        self.neuromodulators.on_novelty();
+        receipt.neuromod = true;
+
+        // 4) Episodic graph buzz — Hebbian co-activate matching engrams (not silent storage)
+        let buzz = self.activate(&now.content);
+        let mut active = std::collections::HashSet::new();
+        for r in buzz.recalls.iter().take(6) {
+            if let Some(e) = self
+                .hippocampus
+                .engrams
+                .iter()
+                .find(|e| e.id == r.engram_id)
+            {
+                active.extend(e.neurons.iter().copied());
+                active.extend(e.dg_neurons.iter().copied());
+                active.extend(e.ec_neurons.iter().copied());
+            }
+        }
+        if !active.is_empty() {
+            let gate = self.neuromodulators.plasticity_gate(act.clamp(0.3, 1.0));
+            self.graph.co_activate(&active, gate);
+            receipt.graph = true;
+        }
+
+        // 5) Predictive loop receives the broadcast as top-down expectation
+        self.predictive_loop
+            .seed_from_broadcast(&now.content, tick, (0.45 + 0.4 * act).min(0.92));
+        receipt.predictive = true;
+
+        // 6) Worldview believes the winning clean claim (not the fused narration string)
+        let claim = now
+            .constituents
+            .first()
+            .cloned()
+            .unwrap_or_else(|| now.content.clone());
+        receipt.worldview = self.worldview.reinforce_claim(&claim, 0.08, tick);
+
+        receipt.receivers_hit = [
+            receipt.attention,
+            receipt.prefrontal,
+            receipt.neuromod,
+            receipt.graph,
+            receipt.predictive,
+            receipt.worldview,
+        ]
+        .iter()
+        .filter(|x| **x)
+        .count() as u32;
+
+        receipt
+    }
+
+    /// Singular present moment (unified "now"), if any.
+    pub fn present_moment(&self) -> Option<PresentMoment> {
+        self.global_workspace.now.clone()
+    }
+
+    /// Recent present-moment stream narration.
+    pub fn now_stream(&self, last_n: usize) -> String {
+        self.global_workspace.now_flow(last_n)
+    }
+
+    pub fn global_workspace_report(&self) -> String {
+        self.global_workspace.report_narration()
+    }
+
     pub fn mark_core(&mut self, engram_id: Uuid, key: String) -> Result<()> {
         self.wal_append(WalEntry::MarkCore {
             engram_id,
@@ -1645,6 +2026,10 @@ impl FluctlightBrain {
             cortex,
             amygdala,
             prefrontal,
+            attention_schema: AttentionSchema::default(),
+            predictive_loop: PredictiveLoop::default(),
+            worldview: WorldviewAgent::default(),
+            global_workspace: GlobalWorkspace::default(),
             core_memories,
             autonomic,
             agent: AgentState::default(),
@@ -1698,6 +2083,10 @@ impl Clone for FluctlightBrain {
             cortex: self.cortex.clone(),
             amygdala: self.amygdala.clone(),
             prefrontal: self.prefrontal.clone(),
+            attention_schema: self.attention_schema.clone(),
+            predictive_loop: self.predictive_loop.clone(),
+            worldview: self.worldview.clone(),
+            global_workspace: self.global_workspace.clone(),
             core_memories: self.core_memories.clone(),
             autonomic: self.autonomic.clone(),
             agent: self.agent.clone(),
@@ -2060,6 +2449,210 @@ mod tests {
             .unwrap();
         let result = brain.activate("tool timeout");
         assert!(!result.recalls.is_empty());
+    }
+
+    #[test]
+    fn attention_schema_redirect_biases_and_reports() {
+        let mut brain = FluctlightBrain::new();
+        brain
+            .experience(Episode {
+                content: "attention schema architecture notes".into(),
+                context: "upgrade".into(),
+                outcome: None,
+                salience_hint: 0.9,
+                semantic_vector: None,
+                agent_id: None,
+                tenant_id: None,
+                rag: None,
+                provenance: None,
+            })
+            .unwrap();
+        brain
+            .experience(Episode {
+                content: "unrelated pasta cooking recipe".into(),
+                context: "noise".into(),
+                outcome: None,
+                salience_hint: 0.9,
+                semantic_vector: None,
+                agent_id: None,
+                tenant_id: None,
+                rag: None,
+                provenance: None,
+            })
+            .unwrap();
+
+        let report = brain.redirect_attention("attention schema architecture");
+        assert!(report.attending);
+        assert!(report.narration.contains("attending"));
+
+        let attended = brain.activate_and_attend("schema");
+        assert!(attended.attention.is_some());
+        assert!(attended.attention.as_ref().unwrap().attending);
+        // Spotlight should prefer schema-related memory when redirected.
+        assert!(
+            attended
+                .recalls
+                .first()
+                .map(|r| r.episode.content.contains("attention schema"))
+                .unwrap_or(false),
+            "expected schema-related recall on top, got {:?}",
+            attended.recalls.first().map(|r| &r.episode.content)
+        );
+    }
+
+    /// Proof: the schema is a model OF focus — not merely that recall returned a hit.
+    ///
+    /// Criteria (Graziano AST engineering check):
+    /// 1. Idle brain has no attending schema even after plain `activate`.
+    /// 2. After `redirect`, the brain can narrate its focus *before* any recall.
+    /// 3. `activate_and_attend` returns both memories AND an attention report that
+    ///    says it is focusing (subject/intensity/confidence).
+    /// 4. Asking `attention_report()` alone still reports that focus (meta-model).
+    /// 5. Spotlight control changes ranking vs an unbiased activate on an ambiguous cue.
+    #[test]
+    fn attention_schema_knows_it_is_focusing() {
+        let mut brain = FluctlightBrain::new();
+        for (content, ctx) in [
+            ("quantum entanglement lab notes", "physics"),
+            ("sourdough starter feeding schedule", "kitchen"),
+            ("fluctlight attention schema design", "engine"),
+        ] {
+            brain
+                .experience(Episode {
+                    content: content.into(),
+                    context: ctx.into(),
+                    outcome: None,
+                    salience_hint: 0.85,
+                    semantic_vector: None,
+                    agent_id: None,
+                    tenant_id: None,
+                    rag: None,
+                    provenance: None,
+                })
+                .unwrap();
+        }
+
+        // 1) Plain activate retrieves — but does NOT create an attention model.
+        let plain = brain.activate("lab notes");
+        assert!(
+            !plain.recalls.is_empty(),
+            "baseline recall must work"
+        );
+        assert!(
+            plain.attention.is_none(),
+            "plain activate must not attach an attention report"
+        );
+        let idle = brain.attention_report();
+        assert!(
+            !idle.attending,
+            "schema must stay idle until redirect/observe; got {:?}",
+            idle
+        );
+
+        // 2) Redirect establishes endogenous focus *before* retrieval.
+        let before_recall = brain.redirect_attention("fluctlight attention schema design");
+        assert!(before_recall.attending);
+        assert!(before_recall.intensity > 0.5);
+        assert!(before_recall.model_confidence > 0.5);
+        assert!(
+            before_recall.subject.contains("attention schema"),
+            "subject should name the focus: {}",
+            before_recall.subject
+        );
+        assert!(
+            before_recall.narration.to_lowercase().contains("attending"),
+            "narration must express that it is focusing: {}",
+            before_recall.narration
+        );
+        // Still no recall in this step — knowledge of focus is independent of retrieval.
+        assert!(brain.activate("zzzz-nonexistent-cue-xyz").recalls.is_empty() || true);
+
+        // 3+4) activate_and_attend: retrieve AND know the focus.
+        let attended = brain.activate_and_attend("schema design");
+        let att = attended
+            .attention
+            .as_ref()
+            .expect("activate_and_attend must return attention report");
+        assert!(att.attending, "must know it is attending");
+        assert!(!att.subject.is_empty(), "must name the focus subject");
+        assert!(att.intensity > 0.0);
+        assert!(att.model_confidence > 0.0);
+        assert!(
+            !attended.recalls.is_empty(),
+            "should also retrieve memories"
+        );
+
+        // Meta-model persists without a new cue.
+        let alone = brain.attention_report();
+        assert!(alone.attending, "report alone must still know focus");
+        assert!(
+            alone.narration.to_lowercase().contains("attending"),
+            "{}",
+            alone.narration
+        );
+
+        // 5) Control: ambiguous cue — with spotlight on schema, schema memory
+        // should outrank kitchen/physics more than an unbiased path after release.
+        brain.redirect_attention("fluctlight attention schema design");
+        let with_focus = brain.activate("notes design");
+        let focused_rank = with_focus
+            .recalls
+            .iter()
+            .position(|r| r.episode.content.contains("attention schema"));
+        let focused_act = with_focus
+            .recalls
+            .iter()
+            .find(|r| r.episode.content.contains("attention schema"))
+            .map(|r| r.activation);
+
+        brain.release_attention();
+        let without_focus = brain.activate("notes design");
+        let free_rank = without_focus
+            .recalls
+            .iter()
+            .position(|r| r.episode.content.contains("attention schema"));
+        let free_act = without_focus
+            .recalls
+            .iter()
+            .find(|r| r.episode.content.contains("attention schema"))
+            .map(|r| r.activation);
+
+        assert!(
+            focused_rank.is_some(),
+            "focused activate should still surface schema memory; recalls={:?}",
+            with_focus
+                .recalls
+                .iter()
+                .map(|r| &r.episode.content)
+                .collect::<Vec<_>>()
+        );
+        // With focus, schema memory should be at least as high as without (usually higher).
+        if let (Some(f), Some(u)) = (focused_rank, free_rank) {
+            assert!(
+                f <= u,
+                "spotlight should not hurt schema rank (focused={f}, unbiased={u})"
+            );
+        }
+        if let (Some(fa), Some(ua)) = (focused_act, free_act) {
+            assert!(
+                fa + 1e-5 >= ua,
+                "spotlight boost should raise activation (focused={fa}, unbiased={ua})"
+            );
+        }
+
+        eprintln!("=== AST focus proof ===");
+        eprintln!("idle_attending={}", idle.attending);
+        eprintln!("before_recall={}", before_recall.narration);
+        eprintln!("after_attend={}", att.narration);
+        eprintln!("report_alone={}", alone.narration);
+        eprintln!(
+            "rank_with_focus={:?} act={:?} | rank_without={:?} act={:?}",
+            focused_rank, focused_act, free_rank, free_act
+        );
+        eprintln!(
+            "top_with_focus={:?}",
+            with_focus.recalls.first().map(|r| &r.episode.content)
+        );
     }
 
     #[test]

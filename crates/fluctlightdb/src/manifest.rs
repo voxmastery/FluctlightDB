@@ -48,6 +48,10 @@ impl Default for BrainManifest {
                 "cortex".into(),
                 "amygdala".into(),
                 "prefrontal".into(),
+                "attention_schema".into(),
+                "predictive_loop".into(),
+                "worldview".into(),
+                "global_workspace".into(),
                 "core_memories".into(),
                 "autonomic".into(),
                 "recent_separations".into(),
@@ -188,6 +192,10 @@ fn write_checkpoint_dir(brain: &FluctlightBrain, dir: &Path) -> Result<()> {
     segment::write_segment(dir, "cortex", &brain.cortex)?;
     segment::write_segment(dir, "amygdala", &brain.amygdala)?;
     segment::write_segment(dir, "prefrontal", &brain.prefrontal)?;
+    segment::write_segment(dir, "attention_schema", &brain.attention_schema)?;
+    segment::write_segment(dir, "predictive_loop", &brain.predictive_loop)?;
+    segment::write_segment(dir, "worldview", &brain.worldview)?;
+    segment::write_segment(dir, "global_workspace", &brain.global_workspace)?;
     segment::write_segment(dir, "core_memories", &brain.core_memories)?;
     segment::write_segment(dir, "autonomic", &brain.autonomic)?;
     segment::write_segment(dir, "recent_separations", &brain.recent_separations)?;
@@ -293,6 +301,13 @@ fn load_checkpoint_dir(dir: &Path) -> Result<FluctlightBrain> {
     brain.muon = segment::read_segment(dir, "muon").unwrap_or_default();
     brain.tau = segment::read_segment(dir, "tau").unwrap_or_default();
     brain.swarm = segment::read_segment(dir, "swarm").unwrap_or_default();
+    brain.attention_schema =
+        segment::read_segment(dir, "attention_schema").unwrap_or_default();
+    brain.predictive_loop =
+        segment::read_segment(dir, "predictive_loop").unwrap_or_default();
+    brain.worldview = segment::read_segment(dir, "worldview").unwrap_or_default();
+    brain.global_workspace =
+        segment::read_segment(dir, "global_workspace").unwrap_or_default();
     brain.agent = segment::read_segment(dir, "agent").unwrap_or_default();
     brain.governance = segment::read_segment(dir, "governance").unwrap_or_default();
     match (manifest.tenant_uuid, manifest.durability) {

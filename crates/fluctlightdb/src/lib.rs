@@ -8,6 +8,7 @@ pub mod agent_prompt;
 pub mod agent_runtime;
 pub mod amygdala;
 pub mod api_slim;
+pub mod attention_schema;
 pub mod auth;
 pub mod auth_store;
 pub mod autonomic;
@@ -68,6 +69,7 @@ pub mod placement;
 pub mod plasticity;
 pub mod prefrontal;
 pub mod preplay;
+pub mod predictive_loop;
 pub mod prism;
 pub mod query;
 pub mod rate_limit;
@@ -104,6 +106,8 @@ pub mod types;
 pub mod wal;
 pub mod wal_sync;
 pub mod wm_ring;
+pub mod worldview_agent;
+pub mod global_workspace;
 
 pub use agent_prompt::AgentPromptBundle;
 pub use agent_runtime::{enable_agent_env, AgentState, ConsolidateReport, ToolObserveInput};
@@ -161,6 +165,21 @@ pub use serve::BrainServer;
 pub use spectrum::{SpectrumSignature, DEFAULT_FULL_READOUT_MAX};
 pub use stage_schedule::StageConsolidationReport;
 pub use storage::{default_brain_path, default_tenant_brain_dir, StorageFormat};
+pub use attention_schema::{
+    AttentionOwner, AttentionSchema, AttentionSchemaReport, AttentionSnapshot, SpotlightSource,
+    SpotlightTarget,
+};
+pub use predictive_loop::{
+    DreamReport, InnerMoment, MomentKind, ObservePredictionReport, Prediction, PredictionError,
+    PredictionSource, PredictiveCycleReport, PredictiveLoop, WorldInterpretation,
+};
+pub use worldview_agent::{
+    BroadcastKind, WorkspaceBroadcast, WorldBelief, WorldviewAgent, WorldviewStepReport,
+};
+pub use global_workspace::{
+    BroadcastReceipt, GlobalBroadcast, GlobalWorkspace, GlobalWorkspaceReport, PresentMoment,
+    WorkspaceCandidate, WorkspaceSource,
+};
 pub use store::{verify_path, BrainVerifyReport};
 pub use store_lock::{SharedStoreLock, StoreLock};
 pub use swarm::{
