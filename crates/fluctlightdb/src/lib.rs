@@ -9,6 +9,7 @@ pub mod agent_runtime;
 pub mod amygdala;
 pub mod api_slim;
 pub mod attention_schema;
+pub mod connectome;
 pub mod auth;
 pub mod auth_store;
 pub mod autonomic;
