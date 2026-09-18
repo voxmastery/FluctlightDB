@@ -75,6 +75,9 @@ pub struct FluctlightBrain {
     /// Global workspace — competition / ignition / single broadcast (Baars/CTM).
     #[serde(default)]
     pub global_workspace: GlobalWorkspace,
+    /// Imported biological connectome metadata (FlyWire). `None` for ordinary brains.
+    /// Segment `connectome`, additive — never bumps `format_version`.
+    pub connectome: Option<crate::connectome::ConnectomeMeta>,
     pub core_memories: CoreMemoryStore,
     pub autonomic: AutonomicState,
     #[serde(default)]
@@ -184,6 +187,7 @@ impl FluctlightBrain {
             predictive_loop: PredictiveLoop::default(),
             worldview: WorldviewAgent::default(),
             global_workspace: GlobalWorkspace::default(),
+            connectome: None,
             core_memories: CoreMemoryStore::default(),
             autonomic: AutonomicState::new(),
             agent: AgentState::default(),
@@ -2030,6 +2034,7 @@ impl FluctlightBrain {
             predictive_loop: PredictiveLoop::default(),
             worldview: WorldviewAgent::default(),
             global_workspace: GlobalWorkspace::default(),
+            connectome: None,
             core_memories,
             autonomic,
             agent: AgentState::default(),
@@ -2087,6 +2092,7 @@ impl Clone for FluctlightBrain {
             predictive_loop: self.predictive_loop.clone(),
             worldview: self.worldview.clone(),
             global_workspace: self.global_workspace.clone(),
+            connectome: self.connectome.clone(),
             core_memories: self.core_memories.clone(),
             autonomic: self.autonomic.clone(),
             agent: self.agent.clone(),

@@ -52,6 +52,7 @@ impl Default for BrainManifest {
                 "predictive_loop".into(),
                 "worldview".into(),
                 "global_workspace".into(),
+                "connectome".into(),
                 "core_memories".into(),
                 "autonomic".into(),
                 "recent_separations".into(),
@@ -196,6 +197,7 @@ fn write_checkpoint_dir(brain: &FluctlightBrain, dir: &Path) -> Result<()> {
     segment::write_segment(dir, "predictive_loop", &brain.predictive_loop)?;
     segment::write_segment(dir, "worldview", &brain.worldview)?;
     segment::write_segment(dir, "global_workspace", &brain.global_workspace)?;
+    segment::write_segment(dir, "connectome", &brain.connectome)?;
     segment::write_segment(dir, "core_memories", &brain.core_memories)?;
     segment::write_segment(dir, "autonomic", &brain.autonomic)?;
     segment::write_segment(dir, "recent_separations", &brain.recent_separations)?;
@@ -308,6 +310,7 @@ fn load_checkpoint_dir(dir: &Path) -> Result<FluctlightBrain> {
     brain.worldview = segment::read_segment(dir, "worldview").unwrap_or_default();
     brain.global_workspace =
         segment::read_segment(dir, "global_workspace").unwrap_or_default();
+    brain.connectome = segment::read_segment(dir, "connectome").unwrap_or_default();
     brain.agent = segment::read_segment(dir, "agent").unwrap_or_default();
     brain.governance = segment::read_segment(dir, "governance").unwrap_or_default();
     match (manifest.tenant_uuid, manifest.durability) {
