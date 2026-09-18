@@ -193,6 +193,9 @@ impl CalciumSpine {
     ///
     /// Returns the weight delta (ΔW) applied this step.
     pub fn tick(&mut self, weight: &mut f32, dt: f32) -> f32 {
+        if *weight < 0.0 {
+            return 0.0; // inhibitory synapses are frozen in v1 (spec §5.4)
+        }
         // Calcium extrusion: exponential decay toward 0 (buffering + pumps)
         self.ca -= (self.ca / self.tau_ca) * dt;
         self.ca = self.ca.max(0.0);
@@ -545,5 +548,20 @@ mod tests {
                 dt, expected, out.direction, out.delta_w
             );
         }
+    }
+
+    #[test]
+    fn calcium_tick_leaves_inhibitory_weight_unchanged() {
+        let mut spine = CalciumSpine::default();
+        let mut w = -0.4f32;
+        // Drive many ticks with strong coincident pre/post spikes (v_post=0.0, spike peak,
+        // relieves the NMDA Mg2+ block almost fully) so an excitatory weight would clearly move.
+        for _ in 0..50 {
+            spine.on_pre_spike();
+            spine.on_post_spike(0.0);
+            let dw = spine.tick(&mut w, 1.0);
+            assert_eq!(dw, 0.0);
+        }
+        assert_eq!(w, -0.4);
     }
 }

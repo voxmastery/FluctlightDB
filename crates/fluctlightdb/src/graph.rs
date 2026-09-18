@@ -190,11 +190,17 @@ impl BrainGraph {
         if self.adjacency_ready {
             let touched = self.edges_between(active, active);
             for i in touched {
+                if self.synapses[i as usize].weight < 0.0 {
+                    continue; // inhibitory synapses are read-only (spec §5.4)
+                }
                 hebbian_strengthen(&mut self.synapses[i as usize], gate, 0.05);
             }
         } else {
             // Index not built (fresh deserialise before from_snapshot's rebuild): stay correct.
             for synapse in &mut self.synapses {
+                if synapse.weight < 0.0 {
+                    continue; // inhibitory synapses are read-only (spec §5.4)
+                }
                 if active.contains(&synapse.from) && active.contains(&synapse.to) {
                     hebbian_strengthen(synapse, gate, 0.05);
                 }
@@ -245,7 +251,7 @@ impl BrainGraph {
 
     pub fn prune_below(&mut self, threshold: f32) -> u32 {
         let before = self.synapses.len();
-        self.synapses.retain(|s| s.weight >= threshold);
+        self.synapses.retain(|s| s.weight < 0.0 || s.weight >= threshold);
         let pruned = (before - self.synapses.len()) as u32;
         if pruned > 0 {
             self.rebuild_index();
@@ -255,6 +261,9 @@ impl BrainGraph {
 
     pub fn weaken_unused(&mut self, active: &HashSet<NeuronId>, delta: f32) {
         for synapse in &mut self.synapses {
+            if synapse.weight < 0.0 {
+                continue; // inhibitory synapses are read-only (spec §5.4)
+            }
             if !active.contains(&synapse.from) && !active.contains(&synapse.to) {
                 ltd_weaken(synapse, delta);
             }
@@ -604,5 +613,30 @@ mod tests {
         assert_eq!(g.synapse_count(), 1000);
         let w = g.neighbors(hub).find(|(_, to)| *to == NeuronId(10_000)).map(|(s, _)| s.weight).unwrap();
         assert_eq!(w, 0.9);
+    }
+
+    #[test]
+    fn plasticity_never_touches_inhibitory_synapses() {
+        use crate::plasticity::Synapse;
+        use crate::types::Region;
+        use std::collections::HashSet;
+        let mut g = BrainGraph::default();
+        g.rebuild_index();
+        let (a, b, c) = (NeuronId(1), NeuronId(2), NeuronId(3));
+        g.add_synapse_uncapped(Synapse::new(a, b, Region::Cortex, -0.4)); // inhibitory
+        g.add_synapse_uncapped(Synapse::new(a, c, Region::Cortex, 0.4));  // excitatory
+        let weight = |g: &BrainGraph, to: NeuronId| g.neighbors(a).find(|(_, t)| *t == to).map(|(s, _)| s.weight).unwrap();
+
+        let active: HashSet<NeuronId> = [a, b, c].into_iter().collect();
+        g.co_activate(&active, 1.0);
+        assert_eq!(weight(&g, b), -0.4, "co_activate must skip negative weights");
+        assert!(weight(&g, c) > 0.4, "excitatory still strengthens");
+
+        g.weaken_unused(&HashSet::new(), 0.1);
+        assert_eq!(weight(&g, b), -0.4, "weaken_unused must skip negative weights");
+
+        let pruned = g.prune_below(0.3);
+        assert_eq!(pruned, 0);
+        assert_eq!(g.synapse_count(), 2, "prune_below must not treat negative as weak");
     }
 }
