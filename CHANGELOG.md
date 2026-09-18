@@ -11,6 +11,17 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+### Added
+
+- **FlyWire connectome import.** `fluctlight import-connectome` ingests the FlyWire FAFB v783
+  whole-brain connectome (139k neurons, 2.7M connections) as the substrate graph. Metadata lives
+  in a new additive `connectome` segment — no `format_version` change; brains without it are
+  unaffected. GABA/glutamate edges are imported with negative weights, honoured by a sign-aware
+  spread, and frozen from plasticity. Cue tokens project onto Kenyon cells (fanout 7), so text
+  recall runs through fly circuitry. `POST /api/v1/connectome` reports the summary.
+  Brains carrying a connectome bypass the activation cache in v1.
+  Spec: `docs/superpowers/specs/2026-09-17-flywire-connectome-import-design.md`.
+
 ### Changed
 
 - **V3 default brain filename is now `brain.flct`** (renamed from a
