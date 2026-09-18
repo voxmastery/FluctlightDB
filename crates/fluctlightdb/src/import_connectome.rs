@@ -20,7 +20,7 @@ use crate::types::Region;
 use crate::{Error, FluctlightBrain, Result};
 
 const CONNECTIONS_HEADER: &str = "pre_root_id,post_root_id,neuropil,syn_count,nt_type";
-const NEURONS_HEADER_PREFIX: &str = "root_id,group,nt_type";
+const NEURONS_HEADER_PREFIX: &str = "root_id,group,nt_type,";
 const CLASSIFICATION_HEADER: &str = "root_id,flow,super_class,class,sub_class,hemilineage,side,nerve";
 /// Abort when more than this share of connection rows is malformed. Real FlyWire files have
 /// zero; a wrong file fails the header check; 10 % catches a partially corrupt file while
@@ -194,6 +194,9 @@ pub fn import_connectome(brain: &mut FluctlightBrain, cfg: &ImportConfig) -> Res
 
     // All parsing happens before any mutation so a failed import leaves the graph untouched.
     let (mut meta, entry_set) = read_neuron_meta(cfg)?;
+    if entry_set.is_empty() {
+        warnings.push(format!("entry set is empty: no neuron has class `{}`", cfg.entry_class));
+    }
     let (sums, rows_read, rows_malformed) = read_pair_sums(cfg, &mut meta)?;
     let p99_syn = p99(&sums);
 
@@ -209,9 +212,16 @@ pub fn import_connectome(brain: &mut FluctlightBrain, cfg: &ImportConfig) -> Res
             weight_for(sum, p99_syn, inh),
         ));
     }
+    if inhibitory == 0 {
+        warnings.push("no inhibitory synapses were imported — check neurons.csv nt_type column".into());
+    }
+    let pairs = sums.len() as u64;
+    // `sums` peaks at ~2.7M entries on v783; free it before the index rebuild allocates.
+    drop(sums);
     let import_s = t0.elapsed().as_secs_f64();
     let t1 = Instant::now();
     brain.graph.rebuild_index();
+    brain.invalidate_activation_cache();
     let index_s = t1.elapsed().as_secs_f64();
 
     let imported_at = std::time::SystemTime::now()
@@ -233,7 +243,7 @@ pub fn import_connectome(brain: &mut FluctlightBrain, cfg: &ImportConfig) -> Res
     Ok(ImportReport {
         rows_read,
         rows_malformed,
-        pairs: sums.len() as u64,
+        pairs,
         neurons,
         inhibitory_synapses: inhibitory,
         entry_set_len,

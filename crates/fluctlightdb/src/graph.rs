@@ -39,6 +39,10 @@ pub struct BrainGraph {
     /// fully indexed, which lets an incrementally built brain stay fast without an explicit rebuild.
     #[serde(skip)]
     adjacency_ready: bool,
+    /// True when any synapse has a negative (inhibitory) weight. Derived — rebuilt by
+    /// `rebuild_index`, maintained by the two insert paths — and never serialised.
+    #[serde(skip)]
+    pub has_inhibitory: bool,
 }
 
 /// Per-neuron out-degree cap for synaptic competition. Cortical neurons keep a bounded synapse
@@ -61,6 +65,7 @@ impl Default for BrainGraph {
             synapse_index: HashMap::new(),
             adjacency: HashMap::new(),
             adjacency_ready: true,
+            has_inhibitory: false,
         }
     }
 }
@@ -78,6 +83,9 @@ impl BrainGraph {
         if let Some(&idx) = self.synapse_index.get(&key) {
             if self.synapses[idx].weight < synapse.weight {
                 self.synapses[idx].weight = synapse.weight;
+                if synapse.weight < 0.0 {
+                    self.has_inhibitory = true;
+                }
             }
             return;
         }
@@ -108,11 +116,17 @@ impl BrainGraph {
                 let old_key = (loser.from.0, loser.to.0);
                 self.synapse_index.remove(&old_key);
                 self.synapse_index.insert(key, weakest as usize);
+                if synapse.weight < 0.0 {
+                    self.has_inhibitory = true;
+                }
                 self.synapses[weakest as usize] = synapse;
                 return;
             }
         }
         let idx = self.synapses.len();
+        if synapse.weight < 0.0 {
+            self.has_inhibitory = true;
+        }
         self.synapses.push(synapse);
         self.synapse_index.insert(key, idx);
         // Only extend adjacency while it is a complete mirror. Appending to a stale map (e.g. a
@@ -133,10 +147,16 @@ impl BrainGraph {
         if let Some(&idx) = self.synapse_index.get(&key) {
             if self.synapses[idx].weight.abs() < synapse.weight.abs() {
                 self.synapses[idx].weight = synapse.weight;
+                if synapse.weight < 0.0 {
+                    self.has_inhibitory = true;
+                }
             }
             return;
         }
         let idx = self.synapses.len();
+        if synapse.weight < 0.0 {
+            self.has_inhibitory = true;
+        }
         self.synapses.push(synapse);
         self.synapse_index.insert(key, idx);
         if self.adjacency_ready {
@@ -153,6 +173,7 @@ impl BrainGraph {
             self.adjacency.entry(s.from.0).or_default().push(i as u32);
         }
         self.adjacency_ready = true;
+        self.has_inhibitory = self.synapses.iter().any(|s| s.weight < 0.0);
     }
 
     pub fn synapse_count(&self) -> usize {
@@ -691,5 +712,32 @@ mod tests {
             weight(&g, c) > c_before_fallback_stdp,
             "excitatory edge must move again under the stdp_sequential fallback branch"
         );
+    }
+    /// `has_inhibitory` is the gate that decides whether `activation::spread` may run the
+    /// original bit-identical loop. It must flip on any negative insert and must be
+    /// recomputed from scratch by `rebuild_index` (which is what every retain path calls).
+    #[test]
+    fn has_inhibitory_tracks_negative_weights() {
+        let mut g = BrainGraph::default();
+        assert!(!g.has_inhibitory, "an empty graph carries no inhibition");
+
+        g.add_synapse_uncapped(Synapse::new(NeuronId(1), NeuronId(2), Region::Cortex, 0.5));
+        assert!(!g.has_inhibitory, "positive inserts must not flip the flag");
+
+        g.add_synapse_uncapped(Synapse::new(NeuronId(3), NeuronId(4), Region::Cortex, -0.4));
+        assert!(g.has_inhibitory, "add_synapse_uncapped of a negative weight must flip the flag");
+
+        // rebuild_index recomputes it: still true while the negative edge is present.
+        g.rebuild_index();
+        assert!(g.has_inhibitory, "rebuild_index must recompute the flag as true");
+
+        // Drop the negative edge the way prune/remove paths do, then rebuild.
+        g.synapses.retain(|s| s.weight >= 0.0);
+        g.rebuild_index();
+        assert!(!g.has_inhibitory, "rebuild_index must recompute the flag as false");
+
+        // The capped insert path maintains it too.
+        g.add_synapse(Synapse::new(NeuronId(5), NeuronId(6), Region::Cortex, -0.9));
+        assert!(g.has_inhibitory, "add_synapse of a negative weight must flip the flag");
     }
 }

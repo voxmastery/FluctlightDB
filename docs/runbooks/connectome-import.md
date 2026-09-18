@@ -22,9 +22,19 @@ tenant that `fluctlight-serve` has open — stop serve first, or import into a f
       --classification /var/lib/fluctlight/flywire-783/classification.csv \
       --neurons /var/lib/fluctlight/flywire-783/neurons.csv
 
-Expect ≈10 s, ≈500 MB RSS, ≈145 MB on disk, and a JSON report with `pairs ≈ 2,700,513`,
-`entry_set_len = 5177`. The importer parses everything before touching the graph: a failed
-import leaves the brain exactly as it was.
+Expect ≈6 s, ≈400 MB peak RSS, ≈145 MB on disk, recall ≈12 ms, and a JSON report with
+`pairs ≈ 2,700,513`, `entry_set_len = 5177`. The importer parses everything before touching the
+graph: a failed import leaves the brain exactly as it was.
+
+Check the report: `rows_malformed` should be 0 and `inhibitory_synapses` well above 0 (≈1.1M for
+v783). A zero there means the wrong `neurons.csv`.
+
+## Compatibility (read this)
+
+A fused tenant opens under an older binary, but that binary does not know negative weights: its
+first sleep cycle prunes or rewrites every inhibitory synapse. Once imported, the tenant requires
+the version that shipped this feature or newer. `graphprune` likewise prunes by weight ascending
+and must not be run against a fused tenant.
 
 ## Verify
 
@@ -36,3 +46,6 @@ import leaves the brain exactly as it was.
 `--replace` removes every synapse touching a neuron of the previous connectome, then imports.
 To roll back entirely, restore the tenant from `~/.fluctlight/backups/` (backup-restore.md) —
 there is no partial undo.
+
+`export-raw` / `import-raw` carry the connectome as of this change; dumps from before it restore
+the wiring but not the entry set — re-import.

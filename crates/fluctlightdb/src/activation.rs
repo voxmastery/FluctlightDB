@@ -79,9 +79,27 @@ pub fn activate_from(
 
 /// Spreading activation over the synapse graph. Additive per hop; a node's incoming deltas
 /// are summed before being applied so that inhibitory (negative-weight) edges subtract
-/// deterministically regardless of `HashMap` iteration order. For graphs with no negative
-/// weights this is arithmetically identical to the previous inline loop.
+/// deterministically regardless of `HashMap` iteration order. Graphs with no negative weight
+/// run the original loop verbatim, so they stay bit-identical to the pre-connectome engine.
 pub fn spread(activation: &mut HashMap<NeuronId, f32>, graph: &BrainGraph, max_hops: u32, spread_factor: f32) {
+    if !graph.has_inhibitory {
+        // No negative weights anywhere: run the exact pre-connectome loop so ordinary brains
+        // are bit-identical to before (float re-association in the summed path below drifts
+        // up to ~6e-6 on 60-node graphs; measured in the final review).
+        for _hop in 0..max_hops {
+            let current: Vec<(NeuronId, f32)> = activation.iter().map(|(k, v)| (*k, *v)).collect();
+            for (node, act) in current {
+                for (synapse, to) in graph.neighbors(node) {
+                    let delta = act * synapse.weight * spread_factor;
+                    if delta > 0.001 {
+                        *activation.entry(to).or_insert(0.0) += delta;
+                    }
+                }
+            }
+            activation.retain(|_, v| *v > 0.01);
+        }
+        return;
+    }
     for _hop in 0..max_hops {
         let current: Vec<(NeuronId, f32)> = activation.iter().map(|(k, v)| (*k, *v)).collect();
         let mut incoming: HashMap<NeuronId, f32> = HashMap::new();
@@ -392,11 +410,55 @@ mod tests {
         let mut b = seeds;
         legacy_spread(&mut a, &g, 4, 0.6);
         spread(&mut b, &g, 4, 0.6);
+        assert!(!g.has_inhibitory, "an all-positive graph must take the legacy fast path");
         assert_eq!(a.len(), b.len());
         for (k, v) in &a {
             let bv = b.get(k).copied().unwrap_or(f32::NAN);
-            assert!((v - bv).abs() < 1e-5, "{k:?}: legacy {v} vs new {bv}");
+            assert_eq!(*v, bv, "{k:?}: legacy {v} vs new {bv}");
         }
+        assert_eq!(a, b, "the no-inhibition path must be bit-identical to the legacy loop");
+    }
+
+    /// The moment a single negative edge exists the graph must switch to the summed,
+    /// sign-aware path - and inhibition must still behave exactly as specified.
+    #[test]
+    fn spread_uses_summed_path_when_graph_has_inhibitory() {
+        use crate::plasticity::Synapse;
+        use crate::types::Region;
+        // Same deterministic 60-node / 300-edge graph as the bit-identity test.
+        let mut g = BrainGraph::default();
+        g.rebuild_index();
+        let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || { x ^= x << 13; x ^= x >> 7; x ^= x << 17; x };
+        for _ in 0..300 {
+            let from = NeuronId(next() % 60);
+            let to = NeuronId(next() % 60);
+            let w = ((next() % 1000) as f32 + 1.0) / 1000.0;
+            g.add_synapse_uncapped(Synapse::new(from, to, Region::Cortex, w));
+        }
+        assert!(!g.has_inhibitory);
+
+        // Add the inhibition triple on ids the random graph cannot reach (a -> b excitatory,
+        // i -> b inhibitory), so the a/i/b behaviour is exactly the inhibition test's.
+        let (a, i, b) = (NeuronId(101), NeuronId(102), NeuronId(103));
+        g.add_synapse_uncapped(Synapse::new(a, b, Region::Cortex, 1.0));
+        g.add_synapse_uncapped(Synapse::new(i, b, Region::Cortex, -1.0));
+        assert!(g.has_inhibitory, "one negative edge must flip the graph onto the summed path");
+
+        // Excitatory only: b lights up.
+        let mut act: HashMap<NeuronId, f32> = [(a, 1.0)].into_iter().collect();
+        spread(&mut act, &g, 1, 0.6);
+        assert!((act[&b] - 0.6).abs() < 1e-6);
+        // Equally active inhibitory seed: net zero, b drops out, regardless of map order.
+        for _ in 0..20 {
+            let mut act: HashMap<NeuronId, f32> = [(a, 1.0), (i, 1.0)].into_iter().collect();
+            spread(&mut act, &g, 1, 0.6);
+            assert!(!act.contains_key(&b), "b must be fully suppressed");
+        }
+        // Partial inhibition: 1.0 - 0.5 => b = 0.3
+        let mut act: HashMap<NeuronId, f32> = [(a, 1.0), (i, 0.5)].into_iter().collect();
+        spread(&mut act, &g, 1, 0.6);
+        assert!((act[&b] - 0.3).abs() < 1e-6);
     }
 
     #[test]
