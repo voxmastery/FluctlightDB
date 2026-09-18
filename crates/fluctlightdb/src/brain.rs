@@ -848,12 +848,17 @@ impl FluctlightBrain {
         top_k: usize,
     ) -> ActivationResult {
         let top_k = top_k.clamp(1, crate::index::MAX_CANDIDATE_CAP);
-        if let Some(cached) = self
+        if let Some(mut cached) = self
             .activation_cache
             .lock()
             .unwrap()
             .get(cue, agent_id, top_k)
         {
+            let projected: Vec<crate::id::NeuronId> = match &self.connectome {
+                Some(c) => c.project_tokens(&crate::tokenize::tokenize(cue)),
+                None => Vec::new(),
+            };
+            cached.connectome_seeds = if projected.is_empty() { None } else { Some(projected.len()) };
             return cached;
         }
 
@@ -877,6 +882,10 @@ impl FluctlightBrain {
                 }
             });
 
+        let projected: Vec<crate::id::NeuronId> = match &self.connectome {
+            Some(c) => c.project_tokens(&crate::tokenize::tokenize(cue)),
+            None => Vec::new(),
+        };
         let mut result = activate_from_hybrid(
             cue,
             cue_vector,
@@ -889,7 +898,7 @@ impl FluctlightBrain {
             top_k,
             candidate_set.as_ref(),
             self.life.neuron_codec,
-            &[],
+            &projected,
         );
         let cortex_boost = self.cortex.fact_boost(cue) + self.cortex.semantic_boost(cue_vector);
         let field_boost = cue_vector

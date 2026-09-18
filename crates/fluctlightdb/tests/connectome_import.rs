@@ -47,3 +47,15 @@ fn connectome_segment_round_trips_and_is_absent_by_default() {
     let brain = FluctlightBrain::open(&path).unwrap();
     assert_eq!(brain.connectome, Some(tiny_meta()));
 }
+
+#[test]
+fn activate_projects_tokens_onto_entry_set_only_when_connectome_present() {
+    let _g = v4_env();
+    let dir = tempdir().unwrap();
+    let mut brain = FluctlightBrain::open(dir.path().join("brain")).unwrap();
+    assert_eq!(brain.activate("hello world").connectome_seeds, None);
+
+    brain.connectome = Some(tiny_meta()); // fanout 3
+    let r = brain.activate("hello world");
+    assert_eq!(r.connectome_seeds, Some(2 * 3), "2 tokens × fanout 3");
+}
