@@ -848,18 +848,17 @@ impl FluctlightBrain {
         top_k: usize,
     ) -> ActivationResult {
         let top_k = top_k.clamp(1, crate::index::MAX_CANDIDATE_CAP);
-        if let Some(mut cached) = self
-            .activation_cache
-            .lock()
-            .unwrap()
-            .get(cue, agent_id, top_k)
-        {
-            let projected: Vec<crate::id::NeuronId> = match &self.connectome {
-                Some(c) => c.project_tokens(&crate::tokenize::tokenize(cue)),
-                None => Vec::new(),
-            };
-            cached.connectome_seeds = if projected.is_empty() { None } else { Some(projected.len()) };
-            return cached;
+        // Activation cache keys on (cue, agent, top_k) only; a connectome changes recall for the same cue, so connectome brains bypass it in v1 (follow-up: fingerprint the key).
+        let use_cache = self.connectome.is_none();
+        if use_cache {
+            if let Some(cached) = self
+                .activation_cache
+                .lock()
+                .unwrap()
+                .get(cue, agent_id, top_k)
+            {
+                return cached;
+            }
         }
 
         let candidate_cap = top_k.max(default_candidate_cap());
@@ -1093,10 +1092,12 @@ impl FluctlightBrain {
         }
 
         annotate_recall_trust(&mut result.recalls);
-        self.activation_cache
-            .lock()
-            .unwrap()
-            .put(cue, agent_id, top_k, result.clone());
+        if use_cache {
+            self.activation_cache
+                .lock()
+                .unwrap()
+                .put(cue, agent_id, top_k, result.clone());
+        }
         result
     }
 
