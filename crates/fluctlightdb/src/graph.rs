@@ -240,6 +240,9 @@ impl BrainGraph {
         }
         let mut scaled = 0u32;
         for s in &mut self.synapses {
+            if s.weight < 0.0 {
+                continue; // inhibitory synapses are read-only (spec §5.4)
+            }
             if protected.contains(&s.from) && protected.contains(&s.to) {
                 continue; // replayed tonight — consolidation owns these
             }
@@ -302,10 +305,16 @@ impl BrainGraph {
                 let touched = self.edges_between(pre_neurons, post_neurons);
                 for i in touched {
                     let s = &mut self.synapses[i as usize];
+                    if s.weight < 0.0 {
+                        continue; // inhibitory synapses are read-only (spec §5.4)
+                    }
                     s.weight = (s.weight + dw).clamp(0.001, 1.0);
                 }
             } else {
                 for synapse in &mut self.synapses {
+                    if synapse.weight < 0.0 {
+                        continue; // inhibitory synapses are read-only (spec §5.4)
+                    }
                     if pre_neurons.contains(&synapse.from) && post_neurons.contains(&synapse.to) {
                         synapse.weight = (synapse.weight + dw).clamp(0.001, 1.0);
                     }
@@ -638,5 +647,49 @@ mod tests {
         let pruned = g.prune_below(0.3);
         assert_eq!(pruned, 0);
         assert_eq!(g.synapse_count(), 2, "prune_below must not treat negative as weak");
+
+        let c_before_downscale = weight(&g, c);
+        g.homeostatic_downscale(&HashSet::new(), 0.5);
+        assert_eq!(weight(&g, b), -0.4, "homeostatic_downscale must skip negative weights");
+        assert!(
+            (weight(&g, c) - c_before_downscale * 0.5).abs() < 1e-6,
+            "excitatory still scales down: {} vs expected {}",
+            weight(&g, c),
+            c_before_downscale * 0.5
+        );
+
+        let c_before_stdp = weight(&g, c);
+        let pre: HashSet<NeuronId> = [a].into_iter().collect();
+        let post: HashSet<NeuronId> = [b, c].into_iter().collect();
+        // pre_tick=0, post_tick=50 -> delta_t_ms = 5.0, well inside the LTP window with
+        // da_gate=1.0, which produces a clearly nonzero positive dw (verified in the fix report).
+        g.stdp_sequential(&pre, &post, 0, 50, 1.0);
+        assert_eq!(weight(&g, b), -0.4, "stdp_sequential (indexed branch) must skip negative weights");
+        assert!(
+            weight(&g, c) > c_before_stdp,
+            "excitatory edge must move under stdp_sequential: {} vs before {}",
+            weight(&g, c),
+            c_before_stdp
+        );
+
+        // Fallback (non-indexed) branches: force the linear-scan path for both co_activate and
+        // stdp_sequential by marking the adjacency index stale, and confirm they are exercised
+        // and still respect the guard.
+        g.adjacency_ready = false;
+        let c_before_fallback_co_activate = weight(&g, c);
+        g.co_activate(&active, 1.0);
+        assert_eq!(weight(&g, b), -0.4, "co_activate fallback branch must skip negative weights");
+        assert!(
+            weight(&g, c) > c_before_fallback_co_activate,
+            "excitatory edge must move again under the co_activate fallback branch"
+        );
+
+        let c_before_fallback_stdp = weight(&g, c);
+        g.stdp_sequential(&pre, &post, 0, 50, 1.0);
+        assert_eq!(weight(&g, b), -0.4, "stdp_sequential (fallback branch) must skip negative weights");
+        assert!(
+            weight(&g, c) > c_before_fallback_stdp,
+            "excitatory edge must move again under the stdp_sequential fallback branch"
+        );
     }
 }
