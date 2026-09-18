@@ -160,3 +160,14 @@ Projection / inhibition graduate from "present when data is present" to document
 | Sign-aware spread regresses excitatory recall | Property test (§8) is the gate; the branch is a no-op when no negative weights exist. |
 | Aggregation `HashMap` memory | ~100 MB for 2.7 M pairs; dropped before checkpoint. Spike peak was 506 MB total. |
 | Someone commits the CSVs | `tests/fixtures/connectome/` holds only the 20-neuron fixture; perf test downloads to scratch. |
+
+## 11. Corrections after implementation (2026-09-18)
+
+Recorded so the spec matches the code. Each was ruled during execution; see the plan's SDD ledger.
+
+- **§5.4 guard points are seven, not three.** Inhibitory (negative) weights are skipped at `graph.rs` `co_activate` (both branches), `weaken_unused`, `prune_below`, `homeostatic_downscale`, `stdp_sequential` (both branches), and `calcium.rs` `CalciumSpine::tick`. `prune_below` would otherwise delete every inhibitory synapse as "weak"; `homeostatic_downscale` would rewrite them to `0.001`.
+- **§5.4 spread rule is additive, not `max`.** The pre-existing loop summed deltas; the sign-aware helper sums each hop's incoming deltas per target and applies `(*e + sum).max(0.0)`, so inhibition is iteration-order independent and the positive-weight path is arithmetically unchanged (property-tested to 1e-5).
+- **§5.4 `preplay.rs` is deferred.** Its walk uses `max` accumulation with a `> 0.02` floor, so negative edges are simply never traversed (safe, not subtractive). Making a max-walk subtractive needs its own design; follow-up.
+- **§7 malformed-row threshold is 10 %, not 1 %.** The 20-neuron fixture deliberately carries 1 malformed row of 40 (2.5 %); real FlyWire files carry none; a wrong file fails the header check. Rows below the threshold are still reported in `ImportReport.rows_malformed`.
+- **§5.5 route is `POST /api/v1/connectome`** (path-dispatched like every other brain route) and answers `{"present": false}` rather than 404 when no connectome is present.
+- **Activation cache.** `ActivationCache` keys on `(cue, agent_id, top_k)` only, so a brain carrying a connectome bypasses the cache (lookup and insert) in v1; the no-connectome path is unchanged. Follow-up: include a connectome fingerprint in the key.
