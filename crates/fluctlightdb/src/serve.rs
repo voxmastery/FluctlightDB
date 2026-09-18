@@ -2559,6 +2559,13 @@ fn dispatch(
             let result = server.with_brain_read(tenant_id, |b| Ok(b.preplay(&goal, steps)))?;
             Ok(serde_json::to_value(result).unwrap())
         }
+        "/api/v1/connectome" | "/connectome" => {
+            require_role(auth, Role::Read)?;
+            let summary = server.with_brain_read(tenant_id, |b| {
+                Ok(b.connectome.as_ref().map(|c| c.summary()))
+            })?;
+            Ok(summary.unwrap_or_else(|| serde_json::json!({"present": false})))
+        }
         "/api/v1/neurogenesis" | "/neurogenesis" => {
             require_writable(server)?;
             require_role(auth, Role::Write)?;
