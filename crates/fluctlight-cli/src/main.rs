@@ -182,6 +182,13 @@ fn parse_flag_path(args: &[String], flag: &str) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+fn parse_flag_str(args: &[String], flag: &str) -> Option<String> {
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1))
+        .cloned()
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 || args.iter().any(|a| a == "--help" || a == "-h") {
@@ -236,6 +243,36 @@ fn main() {
         if let Err(e) = server.serve(&addr) {
             eprintln!("fluctlight serve: {e} (addr {addr})");
             std::process::exit(1);
+        }
+        return;
+    }
+
+    if args[1] == "import-connectome" {
+        let need = |flag: &str| {
+            parse_flag_path(&args, flag).unwrap_or_else(|| {
+                eprintln!("import-connectome: {flag} FILE is required");
+                std::process::exit(2);
+            })
+        };
+        let path = need("--path");
+        let cfg = fluctlightdb::ImportConfig {
+            connections: need("--connections"),
+            classification: need("--classification"),
+            neurons: need("--neurons"),
+            entry_class: parse_flag_str(&args, "--entry-class").unwrap_or_else(|| "Kenyon_Cell".into()),
+            fanout: parse_flag_str(&args, "--fanout").and_then(|v| v.parse().ok()).unwrap_or(7),
+            replace: args.iter().any(|a| a == "--replace"),
+        };
+        let mut brain = FluctlightBrain::open(&path).expect("open brain (is it being served? see docs/runbooks/connectome-import.md)");
+        match fluctlightdb::import_connectome(&mut brain, &cfg) {
+            Ok(report) => {
+                brain.checkpoint().expect("checkpoint after import");
+                println!("{}", serde_json::to_string_pretty(&report).unwrap());
+            }
+            Err(e) => {
+                eprintln!("import-connectome: {e}");
+                std::process::exit(1);
+            }
         }
         return;
     }
@@ -744,6 +781,8 @@ fn print_usage() {
          fluctlight export-raw [FILE] [--path FILE]   full engrams + synapses (JSON)
          fluctlight import-raw [FILE] [--path FILE]   restore from export-raw JSON\n\
          fluctlight migrate-v4 [--from FILE.flct] [--out DIR]   v3 → v4 tenant brain\n\
+         fluctlight import-connectome --path DIR --connections F --classification F --neurons F [--entry-class Kenyon_Cell] [--fanout 7] [--replace]\n\
+                                                      import a FlyWire Codex connectome as the substrate graph\n\
          fluctlight tenant create TENANT_ID   provision tenant brain dir\n\
          fluctlight tenant provision TENANT_ID [--role admin|write|read]   tenant + API key\n\
          fluctlight demo-separate [--path FILE]  DG separation demo + viz export\n\
