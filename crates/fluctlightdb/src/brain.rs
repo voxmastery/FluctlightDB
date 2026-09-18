@@ -77,6 +77,7 @@ pub struct FluctlightBrain {
     pub global_workspace: GlobalWorkspace,
     /// Imported biological connectome metadata (FlyWire). `None` for ordinary brains.
     /// Segment `connectome`, additive — never bumps `format_version`.
+    #[serde(default)]
     pub connectome: Option<crate::connectome::ConnectomeMeta>,
     pub core_memories: CoreMemoryStore,
     pub autonomic: AutonomicState,
