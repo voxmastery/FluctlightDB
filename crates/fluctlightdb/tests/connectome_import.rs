@@ -90,6 +90,7 @@ fn import_fixture_aggregates_pairs_signs_edges_and_builds_entry_set() {
     assert_eq!(report.neurons, 20);
     assert_eq!(report.entry_set_len, 5);
     assert_eq!(report.inhibitory_synapses, 7, "5 GABA from 4001 + 2 GLUT from 3002");
+    assert_eq!(report.p99_syn, 40.0);
     assert!(report.warnings.is_empty());
 
     let meta = brain.connectome.as_ref().expect("connectome set");
@@ -167,4 +168,68 @@ fn import_rejects_header_mismatch_and_malformed_majority() {
     let err = import_connectome(&mut brain, &cfg).unwrap_err();
     assert!(err.to_string().contains("malformed"), "{err}");
     assert!(brain.connectome.is_none(), "failed import must leave no partial state");
+}
+
+#[test]
+fn sleep_cycle_leaves_inhibitory_synapses_untouched() {
+    let _g = v4_env();
+    let dir = tempdir().unwrap();
+    let mut brain = FluctlightBrain::open(dir.path().join("brain")).unwrap();
+    import_connectome(&mut brain, &fixture_cfg(false)).unwrap();
+    let w = |b: &FluctlightBrain, from: u64, to: u64| b.graph.neighbors(NeuronId(from)).find(|(_, t)| *t == NeuronId(to)).map(|(s, _)| s.weight).unwrap();
+    let before: Vec<f32> = [(4001, 1001), (4001, 1002), (4001, 1003), (4001, 1004), (4001, 1005), (3002, 3001), (3002, 3003)].iter().map(|&(f, t)| w(&brain, f, t)).collect();
+    assert!(before.iter().all(|x| *x < 0.0));
+    let count = brain.graph.synapse_count();
+    brain.sleep().unwrap();
+    let after: Vec<f32> = [(4001, 1001), (4001, 1002), (4001, 1003), (4001, 1004), (4001, 1005), (3002, 3001), (3002, 3003)].iter().map(|&(f, t)| w(&brain, f, t)).collect();
+    assert_eq!(before, after, "sleep must not touch inhibitory weights");
+    assert_eq!(brain.graph.synapse_count(), count, "sleep must not prune inhibitory synapses");
+}
+
+/// `nt_type_score` starts with `nt_type`: without the trailing comma in the expected prefix a
+/// neurons.csv that has no `nt_type` column at all would pass the header check and silently
+/// import a whole connectome with zero inhibition.
+#[test]
+fn import_rejects_neurons_header_without_nt_type_column() {
+    let _g = v4_env();
+    let dir = tempdir().unwrap();
+    let bad = dir.path().join("neurons_bad.csv");
+    std::fs::write(
+        &bad,
+        "root_id,group,nt_type_score,da_avg,ser_avg,gaba_avg,glut_avg,ach_avg,oct_avg\n1001,MB,0.9,0,0,0,0,0.9,0\n",
+    )
+    .unwrap();
+    let mut cfg = fixture_cfg(false);
+    cfg.neurons = bad;
+    let mut brain = FluctlightBrain::open(dir.path().join("brain")).unwrap();
+    let err = import_connectome(&mut brain, &cfg).unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("header mismatch"), "must be a header error: {msg}");
+    assert!(msg.contains("nt_type,"), "must name the nt_type column: {msg}");
+    assert!(brain.connectome.is_none(), "failed import must leave no partial state");
+}
+
+/// A raw dump must carry the `connectome` segment, not just the synapses: without it the
+/// restored brain has the wiring but no entry set, so cues never reach the substrate.
+#[test]
+fn export_raw_import_raw_round_trips_the_connectome() {
+    let _g = EnvGuard::acquire(&["FLUCTLIGHT_STORAGE", "FLUCTLIGHT_SOMNUS", "FLUCTLIGHT_EXPORT_SYNAPSES"]);
+    std::env::remove_var("FLUCTLIGHT_SOMNUS");
+    std::env::set_var("FLUCTLIGHT_STORAGE", "v4");
+    std::env::set_var("FLUCTLIGHT_EXPORT_SYNAPSES", "1");
+
+    let dir = tempdir().unwrap();
+    let mut src = FluctlightBrain::open(dir.path().join("src")).unwrap();
+    import_connectome(&mut src, &fixture_cfg(false)).unwrap();
+    let dump = src.export_raw();
+    assert!(dump.connectome.is_some(), "export must carry the connectome");
+
+    let mut dst = FluctlightBrain::open(dir.path().join("dst")).unwrap();
+    assert!(dst.connectome.is_none());
+    let report = fluctlightdb::import_raw(&mut dst, dump).unwrap();
+    assert_eq!(report.synapses, 38);
+    let restored = dst.connectome.as_ref().expect("import must restore the connectome");
+    assert_eq!(restored.entry_set.len(), 5);
+    assert_eq!(dst.graph.synapse_count(), 38);
+    assert_eq!(dst.activate("odor").connectome_seeds, Some(7), "the restored entry set must project");
 }

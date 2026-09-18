@@ -15,6 +15,11 @@ pub struct RawExport {
     pub synapses: Vec<Synapse>,
     pub core_memories: Vec<CoreMemory>,
     pub recent_separations: Vec<crate::dentate::SeparationResult>,
+    /// The `connectome` segment (entry set + per-neuron metadata). A dump that carried only
+    /// synapses restored the wiring but lost the cue projection, so recall stopped reaching
+    /// the substrate. Additive and `#[serde(default)]`: older dumps still load.
+    #[serde(default)]
+    pub connectome: Option<crate::connectome::ConnectomeMeta>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -29,6 +34,8 @@ struct RawImportFile {
     recent_separations: Vec<crate::dentate::SeparationResult>,
     #[serde(default)]
     status: Option<crate::brain::BrainStatus>,
+    #[serde(default)]
+    connectome: Option<crate::connectome::ConnectomeMeta>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -71,6 +78,7 @@ pub fn export_raw(brain: &FluctlightBrain) -> RawExport {
         synapses,
         core_memories: brain.core_memories.memories.clone(),
         recent_separations: brain.recent_separations.clone(),
+        connectome: brain.connectome.clone(),
     }
 }
 
@@ -87,6 +95,7 @@ pub fn import_raw_json(brain: &mut FluctlightBrain, json: &str) -> Result<RawImp
         raw.synapses_truncated,
         raw.synapses_total,
         raw.status,
+        raw.connectome,
     )
 }
 
@@ -101,6 +110,7 @@ pub fn import_raw(brain: &mut FluctlightBrain, raw: RawExport) -> Result<RawImpo
         raw.synapses_truncated,
         raw.synapses_total,
         raw.status,
+        raw.connectome,
     )
 }
 
@@ -114,6 +124,7 @@ fn import_raw_parts(
     synapses_truncated: bool,
     synapses_total: usize,
     status: Option<crate::brain::BrainStatus>,
+    connectome: Option<crate::connectome::ConnectomeMeta>,
 ) -> Result<RawImportReport> {
     if let Some(first) = engrams.first() {
         brain.life.life_id = first.life_id;
@@ -124,7 +135,9 @@ fn import_raw_parts(
     }
     brain.hippocampus.engrams = engrams;
     brain.graph.synapses = synapses;
+    brain.connectome = connectome;
     brain.graph.rebuild_index();
+    brain.invalidate_activation_cache();
     brain.core_memories.memories = core_memories;
     brain.recent_separations = recent_separations;
     brain.hippocampus.rebuild_rag_index();

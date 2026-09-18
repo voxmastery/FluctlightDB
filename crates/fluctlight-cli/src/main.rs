@@ -255,18 +255,52 @@ fn main() {
             })
         };
         let path = need("--path");
+        // A bad --fanout must not silently fall back to the default: fanout decides how many
+        // Kenyon cells every cue token lands on, so `--fanout 0` would import a connectome
+        // that never projects anything and `--fanout abc` would look like it worked.
+        let fanout: u8 = match parse_flag_str(&args, "--fanout") {
+            None if args.iter().any(|a| a == "--fanout") => {
+                eprintln!("import-connectome: --fanout must be an integer 1..=255");
+                std::process::exit(2);
+            }
+            None => 7,
+            Some(v) => match v.parse::<u8>() {
+                Ok(n) if n >= 1 => n,
+                _ => {
+                    eprintln!("import-connectome: --fanout must be an integer 1..=255");
+                    std::process::exit(2);
+                }
+            },
+        };
+        let entry_class = match parse_flag_str(&args, "--entry-class") {
+            Some(v) => v,
+            None if args.iter().any(|a| a == "--entry-class") => {
+                eprintln!("import-connectome: --entry-class CLASS is required");
+                std::process::exit(2);
+            }
+            None => "Kenyon_Cell".into(),
+        };
         let cfg = fluctlightdb::ImportConfig {
             connections: need("--connections"),
             classification: need("--classification"),
             neurons: need("--neurons"),
-            entry_class: parse_flag_str(&args, "--entry-class").unwrap_or_else(|| "Kenyon_Cell".into()),
-            fanout: parse_flag_str(&args, "--fanout").and_then(|v| v.parse().ok()).unwrap_or(7),
+            entry_class,
+            fanout,
             replace: args.iter().any(|a| a == "--replace"),
         };
-        let mut brain = FluctlightBrain::open(&path).expect("open brain (is it being served? see docs/runbooks/connectome-import.md)");
+        let mut brain = match FluctlightBrain::open(&path) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("import-connectome: {e} (is the tenant being served? see docs/runbooks/connectome-import.md)");
+                std::process::exit(1);
+            }
+        };
         match fluctlightdb::import_connectome(&mut brain, &cfg) {
             Ok(report) => {
-                brain.checkpoint().expect("checkpoint after import");
+                if let Err(e) = brain.checkpoint() {
+                    eprintln!("import-connectome: {e} (is the tenant being served? see docs/runbooks/connectome-import.md)");
+                    std::process::exit(1);
+                }
                 println!("{}", serde_json::to_string_pretty(&report).unwrap());
             }
             Err(e) => {
