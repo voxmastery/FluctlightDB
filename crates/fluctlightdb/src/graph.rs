@@ -123,6 +123,27 @@ impl BrainGraph {
         }
     }
 
+    /// Like [`add_synapse`](Self::add_synapse) but **never** runs synaptic competition.
+    /// Only for bulk-importing a biological connectome whose degree distribution is the
+    /// ground truth (FlyWire hubs reach 12,896 out-edges). Normal writes stay capped.
+    pub fn add_synapse_uncapped(&mut self, synapse: Synapse) {
+        self.register_neuron(synapse.from, synapse.region);
+        self.register_neuron(synapse.to, synapse.region);
+        let key = (synapse.from.0, synapse.to.0);
+        if let Some(&idx) = self.synapse_index.get(&key) {
+            if self.synapses[idx].weight.abs() < synapse.weight.abs() {
+                self.synapses[idx].weight = synapse.weight;
+            }
+            return;
+        }
+        let idx = self.synapses.len();
+        self.synapses.push(synapse);
+        self.synapse_index.insert(key, idx);
+        if self.adjacency_ready {
+            self.adjacency.entry(key.0).or_default().push(idx as u32);
+        }
+    }
+
     pub fn rebuild_index(&mut self) {
         self.synapse_index.clear();
         self.adjacency.clear();
@@ -564,5 +585,24 @@ mod tests {
             slow > fast * 10,
             "expected >10x from locality; sweep={slow:?} indexed={fast:?}"
         );
+    }
+
+    #[test]
+    fn add_synapse_uncapped_ignores_out_degree_cap() {
+        use crate::plasticity::Synapse;
+        use crate::types::Region;
+        let mut g = BrainGraph::default();
+        g.rebuild_index();
+        let hub = NeuronId(1);
+        for i in 0..1000u64 {
+            g.add_synapse_uncapped(Synapse::new(hub, NeuronId(10_000 + i), Region::Cortex, 0.5));
+        }
+        assert_eq!(g.synapse_count(), 1000, "default cap is 256; uncapped must keep all");
+        assert_eq!(g.neighbors(hub).count(), 1000);
+        // dedup still applies, keeping the stronger weight
+        g.add_synapse_uncapped(Synapse::new(hub, NeuronId(10_000), Region::Cortex, 0.9));
+        assert_eq!(g.synapse_count(), 1000);
+        let w = g.neighbors(hub).find(|(_, to)| *to == NeuronId(10_000)).map(|(s, _)| s.weight).unwrap();
+        assert_eq!(w, 0.9);
     }
 }
