@@ -889,6 +889,7 @@ impl FluctlightBrain {
             top_k,
             candidate_set.as_ref(),
             self.life.neuron_codec,
+            &[],
         );
         let cortex_boost = self.cortex.fact_boost(cue) + self.cortex.semantic_boost(cue_vector);
         let field_boost = cue_vector

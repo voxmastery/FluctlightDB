@@ -73,7 +73,32 @@ pub fn activate_from(
         top_k,
         None,
         codec,
+        &[],
     )
+}
+
+/// Spreading activation over the synapse graph. Additive per hop; a node's incoming deltas
+/// are summed before being applied so that inhibitory (negative-weight) edges subtract
+/// deterministically regardless of `HashMap` iteration order. For graphs with no negative
+/// weights this is arithmetically identical to the previous inline loop.
+pub fn spread(activation: &mut HashMap<NeuronId, f32>, graph: &BrainGraph, max_hops: u32, spread_factor: f32) {
+    for _hop in 0..max_hops {
+        let current: Vec<(NeuronId, f32)> = activation.iter().map(|(k, v)| (*k, *v)).collect();
+        let mut incoming: HashMap<NeuronId, f32> = HashMap::new();
+        for (node, act) in current {
+            for (synapse, to) in graph.neighbors(node) {
+                let delta = act * synapse.weight * spread_factor;
+                if delta.abs() > 0.001 {
+                    *incoming.entry(to).or_insert(0.0) += delta;
+                }
+            }
+        }
+        for (to, sum) in incoming {
+            let e = activation.entry(to).or_insert(0.0);
+            *e = (*e + sum).max(0.0);
+        }
+        activation.retain(|_, v| *v > 0.01);
+    }
 }
 
 // Argument count grew when the neuron codec became per-brain state. The codec must be
@@ -93,6 +118,7 @@ pub fn activate_from_hybrid(
     top_k: usize,
     candidate_ids: Option<&HashSet<Uuid>>,
     codec: u8,
+    extra_seeds: &[NeuronId],
 ) -> ActivationResult {
     let cue_neurons = cue_to_dg_neurons(cue, life_id, codec);
 
@@ -142,19 +168,18 @@ pub fn activate_from_hybrid(
         }
     }
 
-    let spread_factor = 0.6 * myelination.max(0.1);
-    for _hop in 0..max_hops {
-        let current: Vec<(NeuronId, f32)> = activation.iter().map(|(k, v)| (*k, *v)).collect();
-        for (node, act) in current {
-            for (synapse, to) in graph.neighbors(node) {
-                let delta = act * synapse.weight * spread_factor;
-                if delta > 0.001 {
-                    *activation.entry(to).or_insert(0.0) += delta;
-                }
-            }
-        }
-        activation.retain(|_, v| *v > 0.01);
+    for n in extra_seeds {
+        let e = activation.entry(*n).or_insert(0.0);
+        *e = e.max(1.0);
     }
+    let connectome_seeds = if extra_seeds.is_empty() {
+        None
+    } else {
+        Some(extra_seeds.len())
+    };
+
+    let spread_factor = 0.6 * myelination.max(0.1);
+    spread(&mut activation, graph, max_hops, spread_factor);
 
     let mut recalls: Vec<RecallResult> = engram_refs
         .iter()
@@ -198,6 +223,7 @@ pub fn activate_from_hybrid(
         active_neurons: activation.len(),
         hops: max_hops,
         myelinated: myelination > 0.5,
+        connectome_seeds,
         attention: None,
     }
 }
@@ -324,8 +350,91 @@ mod tests {
             4,
             Some(&candidates),
             crate::id::CURRENT_CODEC,
+            &[],
         );
         assert!(!result.recalls.is_empty());
         assert!(result.recalls[0].activation > 0.1);
+    }
+
+    /// Reference implementation of the pre-plan loop (activation.rs:145-153 before this task).
+    fn legacy_spread(activation: &mut HashMap<NeuronId, f32>, graph: &BrainGraph, max_hops: u32, spread_factor: f32) {
+        for _hop in 0..max_hops {
+            let current: Vec<(NeuronId, f32)> = activation.iter().map(|(k, v)| (*k, *v)).collect();
+            for (node, act) in current {
+                for (synapse, to) in graph.neighbors(node) {
+                    let delta = act * synapse.weight * spread_factor;
+                    if delta > 0.001 {
+                        *activation.entry(to).or_insert(0.0) += delta;
+                    }
+                }
+            }
+            activation.retain(|_, v| *v > 0.01);
+        }
+    }
+
+    #[test]
+    fn spread_is_identical_to_legacy_when_all_weights_positive() {
+        use crate::plasticity::Synapse;
+        use crate::types::Region;
+        // Deterministic pseudo-random graph: 60 nodes, 300 edges, weights in (0,1].
+        let mut g = BrainGraph::default();
+        g.rebuild_index();
+        let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || { x ^= x << 13; x ^= x >> 7; x ^= x << 17; x };
+        for _ in 0..300 {
+            let from = NeuronId(next() % 60);
+            let to = NeuronId(next() % 60);
+            let w = ((next() % 1000) as f32 + 1.0) / 1000.0;
+            g.add_synapse_uncapped(Synapse::new(from, to, Region::Cortex, w));
+        }
+        let seeds: HashMap<NeuronId, f32> = (0..5u64).map(|i| (NeuronId(i), 1.0)).collect();
+        let mut a = seeds.clone();
+        let mut b = seeds;
+        legacy_spread(&mut a, &g, 4, 0.6);
+        spread(&mut b, &g, 4, 0.6);
+        assert_eq!(a.len(), b.len());
+        for (k, v) in &a {
+            let bv = b.get(k).copied().unwrap_or(f32::NAN);
+            assert!((v - bv).abs() < 1e-5, "{k:?}: legacy {v} vs new {bv}");
+        }
+    }
+
+    #[test]
+    fn spread_inhibition_suppresses_and_is_order_independent() {
+        use crate::plasticity::Synapse;
+        use crate::types::Region;
+        let (a, i, b) = (NeuronId(1), NeuronId(2), NeuronId(3));
+        let mut g = BrainGraph::default();
+        g.rebuild_index();
+        g.add_synapse_uncapped(Synapse::new(a, b, Region::Cortex, 1.0));
+        g.add_synapse_uncapped(Synapse::new(i, b, Region::Cortex, -1.0));
+        // Excitatory only: b lights up.
+        let mut act: HashMap<NeuronId, f32> = [(a, 1.0)].into_iter().collect();
+        spread(&mut act, &g, 1, 0.6);
+        assert!((act[&b] - 0.6).abs() < 1e-6);
+        // With the inhibitory seed equally active: net zero, b drops out — regardless of map order.
+        for _ in 0..20 {
+            let mut act: HashMap<NeuronId, f32> = [(a, 1.0), (i, 1.0)].into_iter().collect();
+            spread(&mut act, &g, 1, 0.6);
+            assert!(!act.contains_key(&b), "b must be fully suppressed");
+        }
+        // Partial inhibition: 1.0 - 0.5 => b = 0.3
+        let mut act: HashMap<NeuronId, f32> = [(a, 1.0), (i, 0.5)].into_iter().collect();
+        spread(&mut act, &g, 1, 0.6);
+        assert!((act[&b] - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn extra_seeds_enter_activation_at_full_strength() {
+        use crate::hippocampus::Hippocampus;
+        use crate::semantic::SemanticField;
+        let g = BrainGraph::default();
+        let h = Hippocampus::default();
+        let seeds = [NeuronId(777), NeuronId(778)];
+        let r = activate_from_hybrid("zz", None, &g, &h, &SemanticField::default(), Uuid::nil(), 0, 1.0, 8, None, crate::id::CURRENT_CODEC, &seeds);
+        assert_eq!(r.connectome_seeds, Some(2));
+        let r0 = activate_from_hybrid("zz", None, &g, &h, &SemanticField::default(), Uuid::nil(), 0, 1.0, 8, None, crate::id::CURRENT_CODEC, &[]);
+        assert_eq!(r0.connectome_seeds, None);
+        assert_eq!(r.active_neurons, r0.active_neurons + 2);
     }
 }

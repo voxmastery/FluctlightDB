@@ -152,6 +152,10 @@ pub struct ActivationResult {
     pub active_neurons: usize,
     pub hops: u32,
     pub myelinated: bool,
+    /// Number of Kenyon-cell seeds injected by the connectome projection. `None` when the
+    /// brain has no connectome (ordinary brains never see this field).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connectome_seeds: Option<usize>,
     /// Present when activation ran through `activate_and_attend` (AST readout).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attention: Option<crate::attention_schema::AttentionSchemaReport>,
