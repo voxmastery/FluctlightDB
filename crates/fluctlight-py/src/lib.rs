@@ -613,11 +613,7 @@ impl PyBrain {
         json_val_to_py(py, &report)
     }
 
-    fn encode_prediction_error(
-        &mut self,
-        py: Python<'_>,
-        observed: &str,
-    ) -> PyResult<Py<PyAny>> {
+    fn encode_prediction_error(&mut self, py: Python<'_>, observed: &str) -> PyResult<Py<PyAny>> {
         self.require_writable()?;
         let report = self
             .inner

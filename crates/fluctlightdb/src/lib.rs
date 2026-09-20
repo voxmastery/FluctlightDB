@@ -9,7 +9,6 @@ pub mod agent_runtime;
 pub mod amygdala;
 pub mod api_slim;
 pub mod attention_schema;
-pub mod connectome;
 pub mod auth;
 pub mod auth_store;
 pub mod autonomic;
@@ -28,6 +27,7 @@ pub mod compact;
 pub mod confidence;
 pub mod config;
 pub mod conflict_lattice;
+pub mod connectome;
 pub mod consensus;
 #[cfg(feature = "distributed")]
 pub mod control;
@@ -44,6 +44,7 @@ pub mod error;
 pub mod fabric_runtime;
 pub mod forgetting;
 pub mod fovea;
+pub mod global_workspace;
 pub mod governance;
 pub mod graph;
 pub mod graph_export;
@@ -69,9 +70,9 @@ pub mod phase_parse;
 pub mod photon;
 pub mod placement;
 pub mod plasticity;
+pub mod predictive_loop;
 pub mod prefrontal;
 pub mod preplay;
-pub mod predictive_loop;
 pub mod prism;
 pub mod query;
 pub mod rate_limit;
@@ -109,10 +110,13 @@ pub mod wal;
 pub mod wal_sync;
 pub mod wm_ring;
 pub mod worldview_agent;
-pub mod global_workspace;
 
 pub use agent_prompt::AgentPromptBundle;
 pub use agent_runtime::{enable_agent_env, AgentState, ConsolidateReport, ToolObserveInput};
+pub use attention_schema::{
+    AttentionOwner, AttentionSchema, AttentionSchemaReport, AttentionSnapshot, SpotlightSource,
+    SpotlightTarget,
+};
 pub use autonomic::{AutonomicConfig, AutonomicState, TickReport};
 pub use brain::{BrainStatus, FluctlightBrain};
 pub use brain_snapshot::{
@@ -134,12 +138,16 @@ pub use dentate::SeparationResult;
 pub use development::{DevStage, DevelopmentState};
 pub use engram::Engram;
 pub use error::{Error, Result};
-pub use import_connectome::{import_connectome, ImportConfig, ImportReport};
 pub use forgetting::{interference, LoadController, MemoryTrace};
 pub use fovea::{scan_file, scan_text, FoveaConfig, FoveaPacket};
+pub use global_workspace::{
+    BroadcastReceipt, GlobalBroadcast, GlobalWorkspace, GlobalWorkspaceReport, PresentMoment,
+    WorkspaceCandidate, WorkspaceSource,
+};
 pub use governance::{AuditEntry, DeleteBySubjectReport, GovernanceState, PiiScrubReport};
 pub use graph_export::GraphExport;
 pub use homeostasis::HomeostasisReport;
+pub use import_connectome::{import_connectome, ImportConfig, ImportReport};
 pub use index::RecallIndex;
 pub use lattice::{Axis, GridCode, Lattice, LatticeCode, LatticeStore};
 pub use life::{CoreMemory, LifeState};
@@ -148,6 +156,10 @@ pub use muon::{MuonHit, MuonImprintInput, MuonLane};
 pub use neurogenesis::NeurogenesisReport;
 pub use phase_parse::{Codebook, PhaseParser, PhaseVector};
 pub use photon::{PhotonCode, PhotonStore, SimHasher};
+pub use predictive_loop::{
+    DreamReport, InnerMoment, MomentKind, ObservePredictionReport, Prediction, PredictionError,
+    PredictionSource, PredictiveCycleReport, PredictiveLoop, WorldInterpretation,
+};
 pub use preplay::{PreplayResult, PreplayStep};
 pub use prism::{PrismCode, PrismSignature, DEFAULT_CERTIFY_M, DEFAULT_PRISM_FULL_MAX};
 pub use raw_export::{import_raw, import_raw_json, RawExport, RawImportReport};
@@ -168,21 +180,6 @@ pub use serve::BrainServer;
 pub use spectrum::{SpectrumSignature, DEFAULT_FULL_READOUT_MAX};
 pub use stage_schedule::StageConsolidationReport;
 pub use storage::{default_brain_path, default_tenant_brain_dir, StorageFormat};
-pub use attention_schema::{
-    AttentionOwner, AttentionSchema, AttentionSchemaReport, AttentionSnapshot, SpotlightSource,
-    SpotlightTarget,
-};
-pub use predictive_loop::{
-    DreamReport, InnerMoment, MomentKind, ObservePredictionReport, Prediction, PredictionError,
-    PredictionSource, PredictiveCycleReport, PredictiveLoop, WorldInterpretation,
-};
-pub use worldview_agent::{
-    BroadcastKind, WorkspaceBroadcast, WorldBelief, WorldviewAgent, WorldviewStepReport,
-};
-pub use global_workspace::{
-    BroadcastReceipt, GlobalBroadcast, GlobalWorkspace, GlobalWorkspaceReport, PresentMoment,
-    WorkspaceCandidate, WorkspaceSource,
-};
 pub use store::{verify_path, BrainVerifyReport};
 pub use store_lock::{SharedStoreLock, StoreLock};
 pub use swarm::{
@@ -198,3 +195,6 @@ pub use types::{
     SleepReport, VizExport,
 };
 pub use wm_ring::{WmFlushReport, WmRing, WmSlot};
+pub use worldview_agent::{
+    BroadcastKind, WorkspaceBroadcast, WorldBelief, WorldviewAgent, WorldviewStepReport,
+};

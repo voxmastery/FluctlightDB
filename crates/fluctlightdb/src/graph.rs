@@ -275,7 +275,8 @@ impl BrainGraph {
 
     pub fn prune_below(&mut self, threshold: f32) -> u32 {
         let before = self.synapses.len();
-        self.synapses.retain(|s| s.weight < 0.0 || s.weight >= threshold);
+        self.synapses
+            .retain(|s| s.weight < 0.0 || s.weight >= threshold);
         let pruned = (before - self.synapses.len()) as u32;
         if pruned > 0 {
             self.rebuild_index();
@@ -636,12 +637,20 @@ mod tests {
         for i in 0..1000u64 {
             g.add_synapse_uncapped(Synapse::new(hub, NeuronId(10_000 + i), Region::Cortex, 0.5));
         }
-        assert_eq!(g.synapse_count(), 1000, "default cap is 256; uncapped must keep all");
+        assert_eq!(
+            g.synapse_count(),
+            1000,
+            "default cap is 256; uncapped must keep all"
+        );
         assert_eq!(g.neighbors(hub).count(), 1000);
         // dedup still applies, keeping the stronger weight
         g.add_synapse_uncapped(Synapse::new(hub, NeuronId(10_000), Region::Cortex, 0.9));
         assert_eq!(g.synapse_count(), 1000);
-        let w = g.neighbors(hub).find(|(_, to)| *to == NeuronId(10_000)).map(|(s, _)| s.weight).unwrap();
+        let w = g
+            .neighbors(hub)
+            .find(|(_, to)| *to == NeuronId(10_000))
+            .map(|(s, _)| s.weight)
+            .unwrap();
         assert_eq!(w, 0.9);
     }
 
@@ -654,24 +663,45 @@ mod tests {
         g.rebuild_index();
         let (a, b, c) = (NeuronId(1), NeuronId(2), NeuronId(3));
         g.add_synapse_uncapped(Synapse::new(a, b, Region::Cortex, -0.4)); // inhibitory
-        g.add_synapse_uncapped(Synapse::new(a, c, Region::Cortex, 0.4));  // excitatory
-        let weight = |g: &BrainGraph, to: NeuronId| g.neighbors(a).find(|(_, t)| *t == to).map(|(s, _)| s.weight).unwrap();
+        g.add_synapse_uncapped(Synapse::new(a, c, Region::Cortex, 0.4)); // excitatory
+        let weight = |g: &BrainGraph, to: NeuronId| {
+            g.neighbors(a)
+                .find(|(_, t)| *t == to)
+                .map(|(s, _)| s.weight)
+                .unwrap()
+        };
 
         let active: HashSet<NeuronId> = [a, b, c].into_iter().collect();
         g.co_activate(&active, 1.0);
-        assert_eq!(weight(&g, b), -0.4, "co_activate must skip negative weights");
+        assert_eq!(
+            weight(&g, b),
+            -0.4,
+            "co_activate must skip negative weights"
+        );
         assert!(weight(&g, c) > 0.4, "excitatory still strengthens");
 
         g.weaken_unused(&HashSet::new(), 0.1);
-        assert_eq!(weight(&g, b), -0.4, "weaken_unused must skip negative weights");
+        assert_eq!(
+            weight(&g, b),
+            -0.4,
+            "weaken_unused must skip negative weights"
+        );
 
         let pruned = g.prune_below(0.3);
         assert_eq!(pruned, 0);
-        assert_eq!(g.synapse_count(), 2, "prune_below must not treat negative as weak");
+        assert_eq!(
+            g.synapse_count(),
+            2,
+            "prune_below must not treat negative as weak"
+        );
 
         let c_before_downscale = weight(&g, c);
         g.homeostatic_downscale(&HashSet::new(), 0.5);
-        assert_eq!(weight(&g, b), -0.4, "homeostatic_downscale must skip negative weights");
+        assert_eq!(
+            weight(&g, b),
+            -0.4,
+            "homeostatic_downscale must skip negative weights"
+        );
         assert!(
             (weight(&g, c) - c_before_downscale * 0.5).abs() < 1e-6,
             "excitatory still scales down: {} vs expected {}",
@@ -685,7 +715,11 @@ mod tests {
         // pre_tick=0, post_tick=50 -> delta_t_ms = 5.0, well inside the LTP window with
         // da_gate=1.0, which produces a clearly nonzero positive dw (verified in the fix report).
         g.stdp_sequential(&pre, &post, 0, 50, 1.0);
-        assert_eq!(weight(&g, b), -0.4, "stdp_sequential (indexed branch) must skip negative weights");
+        assert_eq!(
+            weight(&g, b),
+            -0.4,
+            "stdp_sequential (indexed branch) must skip negative weights"
+        );
         assert!(
             weight(&g, c) > c_before_stdp,
             "excitatory edge must move under stdp_sequential: {} vs before {}",
@@ -699,7 +733,11 @@ mod tests {
         g.adjacency_ready = false;
         let c_before_fallback_co_activate = weight(&g, c);
         g.co_activate(&active, 1.0);
-        assert_eq!(weight(&g, b), -0.4, "co_activate fallback branch must skip negative weights");
+        assert_eq!(
+            weight(&g, b),
+            -0.4,
+            "co_activate fallback branch must skip negative weights"
+        );
         assert!(
             weight(&g, c) > c_before_fallback_co_activate,
             "excitatory edge must move again under the co_activate fallback branch"
@@ -707,7 +745,11 @@ mod tests {
 
         let c_before_fallback_stdp = weight(&g, c);
         g.stdp_sequential(&pre, &post, 0, 50, 1.0);
-        assert_eq!(weight(&g, b), -0.4, "stdp_sequential (fallback branch) must skip negative weights");
+        assert_eq!(
+            weight(&g, b),
+            -0.4,
+            "stdp_sequential (fallback branch) must skip negative weights"
+        );
         assert!(
             weight(&g, c) > c_before_fallback_stdp,
             "excitatory edge must move again under the stdp_sequential fallback branch"
@@ -725,19 +767,31 @@ mod tests {
         assert!(!g.has_inhibitory, "positive inserts must not flip the flag");
 
         g.add_synapse_uncapped(Synapse::new(NeuronId(3), NeuronId(4), Region::Cortex, -0.4));
-        assert!(g.has_inhibitory, "add_synapse_uncapped of a negative weight must flip the flag");
+        assert!(
+            g.has_inhibitory,
+            "add_synapse_uncapped of a negative weight must flip the flag"
+        );
 
         // rebuild_index recomputes it: still true while the negative edge is present.
         g.rebuild_index();
-        assert!(g.has_inhibitory, "rebuild_index must recompute the flag as true");
+        assert!(
+            g.has_inhibitory,
+            "rebuild_index must recompute the flag as true"
+        );
 
         // Drop the negative edge the way prune/remove paths do, then rebuild.
         g.synapses.retain(|s| s.weight >= 0.0);
         g.rebuild_index();
-        assert!(!g.has_inhibitory, "rebuild_index must recompute the flag as false");
+        assert!(
+            !g.has_inhibitory,
+            "rebuild_index must recompute the flag as false"
+        );
 
         // The capped insert path maintains it too.
         g.add_synapse(Synapse::new(NeuronId(5), NeuronId(6), Region::Cortex, -0.9));
-        assert!(g.has_inhibitory, "add_synapse of a negative weight must flip the flag");
+        assert!(
+            g.has_inhibitory,
+            "add_synapse of a negative weight must flip the flag"
+        );
     }
 }

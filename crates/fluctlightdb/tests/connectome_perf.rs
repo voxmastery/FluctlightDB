@@ -13,7 +13,11 @@ use tempfile::tempdir;
 fn rss_mb() -> u64 {
     std::fs::read_to_string("/proc/self/status")
         .ok()
-        .and_then(|s| s.lines().find(|l| l.starts_with("VmRSS:")).and_then(|l| l.split_whitespace().nth(1)?.parse::<u64>().ok()))
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("VmRSS:"))
+                .and_then(|l| l.split_whitespace().nth(1)?.parse::<u64>().ok())
+        })
         .map(|kb| kb / 1024)
         .unwrap_or(0)
 }
@@ -53,7 +57,11 @@ fn whole_brain_v783_within_budget() {
 
     eprintln!("{report:#?}\ntotal_s={total_s:.2} peak_mb={peak_mb} recall_ms={recall_ms:.2} active={} seeds={:?}", r.active_neurons, r.connectome_seeds);
     assert_eq!(report.entry_set_len, 5177, "Kenyon cells in v783");
-    assert!(report.pairs > 2_600_000 && report.pairs < 2_800_000, "{}", report.pairs);
+    assert!(
+        report.pairs > 2_600_000 && report.pairs < 2_800_000,
+        "{}",
+        report.pairs
+    );
     assert!(total_s <= 20.0, "import+checkpoint {total_s:.1}s > 20s");
     assert!(peak_mb <= 1024, "peak RSS {peak_mb} MB > 1 GB");
     assert!(recall_ms <= 20.0, "4-hop recall {recall_ms:.1} ms > 20 ms");

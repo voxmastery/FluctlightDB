@@ -166,11 +166,8 @@ impl AttentionSchema {
 
         let top = &recalls[0];
         let top_n = recalls.len().min(3);
-        let mean_act: f32 = recalls[..top_n]
-            .iter()
-            .map(|r| r.activation)
-            .sum::<f32>()
-            / top_n as f32;
+        let mean_act: f32 =
+            recalls[..top_n].iter().map(|r| r.activation).sum::<f32>() / top_n as f32;
         let intensity = (mean_act / 2.5).clamp(0.15, 1.0);
         let depth = if top_n >= 3 && mean_act > 1.0 {
             0.85

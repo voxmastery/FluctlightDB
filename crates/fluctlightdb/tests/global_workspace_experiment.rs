@@ -30,9 +30,18 @@ fn global_neural_broadcasting_present_moment() {
     brain.predictive_loop.enabled = true;
     brain.global_workspace.ignition_threshold = 0.40;
 
-    seed(&mut brain, "the harbor beacon flashes twice before fog rolls in");
-    seed(&mut brain, "dock workers store lantern oil near the south pier");
-    seed(&mut brain, "when fog arrives ships wait for the harbor beacon");
+    seed(
+        &mut brain,
+        "the harbor beacon flashes twice before fog rolls in",
+    );
+    seed(
+        &mut brain,
+        "dock workers store lantern oil near the south pier",
+    );
+    seed(
+        &mut brain,
+        "when fog arrives ships wait for the harbor beacon",
+    );
     brain
         .prefrontal
         .add_goal("keep ships safe in fog".into(), 0);
@@ -72,7 +81,9 @@ fn global_neural_broadcasting_present_moment() {
     println!("B) now={:?}", now.as_ref().map(|n| &n.content));
     let pass_b = now
         .as_ref()
-        .map(|n| n.content.to_lowercase().contains("harbor") || n.content.to_lowercase().contains("fog"))
+        .map(|n| {
+            n.content.to_lowercase().contains("harbor") || n.content.to_lowercase().contains("fog")
+        })
         .unwrap_or(false);
     println!("   PASS={pass_b}\n");
 

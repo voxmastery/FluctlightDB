@@ -35,9 +35,11 @@ fn is_meta(s: &str) -> bool {
 
 fn mentions_world(s: &str) -> bool {
     let l = s.to_lowercase();
-    ["harbor", "beacon", "fog", "lantern", "pier", "ships", "dock"]
-        .iter()
-        .any(|w| l.contains(w))
+    [
+        "harbor", "beacon", "fog", "lantern", "pier", "ships", "dock",
+    ]
+    .iter()
+    .any(|w| l.contains(w))
 }
 
 #[test]
@@ -67,7 +69,9 @@ fn worldview_agent_coherent_beliefs() {
     // A) Explicit step yields clean belief(s)
     let report = brain.worldview_step(None);
     let tops = brain.top_beliefs(5);
-    let clean_a = tops.iter().any(|b| !is_meta(&b.claim) && mentions_world(&b.claim));
+    let clean_a = tops
+        .iter()
+        .any(|b| !is_meta(&b.claim) && mentions_world(&b.claim));
     let no_meta_a = tops.iter().all(|b| !is_meta(&b.claim));
     println!("A) clean beliefs after worldview_step");
     for b in &tops {
@@ -83,7 +87,10 @@ fn worldview_agent_coherent_beliefs() {
     let tops_b = brain.top_beliefs(8);
     let no_meta_b = tops_b.iter().all(|b| !is_meta(&b.claim));
     let worldish = tops_b.iter().filter(|b| mentions_world(&b.claim)).count();
-    println!("B) after ticks: beliefs={} worldish={worldish}", tops_b.len());
+    println!(
+        "B) after ticks: beliefs={} worldish={worldish}",
+        tops_b.len()
+    );
     for b in &tops_b {
         println!("   conf={:.2} «{}»", b.confidence, b.claim);
     }
@@ -91,10 +98,7 @@ fn worldview_agent_coherent_beliefs() {
     println!("   PASS={pass_b}\n");
 
     // C) Confidence not saturated at 0.98 for fresh beliefs
-    let max_c = tops_b
-        .iter()
-        .map(|b| b.confidence)
-        .fold(0.0_f32, f32::max);
+    let max_c = tops_b.iter().map(|b| b.confidence).fold(0.0_f32, f32::max);
     let pass_c = max_c <= 0.92 && tops_b.iter().any(|b| b.confidence < 0.90);
     println!("C) confidence discipline max={max_c:.2}");
     println!("   PASS={pass_c}\n");
@@ -114,7 +118,10 @@ fn worldview_agent_coherent_beliefs() {
     let _ = brain.worldview_step(Some(&dream));
     let after_tops = brain.top_beliefs(12);
     let no_meta_e = after_tops.iter().all(|b| !is_meta(&b.claim));
-    println!("E) dream-coupled step beliefs {before}→{}", after_tops.len());
+    println!(
+        "E) dream-coupled step beliefs {before}→{}",
+        after_tops.len()
+    );
     println!("   PASS={}\n", no_meta_e);
 
     // F) Curiosity: open questions exist and are non-meta memory junk

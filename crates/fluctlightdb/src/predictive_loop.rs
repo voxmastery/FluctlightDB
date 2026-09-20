@@ -380,8 +380,8 @@ impl PredictiveLoop {
                 parts.push(spot.summary.clone());
                 used_attention = true;
                 source = PredictionSource::Attention;
-                confidence = (0.4 + 0.5 * attention.intensity * attention.model_confidence)
-                    .clamp(0.2, 0.95);
+                confidence =
+                    (0.4 + 0.5 * attention.intensity * attention.model_confidence).clamp(0.2, 0.95);
             }
         }
         if let Some(pp) = preplay {
@@ -588,7 +588,10 @@ impl PredictiveLoop {
             } else {
                 prediction.confidence
             },
-            rooted_in: vec![prediction.summary.clone(), observed.chars().take(120).collect()],
+            rooted_in: vec![
+                prediction.summary.clone(),
+                observed.chars().take(120).collect(),
+            ],
         };
         self.interpretations.push_back(interp.clone());
         while self.interpretations.len() > MAX_INTERPRETATIONS {
