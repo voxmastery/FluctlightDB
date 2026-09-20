@@ -26,6 +26,14 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ### Removed
 
+- **Cursor integration and Cursor-API benchmark backend.** This repository no longer
+  ships `.cursor/` (MCP config, hooks, rules) or a `cursor` agent spoke, its handoff
+  log starts empty, and the LongMemEval e2e runner drops `--llm-backend cursor`
+  (`benchmarks/cursor_api.py`, `scripts/run-longmemeval-e2e-cursor.sh`); the Colab
+  notebook's e2e path now uses the runner's default Gemini backend. The `fluctlightdb`
+  Python SDK's Cursor scaffolding is unchanged.
+- `.githooks/prepare-commit-msg` also strips `Co-Authored-By:` and `Claude-Session:`
+  trailers; enable with `scripts/setup-git-hooks.sh`.
 - `scripts/ground-wallet-truth.py` — agent-wallet integration specific to one
   deployment, unreferenced by the rest of the repo.
 

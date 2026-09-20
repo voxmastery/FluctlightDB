@@ -72,7 +72,7 @@ Research checklist for arXiv submission and AI-assisted drafting.
 
 1. **You** lock numbers in JSON and tables (already done for LoCoMo).  
 2. **Cloudflare Llama 3.3 70B** — expand bullet outline → paragraph draft per section.  
-3. **Claude (Cursor)** — rewrite for tone, add related-work sentences with verified cites.  
+3. **Claude** — rewrite for tone, add related-work sentences with verified cites.  
 4. **You** — paste into `main.tex`, compile locally, fix LaTeX errors manually.  
 5. **Second human pass** — abstract, limitations, and claims vs evidence.
 

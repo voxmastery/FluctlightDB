@@ -2,7 +2,7 @@
 name: fluctlight-memory
 description: >-
   Use FluctlightDB project brains for durable memory, recall, and handoffs between
-  Cursor, Claude Code, and Codex in this monorepo. Call when you need prior decisions,
+  Claude Code and Codex in this monorepo. Call when you need prior decisions,
   conventions, cross-agent context, or to leave a handoff for another tool.
 ---
 
@@ -26,7 +26,7 @@ This repo uses **FluctlightDB** as the shared project brain (`FluctlightDB`).
 ```python
 from fluctlightdb import connect_project
 
-pb = connect_project(agent="claude")  # or cursor / codex
+pb = connect_project(agent="claude")  # or codex
 print(pb.session_context())
 
 pb.remember("API uses JWT in Authorization header", scope="project", context="architecture")
