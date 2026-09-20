@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "title": "FluctlightDB: A Memory Model of Data for AI Agents",
+    "upload_type": "publication",
+    "publication_type": "preprint",
+    "publication_date": "2026-06-27",
+    "version": "2.0",
+    "language": "eng",
+    "access_right": "open",
+    "license": "cc-by-4.0",
+    "creators": [
+      {
+        "name": "S, Ganesh",
+        "affiliation": "Independent Researcher",
+        "orcid": "0009-0006-7758-4114"
+      }
+    ],
+    "keywords": [
+      "agent memory",
+      "database systems",
+      "episodic memory",
+      "LoCoMo",
+      "LongMemEval",
+      "vector retrieval",
+      "AI agents"
+    ],
+    "related_identifiers": [
+      {
+        "identifier": "arXiv:2608.12365",
+        "relation": "isIdenticalTo",
+        "resource_type": "publication-preprint",
+        "scheme": "arxiv"
+      },
+      {
+        "identifier": "https://github.com/voxmastery/FluctlightDB",
+        "relation": "isSupplementedBy",
+        "resource_type": "software",
+        "scheme": "url"
+      },
+      {
+        "identifier": "https://github.com/voxmastery/FluctlightDB/releases/tag/paper-v1.0",
+        "relation": "isVersionOf",
+        "resource_type": "other",
+        "scheme": "url"
+      },
+      {
+        "identifier": "https://huggingface.co/Voxiesz/fluctlightdb-paper",
+        "relation": "references",
+        "resource_type": "other",
+        "scheme": "url"
+      }
+    ],
+    "description": "<p><strong>Correction notice (supersedes the original deposit).</strong> This record originally headlined <em>98.1% LoCoMo mean evidence recall</em>, <em>BEIR SciFact nDCG@10 0.645</em> and <em>FAMB 97-98% macro</em>. Those figures are withdrawn. The LoCoMo number was produced under a scoring protocol that applied <code>expand_session_neighbors(&plusmn;3)</code> <em>after</em> retrieval, crediting neighbouring turns that were never actually retrieved; a trivial BM25 baseline also reaches ~99% under that protocol, so it distinguishes nothing. The honest figure, with no neighbor expansion, is <strong>96.8% at k=150</strong>. The quoted nDCG@10 of 0.645 was the Chroma baseline's score, not FluctlightDB's (0.646). FAMB is 100% macro and is an author-designed internal regression suite, not a peer benchmark. The text below matches <a href=\"https://arxiv.org/abs/2608.12365v2\">arXiv:2608.12365v2</a> (revised 2026-09-14).</p>\n\n<hr>\n\n<p>For fifty years, data systems have answered two questions. The relational model asked which records match a predicate; the vector model asked which vectors lie nearest a query. Neither was built for cue-driven, provenance-weighted recall across long sessions. We propose treating long-term agent memory as a distinct data model &mdash; with its own write semantics (encoding, separation, consolidation, provenance) and read semantics (cue-driven activation across a linked memory graph) &mdash; and present FluctlightDB, an embedded engine that implements this contract via <code>experience()</code> and <code>activate()</code>. We do not claim novelty over Mem0, Zep, or HippoRAG-style memory layers, only an embedded engine contract beneath them. Numbers are typed by metric; retrieval is not generation.</p>\n\n<p>On LoCoMo (official evidence-recall; 10 conversations, 1,982 gold spans), our native-Rust CHORUS stack reaches <strong>96.8% at k=150</strong> as raw evidence recall with no neighbor expansion, on an internally reproduced July 2026 run; at k=5 it still yields <strong>72.6%</strong>, while end-to-end QA over date-stamped context reaches 85% at k=15 (retrieval-bound). On LongMemEval-S (500 questions), official <code>session_recall@8</code> is <strong>97.6%</strong> (488/500) and end-to-end QA with our reader/judge stack is <strong>97.4%</strong> (487/500) &mdash; different protocols from vendor leaderboard figures we cite for context only. On BEIR SciFact (shared MiniLM embeddings, same harness), CHORUS/PRISM edges Chroma on nDCG@10 (<strong>0.646</strong> vs. 0.645) and Recall@10 (<strong>0.792</strong> vs. 0.783). A graded provenance-conflict suite (n=50) scores 18% top-1 when all pairs share one brain versus 100% under per-case isolation (ceiling, not deployment evidence).</p>\n\n<p>Engine, harnesses and frozen JSON are MIT; <code>pip install \"fluctlightdb[native]\"</code> re-runs the published numbers. We claim no new neuroscience and no new transformer: a missing layer of the data stack, released for others to re-run and contest.</p>\n\n<p><strong>Verification status:</strong> all headline numbers are maintainer-reported. Harnesses are open and frozen result JSON is in the repository, but no independent third-party reproduction has been published yet. See <code>docs/REPRODUCIBILITY.md</code>.</p>\n\n<p>Software, benchmark harnesses, and LaTeX source: <a href=\"https://github.com/voxmastery/FluctlightDB\">https://github.com/voxmastery/FluctlightDB</a></p>"
+  }
+}

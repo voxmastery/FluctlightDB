@@ -3,7 +3,7 @@
   "harness": "FluctlightDB benchmark suite (paper v2)",
   "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
   "doi": "10.5281/zenodo.20949890",
-  "arxiv": "arXiv:2608.12365 (cs.DB, submitted 2026-07-10); v1 carries the deprecated 99.0% LoCoMo figure, v2 replacement with corrected 96.8%/72.6% prepared and pending upload",
+  "arxiv": "arXiv:2608.12365 (cs.DB, submitted 2026-07-10; v2 revised 2026-09-14 carries the corrected 96.8%/72.6%). Zenodo 10.5281/zenodo.20949890 still serves the withdrawn 98.1% - see papers/arxiv-v1/ZENODO_REPLACE.md",
   "reproduce": "benchmarks/README.md, docs/BENCHMARKS.md, benchmarks/longmemeval_colab_v2.ipynb",
   "fabric_on": true,
   "fabric_note": "Paper-profile Fabric-on (FLUCTLIGHT_FABRIC=1) via configure_paper_fabric() in CHORUS benchmarks (LoCoMo, BEIR, FAMB). LongMemEval connect_index uses hybrid sidecar ranking; Fabric rerank applies on CHORUS/PRISM lane only.",

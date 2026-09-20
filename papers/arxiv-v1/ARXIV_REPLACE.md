@@ -1,6 +1,15 @@
 # arXiv replacement (v1 → v2) — FluctlightDB
 
-**Live now:** [arXiv:2608.12365v1](https://arxiv.org/abs/2608.12365) — submitted 2026-07-10, never revised.
+> **DONE — v2 is live.** [arXiv:2608.12365v2](https://arxiv.org/abs/2608.12365v2) was announced
+> **2026-09-14** and carries the corrected 96.8% / 72.6% figures. The procedure below is kept as the
+> record of how it was done, and as the template for any future replacement.
+>
+> **Still outstanding:** the Zenodo deposit
+> [10.5281/zenodo.20949890](https://doi.org/10.5281/zenodo.20949890) has *not* been corrected — it
+> serves an even older **98.1%** headline, and it is the DOI third parties actually cite. See
+> [`ZENODO_REPLACE.md`](ZENODO_REPLACE.md).
+
+**Superseded:** [arXiv:2608.12365v1](https://arxiv.org/abs/2608.12365v1) — submitted 2026-07-10.
 
 ## Why a replacement is owed
 
@@ -13,7 +22,7 @@ under that protocol, so it distinguishes nothing.
 The published paper has not been updated, so the citable version overstates LoCoMo and omits
 a disclosure the local version adds.
 
-| | arXiv v1 (live) | local `main.tex` (correct) |
+| | arXiv v1 (superseded) | arXiv v2 / `main.tex` (live, correct) |
 |---|---|---|
 | LoCoMo headline | 99.0% | **96.8%** @k=150 raw, no expansion |
 | tight-k | not reported | **72.6%** @k=5 (MiniLM) / 75.1% (mpnet) |

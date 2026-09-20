@@ -1,6 +1,7 @@
 {
   "title": "FluctlightDB: A Memory Model of Data for AI Agents",
-  "description": "Preprint and software release for FluctlightDB — an embedded brain-native memory engine for AI agents. Third data model: experience()/activate(). LoCoMo 99.0% evidence recall, BEIR SciFact parity, FAMB 100%. MIT license.",
+  "description": "Preprint and software release for FluctlightDB - an embedded brain-native memory engine for AI agents. Third data model: experience()/activate(), provenance-weighted cue recall, in-engine consolidation. LoCoMo 96.8% raw evidence recall @k=150 with no neighbor expansion (72.6% @k=5); LongMemEval-S session_recall@8 97.6% and end-to-end QA 97.4%; BEIR SciFact nDCG@10 0.646 / R@10 0.792 vs Chroma 0.645 / 0.783. All numbers maintainer-reported; harnesses and frozen JSON are open. Supersedes the withdrawn 98.1%/99.0% LoCoMo figures, which credited neighbours that were never retrieved. Matches arXiv:2608.12365v2. MIT license.",
+  "version": "2.0",
   "creators": [
     {
       "name": "S, Ganesh",
@@ -13,6 +14,7 @@
     "database systems",
     "episodic memory",
     "LoCoMo",
+    "LongMemEval",
     "vector retrieval",
     "AI agents"
   ],
@@ -21,9 +23,28 @@
   "publication_type": "preprint",
   "related_identifiers": [
     {
+      "identifier": "arXiv:2608.12365",
+      "relation": "isIdenticalTo",
+      "resource_type": "publication-preprint",
+      "scheme": "arxiv"
+    },
+    {
       "identifier": "https://github.com/voxmastery/FluctlightDB",
-      "relation": "isSupplementTo",
-      "resource_type": "software"
+      "relation": "isSupplementedBy",
+      "resource_type": "software",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://github.com/voxmastery/FluctlightDB/releases/tag/paper-v1.0",
+      "relation": "isVersionOf",
+      "resource_type": "other",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://huggingface.co/Voxiesz/fluctlightdb-paper",
+      "relation": "references",
+      "resource_type": "other",
+      "scheme": "url"
     }
   ]
 }
