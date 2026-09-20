@@ -213,7 +213,6 @@ E2E_PROFILES: dict[str, dict[str, Any]] = {
     },
 }
 
-from cursor_api import cursor_auto_chat, load_cursor_api_key  # noqa: E402
 from cloud_llm import chat as cloud_chat, load_env_file, smoke_test  # noqa: E402
 
 READER_MODEL = "gemini-2.5-flash"
@@ -525,8 +524,6 @@ def llm_chat(
     timeout_s: int = 120,
     max_tokens: int = 512,
 ) -> str:
-    if backend == "cursor":
-        return cursor_auto_chat(prompt, model=model or "auto", timeout_s=timeout_s)
     return cloud_chat(
         prompt,
         provider=backend,
@@ -739,20 +736,14 @@ def main() -> int:
     ap.add_argument(
         "--llm-backend",
         default=os.environ.get("LONGMEMEVAL_LLM_BACKEND", DEFAULT_LLM_BACKEND),
-        choices=("gemini", "openrouter", "cerebras", "groq", "openai", "cursor"),
-        help="reader/judge API (OpenAI-compatible chat; cursor = slow Cloud Agents API)",
+        choices=("gemini", "openrouter", "cerebras", "groq", "openai"),
+        help="reader/judge API (OpenAI-compatible chat)",
     )
     ap.add_argument(
         "--llm-timeout",
         type=int,
         default=int(os.environ.get("LONGMEMEVAL_LLM_TIMEOUT", "180")),
         help="seconds per reader/judge chat completion",
-    )
-    ap.add_argument(
-        "--cursor-timeout",
-        type=int,
-        default=int(os.environ.get("CURSOR_API_TIMEOUT", "300")),
-        help="alias kept for scripts; used when --llm-backend cursor",
     )
     ap.add_argument("--granularity", default="session", choices=("session", "turn"))
     ap.add_argument(
@@ -807,8 +798,6 @@ def main() -> int:
         help="comma-separated question_type filter",
     )
     args = ap.parse_args()
-    if args.llm_backend == "cursor" and args.llm_timeout == 120 and args.cursor_timeout != 300:
-        args.llm_timeout = args.cursor_timeout
 
     prof = E2E_PROFILES.get(args.e2e_profile, E2E_PROFILES["standard"])
     if not args.reader_top_k:
@@ -889,8 +878,6 @@ def main() -> int:
     default_model = (
         "gpt-4o-2024-08-06"
         if backend == "openai"
-        else "auto"
-        if backend == "cursor"
         else PROVIDERS.get(backend, {}).get("default_model")
     )
     reader_model = args.reader_model or default_model or READER_MODEL
@@ -905,10 +892,7 @@ def main() -> int:
 
     if not args.skip_llm:
         load_env_file()
-        if backend == "cursor":
-            if not load_cursor_api_key():
-                raise SystemExit("Set CURSOR_API_KEY or pass --skip-llm.")
-        else:
+        if True:
             if not args.skip_smoke_test:
                 try:
                     smoke_test(backend, model=reader_model if backend == "openai" else None)

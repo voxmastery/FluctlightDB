@@ -3,4 +3,6 @@
 sed -i \
   -e '/cursoragent@/d' \
   -e '/^Made-with:/d' \
+  -e '/^Co-Authored-By:/d' \
+  -e '/^Claude-Session:/d' \
   "$1"

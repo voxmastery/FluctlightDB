@@ -154,7 +154,7 @@ pip install "fluctlightdb[native,mcp]"
 fluctlight-project init
 ```
 
-Cursor + Claude + Codex share `.fluctlight/project/` brains, handoffs, MCP. See [MULTI_AGENT.md](docs/MULTI_AGENT.md).
+Claude + Codex share `.fluctlight/project/` brains, handoffs, MCP. See [MULTI_AGENT.md](docs/MULTI_AGENT.md).
 
 ---
 
