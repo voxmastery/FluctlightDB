@@ -21,7 +21,8 @@ use crate::{Error, FluctlightBrain, Result};
 
 const CONNECTIONS_HEADER: &str = "pre_root_id,post_root_id,neuropil,syn_count,nt_type";
 const NEURONS_HEADER_PREFIX: &str = "root_id,group,nt_type,";
-const CLASSIFICATION_HEADER: &str = "root_id,flow,super_class,class,sub_class,hemilineage,side,nerve";
+const CLASSIFICATION_HEADER: &str =
+    "root_id,flow,super_class,class,sub_class,hemilineage,side,nerve";
 /// Abort when more than this share of connection rows is malformed. Real FlyWire files have
 /// zero; a wrong file fails the header check; 10 % catches a partially corrupt file while
 /// tolerating the fixture's 1-of-40. Spec §7 originally said 1 %; corrected here — rows below
@@ -76,11 +77,20 @@ fn open_lines(path: &Path) -> Result<impl Iterator<Item = std::io::Result<String
     Ok(BufReader::new(f).lines())
 }
 
-fn check_header(path: &Path, got: Option<std::io::Result<String>>, expected: &str, prefix_only: bool) -> Result<()> {
+fn check_header(
+    path: &Path,
+    got: Option<std::io::Result<String>>,
+    expected: &str,
+    prefix_only: bool,
+) -> Result<()> {
     let got = got
         .ok_or_else(|| Error::Store(format!("{}: empty file", path.display())))?
         .map_err(|e| Error::Store(format!("{}: {e}", path.display())))?;
-    let ok = if prefix_only { got.trim().starts_with(expected) } else { got.trim() == expected };
+    let ok = if prefix_only {
+        got.trim().starts_with(expected)
+    } else {
+        got.trim() == expected
+    };
     if !ok {
         return Err(Error::Store(format!(
             "{}: header mismatch — expected `{expected}`, found `{}`",
@@ -100,21 +110,30 @@ fn read_neuron_meta(cfg: &ImportConfig) -> Result<(HashMap<NeuronId, NeuronMeta>
     for line in lines {
         let line = line.map_err(|e| Error::Store(e.to_string()))?;
         let mut f = line.split(',');
-        let (Some(id), _group, Some(nt)) = (f.next(), f.next(), f.next()) else { continue };
+        let (Some(id), _group, Some(nt)) = (f.next(), f.next(), f.next()) else {
+            continue;
+        };
         let Ok(id) = id.parse::<u64>() else { continue };
         meta.entry(NeuronId(id)).or_default().nt = Nt::parse(nt);
     }
 
     let mut entry_set = Vec::new();
     let mut lines = open_lines(&cfg.classification)?;
-    check_header(&cfg.classification, lines.next(), CLASSIFICATION_HEADER, false)?;
+    check_header(
+        &cfg.classification,
+        lines.next(),
+        CLASSIFICATION_HEADER,
+        false,
+    )?;
     for line in lines {
         let line = line.map_err(|e| Error::Store(e.to_string()))?;
         let f: Vec<&str> = line.split(',').collect();
         if f.len() < 7 {
             continue;
         }
-        let Ok(id) = f[0].parse::<u64>() else { continue };
+        let Ok(id) = f[0].parse::<u64>() else {
+            continue;
+        };
         let m = meta.entry(NeuronId(id)).or_default();
         m.super_class = f[2].to_string();
         m.class = f[3].to_string();
@@ -129,7 +148,10 @@ fn read_neuron_meta(cfg: &ImportConfig) -> Result<(HashMap<NeuronId, NeuronMeta>
 }
 
 /// Pass 2: Σ syn_count per (pre, post). Also records the first neuropil seen per presynaptic neuron.
-fn read_pair_sums(cfg: &ImportConfig, meta: &mut HashMap<NeuronId, NeuronMeta>) -> Result<PairSums> {
+fn read_pair_sums(
+    cfg: &ImportConfig,
+    meta: &mut HashMap<NeuronId, NeuronMeta>,
+) -> Result<PairSums> {
     let mut sums: HashMap<(u64, u64), u32> = HashMap::new();
     let (mut rows_read, mut rows_malformed) = (0u64, 0u64);
     let mut lines = open_lines(&cfg.connections)?;
@@ -138,11 +160,15 @@ fn read_pair_sums(cfg: &ImportConfig, meta: &mut HashMap<NeuronId, NeuronMeta>) 
         let line = line.map_err(|e| Error::Store(e.to_string()))?;
         rows_read += 1;
         let mut f = line.split(',');
-        let (Some(pre), Some(post), Some(neuropil), Some(syn)) = (f.next(), f.next(), f.next(), f.next()) else {
+        let (Some(pre), Some(post), Some(neuropil), Some(syn)) =
+            (f.next(), f.next(), f.next(), f.next())
+        else {
             rows_malformed += 1;
             continue;
         };
-        let (Ok(pre), Ok(post), Ok(syn)) = (pre.parse::<u64>(), post.parse::<u64>(), syn.parse::<u32>()) else {
+        let (Ok(pre), Ok(post), Ok(syn)) =
+            (pre.parse::<u64>(), post.parse::<u64>(), syn.parse::<u32>())
+        else {
             rows_malformed += 1;
             continue;
         };
@@ -173,8 +199,14 @@ fn p99(sums: &HashMap<(u64, u64), u32>) -> f32 {
 
 /// Drop every synapse touching a neuron of the previous connectome.
 fn remove_previous(brain: &mut FluctlightBrain, old: &ConnectomeMeta) {
-    brain.graph.synapses.retain(|s| !old.neurons.contains_key(&s.from) && !old.neurons.contains_key(&s.to));
-    brain.graph.neuron_regions.retain(|n, _| !old.neurons.contains_key(n));
+    brain
+        .graph
+        .synapses
+        .retain(|s| !old.neurons.contains_key(&s.from) && !old.neurons.contains_key(&s.to));
+    brain
+        .graph
+        .neuron_regions
+        .retain(|n, _| !old.neurons.contains_key(n));
     brain.graph.rebuild_index();
 }
 
@@ -183,19 +215,31 @@ pub fn import_connectome(brain: &mut FluctlightBrain, cfg: &ImportConfig) -> Res
     if let Some(old) = brain.connectome.take() {
         if !cfg.replace {
             brain.connectome = Some(old);
-            return Err(Error::Store("brain already has a connectome (pass replace=true to overwrite)".into()));
+            return Err(Error::Store(
+                "brain already has a connectome (pass replace=true to overwrite)".into(),
+            ));
         }
         remove_previous(brain, &old);
     }
     let mut warnings = Vec::new();
-    if brain.hippocampus.engrams_for_life(brain.life.life_id).next().is_some() {
-        warnings.push("brain already holds engrams; connectome is being fused with existing memory".into());
+    if brain
+        .hippocampus
+        .engrams_for_life(brain.life.life_id)
+        .next()
+        .is_some()
+    {
+        warnings.push(
+            "brain already holds engrams; connectome is being fused with existing memory".into(),
+        );
     }
 
     // All parsing happens before any mutation so a failed import leaves the graph untouched.
     let (mut meta, entry_set) = read_neuron_meta(cfg)?;
     if entry_set.is_empty() {
-        warnings.push(format!("entry set is empty: no neuron has class `{}`", cfg.entry_class));
+        warnings.push(format!(
+            "entry set is empty: no neuron has class `{}`",
+            cfg.entry_class
+        ));
     }
     let (sums, rows_read, rows_malformed) = read_pair_sums(cfg, &mut meta)?;
     let p99_syn = p99(&sums);
@@ -203,7 +247,10 @@ pub fn import_connectome(brain: &mut FluctlightBrain, cfg: &ImportConfig) -> Res
     let mut inhibitory = 0u64;
     brain.graph.rebuild_index();
     for (&(pre, post), &sum) in &sums {
-        let inh = meta.get(&NeuronId(pre)).map(|m| m.nt.sign() < 0.0).unwrap_or(false);
+        let inh = meta
+            .get(&NeuronId(pre))
+            .map(|m| m.nt.sign() < 0.0)
+            .unwrap_or(false);
         inhibitory += inh as u64;
         brain.graph.add_synapse_uncapped(Synapse::new(
             NeuronId(pre),
@@ -213,7 +260,8 @@ pub fn import_connectome(brain: &mut FluctlightBrain, cfg: &ImportConfig) -> Res
         ));
     }
     if inhibitory == 0 {
-        warnings.push("no inhibitory synapses were imported — check neurons.csv nt_type column".into());
+        warnings
+            .push("no inhibitory synapses were imported — check neurons.csv nt_type column".into());
     }
     let pairs = sums.len() as u64;
     // `sums` peaks at ~2.7M entries on v783; free it before the index rebuild allocates.
@@ -237,8 +285,16 @@ pub fn import_connectome(brain: &mut FluctlightBrain, cfg: &ImportConfig) -> Res
         entry_set,
         neurons: meta,
     });
-    let entry_set_len = brain.connectome.as_ref().map(|c| c.entry_set.len()).unwrap_or(0);
-    let neurons = brain.connectome.as_ref().map(|c| c.neurons.len()).unwrap_or(0);
+    let entry_set_len = brain
+        .connectome
+        .as_ref()
+        .map(|c| c.entry_set.len())
+        .unwrap_or(0);
+    let neurons = brain
+        .connectome
+        .as_ref()
+        .map(|c| c.neurons.len())
+        .unwrap_or(0);
 
     Ok(ImportReport {
         rows_read,

@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::activation::{activate_from_hybrid, cap_candidates, complete, default_candidate_cap};
 use crate::agent_runtime::AgentState;
 use crate::amygdala::Amygdala;
+use crate::attention_schema::{AttentionSchema, AttentionSchemaReport};
 use crate::autonomic::{AutonomicState, TickReport};
 use crate::budget::{self, WiringBudget, PRESSURE_COMPACT_THRESHOLD};
 use crate::cache::ActivationCache;
@@ -19,20 +20,18 @@ use crate::dentate::SeparationResult;
 use crate::development::{DevStage, DevelopmentState};
 use crate::engram::Engram;
 use crate::error::{Error, Result};
+use crate::global_workspace::{
+    BroadcastReceipt, GlobalBroadcast, GlobalWorkspace, GlobalWorkspaceReport, PresentMoment,
+};
 use crate::graph::BrainGraph;
 use crate::graph_export::{export_graph, export_graph_lite, GraphExport};
 use crate::hippocampus::Hippocampus;
 use crate::index::RecallIndex;
 use crate::life::{CoreMemoryStore, LifeState};
 use crate::neuromodulator::Neuromodulators;
-use crate::attention_schema::{AttentionSchema, AttentionSchemaReport};
 use crate::predictive_loop::{
     DreamReport, ObservePredictionReport, PredictiveCycleReport, PredictiveLoop,
 };
-use crate::global_workspace::{
-    BroadcastReceipt, GlobalBroadcast, GlobalWorkspace, GlobalWorkspaceReport, PresentMoment,
-};
-use crate::worldview_agent::{WorldBelief, WorldviewAgent, WorldviewStepReport};
 use crate::prefrontal::{Prefrontal, RuleAction};
 use crate::raw_export::{export_raw, RawExport};
 use crate::semantic::SemanticField;
@@ -46,6 +45,7 @@ use crate::types::{
     VizExport,
 };
 use crate::wal::{self, WalEntry, WalIdentity};
+use crate::worldview_agent::{WorldBelief, WorldviewAgent, WorldviewStepReport};
 
 const MAX_RECENT_SEPARATIONS: usize = 12;
 const COMPACT_EVERY_N_SLEEPS: u64 = 48;
@@ -698,8 +698,7 @@ impl FluctlightBrain {
         // PFC working memory fades: goals & task context decay without rehearsal.
         self.prefrontal.tick_decay(self.autonomic.total_ticks);
         // Attention schema fades without maintenance (AST model of unattended spotlight).
-        self.attention_schema
-            .tick_decay(self.autonomic.total_ticks);
+        self.attention_schema.tick_decay(self.autonomic.total_ticks);
         // Continuous predictive dream: simulate futures from the episodic graph
         // without waiting for a user query (autonomous inner timeline).
         let mut last_dream: Option<DreamReport> = None;
@@ -716,9 +715,7 @@ impl FluctlightBrain {
                 // Prediction error encodes only clean observed world content (no meta seeds).
                 if dream.surprise {
                     if let Some(observed) = dream.moment.simulated.as_ref() {
-                        if let Some(clean) =
-                            crate::predictive_loop::clean_world_claim(observed)
-                        {
+                        if let Some(clean) = crate::predictive_loop::clean_world_claim(observed) {
                             let _ = self.encode_prediction_error_silent(&clean, true);
                         }
                     }
@@ -1439,8 +1436,7 @@ impl FluctlightBrain {
 
     /// Release the modeled spotlight.
     pub fn release_attention(&mut self) -> AttentionSchemaReport {
-        self.attention_schema
-            .release(self.autonomic.total_ticks);
+        self.attention_schema.release(self.autonomic.total_ticks);
         self.activation_cache.lock().unwrap().invalidate();
         self.attention_schema.report()
     }
@@ -1453,11 +1449,8 @@ impl FluctlightBrain {
     /// Activate, then update the attention schema from what actually fired.
     pub fn activate_and_attend(&mut self, cue: &str) -> ActivationResult {
         let mut result = self.activate(cue);
-        self.attention_schema.observe_activation(
-            cue,
-            &result.recalls,
-            self.autonomic.total_ticks,
-        );
+        self.attention_schema
+            .observe_activation(cue, &result.recalls, self.autonomic.total_ticks);
         self.activation_cache.lock().unwrap().invalidate();
         result.attention = Some(self.attention_schema.report());
         result
@@ -1579,11 +1572,7 @@ impl FluctlightBrain {
 
     /// Top-k beliefs by confidence (world model readout).
     pub fn top_beliefs(&self, k: usize) -> Vec<WorldBelief> {
-        self.worldview
-            .top_beliefs(k)
-            .into_iter()
-            .cloned()
-            .collect()
+        self.worldview.top_beliefs(k).into_iter().cloned().collect()
     }
 
     /// Current global-workspace broadcast (authoritative GWT), if any.
@@ -1601,10 +1590,7 @@ impl FluctlightBrain {
     /// Implements the upgrade spec mechanically:
     /// episodic graph + specialists compete; winner melts into singular `now`;
     /// ignition broadcasts so attention, PFC, neuromod, graph, predictive, worldview all act.
-    pub fn global_workspace_step(
-        &mut self,
-        dream: Option<&DreamReport>,
-    ) -> GlobalWorkspaceReport {
+    pub fn global_workspace_step(&mut self, dream: Option<&DreamReport>) -> GlobalWorkspaceReport {
         let tick = self.autonomic.total_ticks;
 
         // Live graph as buzzing workspace: activate from current now (or probe).
@@ -2552,10 +2538,7 @@ mod tests {
 
         // 1) Plain activate retrieves — but does NOT create an attention model.
         let plain = brain.activate("lab notes");
-        assert!(
-            !plain.recalls.is_empty(),
-            "baseline recall must work"
-        );
+        assert!(!plain.recalls.is_empty(), "baseline recall must work");
         assert!(
             plain.attention.is_none(),
             "plain activate must not attach an attention report"
@@ -2583,7 +2566,13 @@ mod tests {
             before_recall.narration
         );
         // Still no recall in this step — knowledge of focus is independent of retrieval.
-        assert!(brain.activate("zzzz-nonexistent-cue-xyz").recalls.is_empty() || true);
+        assert!(
+            brain
+                .activate("zzzz-nonexistent-cue-xyz")
+                .recalls
+                .is_empty()
+                || true
+        );
 
         // 3+4) activate_and_attend: retrieve AND know the focus.
         let attended = brain.activate_and_attend("schema design");

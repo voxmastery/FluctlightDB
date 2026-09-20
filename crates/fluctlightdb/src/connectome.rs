@@ -86,7 +86,10 @@ impl ConnectomeMeta {
     }
 
     pub fn is_inhibitory(&self, pre: NeuronId) -> bool {
-        self.neurons.get(&pre).map(|m| m.nt.sign() < 0.0).unwrap_or(false)
+        self.neurons
+            .get(&pre)
+            .map(|m| m.nt.sign() < 0.0)
+            .unwrap_or(false)
     }
 
     pub fn summary(&self) -> serde_json::Value {
@@ -143,11 +146,35 @@ mod tests {
             p99_syn: 78.0,
             fanout: 7,
             entry_class: "Kenyon_Cell".into(),
-            entry_set: vec![NeuronId(1001), NeuronId(1002), NeuronId(1003), NeuronId(1004), NeuronId(1005)],
+            entry_set: vec![
+                NeuronId(1001),
+                NeuronId(1002),
+                NeuronId(1003),
+                NeuronId(1004),
+                NeuronId(1005),
+            ],
             neurons: Default::default(),
         };
-        m.neurons.insert(NeuronId(4001), NeuronMeta { nt: Nt::Gaba, super_class: "central".into(), class: "APL".into(), side: "right".into(), neuropil: "MB_CA_R".into() });
-        m.neurons.insert(NeuronId(2001), NeuronMeta { nt: Nt::Ach, super_class: "central".into(), class: "ALPN".into(), side: "right".into(), neuropil: "AL_R".into() });
+        m.neurons.insert(
+            NeuronId(4001),
+            NeuronMeta {
+                nt: Nt::Gaba,
+                super_class: "central".into(),
+                class: "APL".into(),
+                side: "right".into(),
+                neuropil: "MB_CA_R".into(),
+            },
+        );
+        m.neurons.insert(
+            NeuronId(2001),
+            NeuronMeta {
+                nt: Nt::Ach,
+                super_class: "central".into(),
+                class: "ALPN".into(),
+                side: "right".into(),
+                neuropil: "AL_R".into(),
+            },
+        );
         m
     }
 

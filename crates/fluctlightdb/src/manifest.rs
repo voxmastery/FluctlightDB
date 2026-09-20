@@ -303,13 +303,10 @@ fn load_checkpoint_dir(dir: &Path) -> Result<FluctlightBrain> {
     brain.muon = segment::read_segment(dir, "muon").unwrap_or_default();
     brain.tau = segment::read_segment(dir, "tau").unwrap_or_default();
     brain.swarm = segment::read_segment(dir, "swarm").unwrap_or_default();
-    brain.attention_schema =
-        segment::read_segment(dir, "attention_schema").unwrap_or_default();
-    brain.predictive_loop =
-        segment::read_segment(dir, "predictive_loop").unwrap_or_default();
+    brain.attention_schema = segment::read_segment(dir, "attention_schema").unwrap_or_default();
+    brain.predictive_loop = segment::read_segment(dir, "predictive_loop").unwrap_or_default();
     brain.worldview = segment::read_segment(dir, "worldview").unwrap_or_default();
-    brain.global_workspace =
-        segment::read_segment(dir, "global_workspace").unwrap_or_default();
+    brain.global_workspace = segment::read_segment(dir, "global_workspace").unwrap_or_default();
     brain.connectome = segment::read_segment(dir, "connectome").unwrap_or_default();
     brain.agent = segment::read_segment(dir, "agent").unwrap_or_default();
     brain.governance = segment::read_segment(dir, "governance").unwrap_or_default();

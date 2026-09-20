@@ -59,7 +59,8 @@ fn predictive_loop_first_principles_scorecard() {
     let narr = brain.prediction_report();
     println!("C) Active expectation");
     println!("   {}", narr);
-    let pass_c = narr.to_lowercase().contains("expecting") || brain.predictive_loop.expectation.is_some();
+    let pass_c =
+        narr.to_lowercase().contains("expecting") || brain.predictive_loop.expectation.is_some();
     println!("   PASS={pass_c}\n");
 
     // D) Surprise / confirm machinery works on external observe
@@ -68,7 +69,10 @@ fn predictive_loop_first_principles_scorecard() {
     let bad = brain.observe_prediction("pineapple pizza topping controversy");
     let good = brain.observe_prediction("fluctlight attention schema design notes");
     println!("D) Surprise vs confirm");
-    println!("   bad.surprise={} good.surprise={}", bad.surprise, good.surprise);
+    println!(
+        "   bad.surprise={} good.surprise={}",
+        bad.surprise, good.surprise
+    );
     let pass_d = bad.surprise && !good.surprise;
     println!("   PASS={pass_d}\n");
 
@@ -83,7 +87,10 @@ fn predictive_loop_first_principles_scorecard() {
     }
     println!("E) Proactive interpretation");
     println!("   latest={:?}", brain.world_interpretation());
-    println!("   interpretations={}", brain.predictive_loop.interpretations.len());
+    println!(
+        "   interpretations={}",
+        brain.predictive_loop.interpretations.len()
+    );
     let pass_e = saw_interp || !brain.predictive_loop.interpretations.is_empty();
     println!("   PASS={pass_e}\n");
 
@@ -92,10 +99,9 @@ fn predictive_loop_first_principles_scorecard() {
     let _ = brain.encode_prediction_error("totally unrelated asteroid mining logistics");
     let after = brain.hippocampus.engrams.len();
     let recall = brain.activate("prediction_error asteroid");
-    let hit = recall
-        .recalls
-        .iter()
-        .any(|r| r.episode.content.contains("prediction_error") || r.episode.content.contains("asteroid"));
+    let hit = recall.recalls.iter().any(|r| {
+        r.episode.content.contains("prediction_error") || r.episode.content.contains("asteroid")
+    });
     println!("F) Error encode → recall");
     println!("   engrams {before}→{after} hit={hit}");
     let pass_f = after >= before && hit;
@@ -104,5 +110,9 @@ fn predictive_loop_first_principles_scorecard() {
     let passes = [pass_a, pass_b, pass_c, pass_d, pass_e, pass_f];
     let score = passes.iter().filter(|p| **p).count();
     println!("========== SCORE {score}/{} ==========\n", passes.len());
-    assert_eq!(score, passes.len(), "first-principles predictive loop failed: {passes:?}");
+    assert_eq!(
+        score,
+        passes.len(),
+        "first-principles predictive loop failed: {passes:?}"
+    );
 }

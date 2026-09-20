@@ -81,7 +81,12 @@ pub fn activate_from(
 /// are summed before being applied so that inhibitory (negative-weight) edges subtract
 /// deterministically regardless of `HashMap` iteration order. Graphs with no negative weight
 /// run the original loop verbatim, so they stay bit-identical to the pre-connectome engine.
-pub fn spread(activation: &mut HashMap<NeuronId, f32>, graph: &BrainGraph, max_hops: u32, spread_factor: f32) {
+pub fn spread(
+    activation: &mut HashMap<NeuronId, f32>,
+    graph: &BrainGraph,
+    max_hops: u32,
+    spread_factor: f32,
+) {
     if !graph.has_inhibitory {
         // No negative weights anywhere: run the exact pre-connectome loop so ordinary brains
         // are bit-identical to before (float re-association in the summed path below drifts
@@ -375,7 +380,12 @@ mod tests {
     }
 
     /// Reference implementation of the pre-plan loop (activation.rs:145-153 before this task).
-    fn legacy_spread(activation: &mut HashMap<NeuronId, f32>, graph: &BrainGraph, max_hops: u32, spread_factor: f32) {
+    fn legacy_spread(
+        activation: &mut HashMap<NeuronId, f32>,
+        graph: &BrainGraph,
+        max_hops: u32,
+        spread_factor: f32,
+    ) {
         for _hop in 0..max_hops {
             let current: Vec<(NeuronId, f32)> = activation.iter().map(|(k, v)| (*k, *v)).collect();
             for (node, act) in current {
@@ -398,7 +408,12 @@ mod tests {
         let mut g = BrainGraph::default();
         g.rebuild_index();
         let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
-        let mut next = || { x ^= x << 13; x ^= x >> 7; x ^= x << 17; x };
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
         for _ in 0..300 {
             let from = NeuronId(next() % 60);
             let to = NeuronId(next() % 60);
@@ -410,13 +425,19 @@ mod tests {
         let mut b = seeds;
         legacy_spread(&mut a, &g, 4, 0.6);
         spread(&mut b, &g, 4, 0.6);
-        assert!(!g.has_inhibitory, "an all-positive graph must take the legacy fast path");
+        assert!(
+            !g.has_inhibitory,
+            "an all-positive graph must take the legacy fast path"
+        );
         assert_eq!(a.len(), b.len());
         for (k, v) in &a {
             let bv = b.get(k).copied().unwrap_or(f32::NAN);
             assert_eq!(*v, bv, "{k:?}: legacy {v} vs new {bv}");
         }
-        assert_eq!(a, b, "the no-inhibition path must be bit-identical to the legacy loop");
+        assert_eq!(
+            a, b,
+            "the no-inhibition path must be bit-identical to the legacy loop"
+        );
     }
 
     /// The moment a single negative edge exists the graph must switch to the summed,
@@ -429,7 +450,12 @@ mod tests {
         let mut g = BrainGraph::default();
         g.rebuild_index();
         let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
-        let mut next = || { x ^= x << 13; x ^= x >> 7; x ^= x << 17; x };
+        let mut next = || {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x
+        };
         for _ in 0..300 {
             let from = NeuronId(next() % 60);
             let to = NeuronId(next() % 60);
@@ -443,7 +469,10 @@ mod tests {
         let (a, i, b) = (NeuronId(101), NeuronId(102), NeuronId(103));
         g.add_synapse_uncapped(Synapse::new(a, b, Region::Cortex, 1.0));
         g.add_synapse_uncapped(Synapse::new(i, b, Region::Cortex, -1.0));
-        assert!(g.has_inhibitory, "one negative edge must flip the graph onto the summed path");
+        assert!(
+            g.has_inhibitory,
+            "one negative edge must flip the graph onto the summed path"
+        );
 
         // Excitatory only: b lights up.
         let mut act: HashMap<NeuronId, f32> = [(a, 1.0)].into_iter().collect();
@@ -493,9 +522,35 @@ mod tests {
         let g = BrainGraph::default();
         let h = Hippocampus::default();
         let seeds = [NeuronId(777), NeuronId(778)];
-        let r = activate_from_hybrid("zz", None, &g, &h, &SemanticField::default(), Uuid::nil(), 0, 1.0, 8, None, crate::id::CURRENT_CODEC, &seeds);
+        let r = activate_from_hybrid(
+            "zz",
+            None,
+            &g,
+            &h,
+            &SemanticField::default(),
+            Uuid::nil(),
+            0,
+            1.0,
+            8,
+            None,
+            crate::id::CURRENT_CODEC,
+            &seeds,
+        );
         assert_eq!(r.connectome_seeds, Some(2));
-        let r0 = activate_from_hybrid("zz", None, &g, &h, &SemanticField::default(), Uuid::nil(), 0, 1.0, 8, None, crate::id::CURRENT_CODEC, &[]);
+        let r0 = activate_from_hybrid(
+            "zz",
+            None,
+            &g,
+            &h,
+            &SemanticField::default(),
+            Uuid::nil(),
+            0,
+            1.0,
+            8,
+            None,
+            crate::id::CURRENT_CODEC,
+            &[],
+        );
         assert_eq!(r0.connectome_seeds, None);
         assert_eq!(r.active_neurons, r0.active_neurons + 2);
     }

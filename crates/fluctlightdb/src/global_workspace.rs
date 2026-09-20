@@ -233,7 +233,8 @@ impl GlobalWorkspace {
         if let Some(act) = sensory {
             for (i, r) in act.recalls.iter().take(5).enumerate() {
                 if let Some(c) = clean_claim(&r.episode.content) {
-                    let act_n = (0.38 + 0.12 * r.activation.min(2.0) - 0.03 * i as f32).clamp(0.2, 0.92);
+                    let act_n =
+                        (0.38 + 0.12 * r.activation.min(2.0) - 0.03 * i as f32).clamp(0.2, 0.92);
                     out.push(WorkspaceCandidate {
                         content: c,
                         source: WorkspaceSource::Memory,
@@ -254,7 +255,11 @@ impl GlobalWorkspace {
         candidates: Vec<WorkspaceCandidate>,
     ) -> (GlobalWorkspaceReport, bool) {
         self.cycle_count = self.cycle_count.saturating_add(1);
-        self.last_candidates = candidates.iter().take(MAX_CANDIDATES_LOG).cloned().collect();
+        self.last_candidates = candidates
+            .iter()
+            .take(MAX_CANDIDATES_LOG)
+            .cloned()
+            .collect();
 
         let in_refractory = tick < self.refractory_until;
         let winner = candidates
@@ -345,7 +350,11 @@ impl GlobalWorkspace {
         (report, ignited)
     }
 
-    pub fn attach_receipt(&mut self, report: &mut GlobalWorkspaceReport, receipt: BroadcastReceipt) {
+    pub fn attach_receipt(
+        &mut self,
+        report: &mut GlobalWorkspaceReport,
+        receipt: BroadcastReceipt,
+    ) {
         report.receipt = receipt;
         if report.ignited {
             report.narration = format!(
@@ -421,7 +430,11 @@ fn forge_present_moment(
     for c in ranked.iter().skip(1).take(4) {
         clash_count += 1;
         let ov = jaccard(&win_tok, &token_set(&c.content));
-        if ov >= 0.22 && !constituents.iter().any(|x| x.eq_ignore_ascii_case(&c.content)) {
+        if ov >= 0.22
+            && !constituents
+                .iter()
+                .any(|x| x.eq_ignore_ascii_case(&c.content))
+        {
             constituents.push(c.content.clone());
             if !sources.contains(&c.source) {
                 sources.push(c.source);
@@ -432,7 +445,11 @@ fn forge_present_moment(
 
     if let Some(p) = prev {
         let pov = jaccard(&win_tok, &token_set(&p.content));
-        if pov >= 0.18 && !constituents.iter().any(|x| x.eq_ignore_ascii_case(&p.content)) {
+        if pov >= 0.18
+            && !constituents
+                .iter()
+                .any(|x| x.eq_ignore_ascii_case(&p.content))
+        {
             // Continuity of "now": prior moment residue melts in.
             constituents.push(trunc(&p.content, 120));
             merged = true;

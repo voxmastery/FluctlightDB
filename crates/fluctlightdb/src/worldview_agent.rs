@@ -437,9 +437,11 @@ impl WorldviewAgent {
         if tokens.is_empty() {
             return false;
         }
-        if let Some(existing) = self.beliefs.iter_mut().find(|b| {
-            jaccard(&b.tokens, &tokens) >= 0.55 || b.claim.eq_ignore_ascii_case(claim)
-        }) {
+        if let Some(existing) = self
+            .beliefs
+            .iter_mut()
+            .find(|b| jaccard(&b.tokens, &tokens) >= 0.55 || b.claim.eq_ignore_ascii_case(claim))
+        {
             apply_confidence_delta(existing, delta);
             if delta >= 0.0 {
                 existing.support_count = existing.support_count.saturating_add(1);
@@ -615,13 +617,7 @@ mod tests {
         let mut agent = WorldviewAgent::default();
         let cue = agent.select_cue(&attn, &pred);
         let activation = brain.activate(&cue);
-        let report = agent.step(
-            1,
-            &attn,
-            &pred,
-            Some(&dream),
-            Some((cue, activation)),
-        );
+        let report = agent.step(1, &attn, &pred, Some(&dream), Some((cue, activation)));
         assert!(report.belief_count >= 1 || report.belief_upserts >= 1);
         assert!(agent.workspace.is_some() || report.broadcast.is_some());
         assert!(agent.cycle_count >= 1);

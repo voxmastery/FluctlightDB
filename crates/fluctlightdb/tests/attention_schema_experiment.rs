@@ -39,7 +39,10 @@ fn scorecard() {
         plain.attention.is_some(),
         idle.attending
     );
-    println!("   top={:?}", plain.recalls.first().map(|r| &r.episode.content));
+    println!(
+        "   top={:?}",
+        plain.recalls.first().map(|r| &r.episode.content)
+    );
     println!("   narration={}", idle.narration);
     let pass_a = !plain.recalls.is_empty() && plain.attention.is_none() && !idle.attending;
     println!("   PASS={pass_a}  (retrieve ≠ know focus)\n");
@@ -49,7 +52,10 @@ fn scorecard() {
     println!("B) Redirect — model focus BEFORE using it to retrieve");
     println!("   attending={}", focus.attending);
     println!("   subject={}", focus.subject);
-    println!("   intensity={:.3} confidence={:.3} depth={:.3}", focus.intensity, focus.model_confidence, focus.depth);
+    println!(
+        "   intensity={:.3} confidence={:.3} depth={:.3}",
+        focus.intensity, focus.model_confidence, focus.depth
+    );
     println!("   owner={:?}", focus.owner);
     println!("   narration={}", focus.narration);
     let pass_b = focus.attending
@@ -63,7 +69,10 @@ fn scorecard() {
     let att = attended.attention.as_ref().expect("attention attached");
     println!("C) activate_and_attend — retrieve AND know");
     println!("   recalls={}", attended.recalls.len());
-    println!("   top={:?}", attended.recalls.first().map(|r| &r.episode.content));
+    println!(
+        "   top={:?}",
+        attended.recalls.first().map(|r| &r.episode.content)
+    );
     println!("   attending={} subject={}", att.attending, att.subject);
     println!("   narration={}", att.narration);
     let pass_c = att.attending && !attended.recalls.is_empty() && !att.subject.is_empty();
@@ -72,7 +81,10 @@ fn scorecard() {
     // D) Meta-model without a new cue
     let alone = brain.attention_report();
     println!("D) attention_report() with no new cue");
-    println!("   attending={} narration={}", alone.attending, alone.narration);
+    println!(
+        "   attending={} narration={}",
+        alone.attending, alone.narration
+    );
     let pass_d = alone.attending && alone.narration.to_lowercase().contains("attending");
     println!("   PASS={pass_d}  (model persists as self-focus knowledge)\n");
 
@@ -120,14 +132,21 @@ fn scorecard() {
     brain.release_attention();
     let cleared = brain.attention_report();
     println!("F) release_attention()");
-    println!("   attending={} narration={}", cleared.attending, cleared.narration);
+    println!(
+        "   attending={} narration={}",
+        cleared.attending, cleared.narration
+    );
     let pass_f = !cleared.attending;
     println!("   PASS={pass_f}\n");
 
     let passes = [pass_a, pass_b, pass_c, pass_d, pass_e, pass_f];
     let score = passes.iter().filter(|p| **p).count();
     println!("========== SCORE {score}/{} ==========\n", passes.len());
-    assert_eq!(score, passes.len(), "attention schema experiment failed: {passes:?}");
+    assert_eq!(
+        score,
+        passes.len(),
+        "attention schema experiment failed: {passes:?}"
+    );
 }
 
 #[test]
