@@ -104,7 +104,7 @@ jobs:
       - name: Install SDK + test deps
         run: |
           python -m pip install --upgrade pip
-          pip install -e ./sdks/python
+          pip install -e "./sdks/python[mcp]"
           pip install "langchain-core>=0.2.0,<1.0.0" "llama-index-core>=0.10.0"
 
       - name: Run Python unit tests

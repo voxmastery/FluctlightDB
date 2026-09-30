@@ -46,7 +46,7 @@ Benchmarks = "https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/re
 
 [project.optional-dependencies]
 native = ["fluctlightdb-native>=0.5.10"]
-mcp = ["mcp>=1.0"]
+mcp = ["mcp>=1.0,<2"]
 langchain = ["langchain-core>=0.2.0,<1.0.0", "fluctlightdb[native]"]
 llamaindex = ["llama-index-core>=0.10.0", "fluctlightdb[native]"]
 agents = ["fluctlightdb[native]"]
