@@ -11,6 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+---
+
+## [0.5.22] - 2026-09-30
+
 ### Added
 
 - **FlyWire connectome import.** `fluctlight import-connectome` ingests the FlyWire FAFB v783
@@ -21,6 +25,18 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
   recall runs through fly circuitry. `POST /api/v1/connectome` reports the summary.
   Brains carrying a connectome bypass the activation cache in v1.
   Spec: `docs/superpowers/specs/2026-09-17-flywire-connectome-import-design.md`.
+- **Weight-preserving codec migration.** `fluctlight-rekey <brain-path>` (serve stopped) derives
+  the old→new neuron id map from the seed families those ids are functions of and rewrites ids
+  in place across the hippocampus, graph, cortex, and recent-separation window, so learned
+  synapse weights stay put. Unmappable remnants are counted and left in place. A drifted brain
+  falls back to the drain path.
+- **`fluctlight-dumpgraph`.** Reads `graph.seg` and `hippocampus.seg` through the segment reader
+  without opening the brain, so it takes no store lock. Synapses are a flat
+  `[u64 from | u64 to | f32 weight]` buffer; engrams are JSONL.
+- **Attention schema, predictive loop, global workspace, and worldview.** Persisted as additive
+  segments (`attention_schema`, `predictive_loop`, `worldview`, `global_workspace`). Existing
+  brains open with those segments defaulted, and `activate` is unchanged. The predictive loop
+  runs only on explicit `POST /api/v1/tick`, and only when `predictive_loop.enabled`.
 
 ### Changed
 
@@ -34,6 +50,16 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
   `FLUCTLIGHT_PRIMARY_BRAIN` → the `default` tenant.
 - `scripts/longmemeval-notify.sh` reads `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`
   from the environment instead of importing an external agent module.
+- **README no longer leads with the Codex hackathon.** The demo thumbnail, Remotion source,
+  voiceover, and `scripts/demo_codex_swarm.py` live in `HACKATHON.md`. The README keeps a
+  one-line pointer under the badges.
+- **Docker Rust 1.88 pin is documented.** The image stays on `rust:1.88-bookworm`, the lockfile
+  minimum (`time` 0.3.55, `home` 0.5.12). `docs/DOCKER.md` now says an older official `rust`
+  image fails to compile. CI still builds with current stable.
+- Paper site (`papers/public`) and the Hugging Face dataset `hub/dataset/results.json` publish
+  the honest **96.8%** raw evidence recall and no longer show the retracted **99.0%** LoCoMo
+  figure. `CITATION.cff` and `papers/arxiv-v1/ARXIV_REPLACE.md` record arXiv:2608.12365; the
+  live arXiv abstract is still v1 and a replacement is documented, not submitted.
 
 ### Removed
 
@@ -47,6 +73,27 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
   trailers; enable with `scripts/setup-git-hooks.sh`.
 - `scripts/ground-wallet-truth.py` — agent-wallet integration specific to one
   deployment, unreferenced by the rest of the repo.
+
+### Fixed
+
+- **LlamaIndex memory constructs on current `llama-index-core`.** `FluctlightLlamaMemory`
+  implements `BaseMemory.from_defaults` and still accepts the positional `brain` constructor.
+  Stored turns include a `session:{id}` token so episodic recall can find them, and chat
+  history returns that session's messages.
+- **LangChain extra stays on the `BaseMemory` API.** `fluctlightdb[langchain]` pins
+  `langchain-core>=0.2.0,<1.0.0`. When `langchain_core.memory` is absent, the adapter imports
+  `BaseMemory` from `langchain_classic.base_memory`. Chat history stores the session cue in
+  the recalled text and returns that session's messages.
+- **MCP `memory_remember` checkpoints.** After `turn_end(flush=True)` it calls `checkpoint()`,
+  so `memory_recall` on a later connection sees the stored item.
+- **`rustls` 0.23.45.** The lockfile moves off 0.23.43, which is affected by
+  RUSTSEC-2026-0285 (TLS 1.3 handshake messages accepted across encryption-level boundaries).
+
+### Security
+
+- **RUSTSEC-2026-0235 (`rkyv` 0.7)** is recorded as an accepted transitive risk in
+  `.cargo/audit.toml` and `deny.toml`. It arrives only through the off-by-default
+  `distributed` feature (`openraft` → `byte-unit` → `rust_decimal`).
 
 ---
 
@@ -275,7 +322,7 @@ artifacts were cut.
 - `scripts/verify-pypi-wheel.sh` + `make test-native-wheel`
 - `docs/STABILITY.md`, `docs/EMBEDDINGS.md`
 - README restructure (install / API / benchmarks first)
-- Paper freeze `benchmarks/results/paper-2026-07-09.json`; LoCoMo cert **99.0%** *(later found to be ±3 neighbor-expansion inflation; superseded by honest 96.8% @150 no-expansion — see [Unreleased] and `locomo-invented-stack-engine-2026-07-13.json`)*
+- Paper freeze `benchmarks/results/paper-2026-07-09.json`; LoCoMo cert **99.0%** *(later found to be ±3 neighbor-expansion inflation; superseded by honest 96.8% @150 no-expansion — see [0.5.20] and `locomo-invented-stack-engine-2026-07-13.json`)*
 
 ---
 
