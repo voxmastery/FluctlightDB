@@ -86,6 +86,9 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
   the recalled text and returns that session's messages.
 - **MCP `memory_remember` checkpoints.** After `turn_end(flush=True)` it calls `checkpoint()`,
   so `memory_recall` on a later connection sees the stored item.
+- **MCP extra stays on FastMCP.** `fluctlightdb[mcp]` pins `mcp>=1.0,<2`. mcp 2.x dropped
+  `mcp.server.fastmcp.FastMCP`, so `python -m fluctlightdb.mcp_server` exited on import.
+  The 1.x pin keeps that import and registers the eleven memory tools.
 - **`rustls` 0.23.45.** The lockfile moves off 0.23.43, which is affected by
   RUSTSEC-2026-0285 (TLS 1.3 handshake messages accepted across encryption-level boundaries).
 

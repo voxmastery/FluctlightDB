@@ -51,7 +51,8 @@ def memory_recall(cue: str, limit: int = 8, mode: str = "auto") -> str:
     return json.dumps(brain.recall(cue, mode=mode, limit=limit), indent=2)
 
 
-def run() -> None:
+def build_server():
+    """FastMCP server with the memory tools. Does not start the stdio loop."""
     try:
         from mcp.server.fastmcp import FastMCP
     except ImportError as exc:
@@ -180,7 +181,11 @@ def run() -> None:
         """Compact recalled context + handoffs for system prompt injection."""
         return _connect_project().session_context(limit=limit)
 
-    mcp.run()
+    return mcp
+
+
+def run() -> None:
+    build_server().run()
 
 
 if __name__ == "__main__":
