@@ -28,6 +28,29 @@ def _connect_project():
     return connect_project(agent=agent)
 
 
+def memory_remember(
+    content: str,
+    context: str = "mcp",
+    salience: float = 0.6,
+) -> str:
+    """Store a durable memory in the agent brain."""
+    brain = _connect_agent()
+    brain.turn_begin()
+    brain.wm_push(content, context=context, salience=salience)
+    # turn_end(flush=True) commits WM into the in-memory hippocampus but does not
+    # seal the store. A later connection only sees a checkpoint (or WAL). Checkpoint
+    # so the next memory_recall, which opens its own brain, can find this item.
+    report = brain.turn_end(flush=True)
+    brain.checkpoint()
+    return json.dumps({"stored": True, "flush": report}, indent=2)
+
+
+def memory_recall(cue: str, limit: int = 8, mode: str = "auto") -> str:
+    """Cue-driven recall from episodic + corpus lanes."""
+    brain = _connect_agent()
+    return json.dumps(brain.recall(cue, mode=mode, limit=limit), indent=2)
+
+
 def run() -> None:
     try:
         from mcp.server.fastmcp import FastMCP
@@ -41,24 +64,8 @@ def run() -> None:
 
     # --- Standard memory MCP tools (agent brain) ---
 
-    @mcp.tool()
-    def memory_remember(
-        content: str,
-        context: str = "mcp",
-        salience: float = 0.6,
-    ) -> str:
-        """Store a durable memory in the agent brain."""
-        brain = _connect_agent()
-        brain.turn_begin()
-        brain.wm_push(content, context=context, salience=salience)
-        report = brain.turn_end(flush=True)
-        return json.dumps({"stored": True, "flush": report}, indent=2)
-
-    @mcp.tool()
-    def memory_recall(cue: str, limit: int = 8, mode: str = "auto") -> str:
-        """Cue-driven recall from episodic + corpus lanes."""
-        brain = _connect_agent()
-        return json.dumps(brain.recall(cue, mode=mode, limit=limit), indent=2)
+    mcp.tool()(memory_remember)
+    mcp.tool()(memory_recall)
 
     @mcp.tool()
     def memory_resolve(cue: str) -> str:
