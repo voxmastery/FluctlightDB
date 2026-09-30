@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
-import json
-from typing import Any, Optional
+from typing import Any
 
 try:
     from langchain_core.chat_history import BaseChatMessageHistory
     from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
-    from langchain_core.memory import BaseMemory
 except ImportError as exc:
     raise ImportError(
         "LangChain integration requires: pip install 'fluctlightdb[langchain]'"
     ) from exc
+
+try:
+    from langchain_core.memory import BaseMemory
+except ImportError:
+    try:
+        from langchain_classic.base_memory import BaseMemory
+    except ImportError as exc:
+        raise ImportError(
+            "LangChain integration requires langchain_core.memory.BaseMemory, "
+            "which ships in langchain-core>=0.2,<1 (pip install 'fluctlightdb[langchain]'). "
+            "On LangChain 1.x, install langchain-classic so BaseMemory can be imported "
+            "from langchain_classic.base_memory."
+        ) from exc
 
 
 def _msg_to_text(message: BaseMessage) -> str:
@@ -30,6 +41,42 @@ def _msg_to_text(message: BaseMessage) -> str:
     return str(content)
 
 
+def _session_marker(session_id: str) -> str:
+    return f"session:{session_id}"
+
+
+def _stamp(session_id: str, text: str) -> str:
+    """Include the session cue in stored text.
+
+    Episodic recall matches content tokens, not the ``context`` metadata, so a
+    cue of ``session:{id}`` misses turns whose text never contained that token.
+    """
+    marker = _session_marker(session_id) + " "
+    if text.startswith(marker):
+        return text
+    return marker + text
+
+
+def _unstamp(session_id: str, text: str) -> str:
+    marker = _session_marker(session_id) + " "
+    if text.startswith(marker):
+        return text[len(marker) :]
+    # observe_tool persists "[tool] <text>".
+    bracket = text.find("] ")
+    if bracket != -1 and text[bracket + 2 :].startswith(marker):
+        return text[bracket + 2 + len(marker) :]
+    return text
+
+
+def _in_session(hit: dict[str, Any], session_id: str) -> bool:
+    ctx = str(hit.get("context") or "")
+    _role, sep, sid = ctx.rpartition(":")
+    if sep and sid == session_id:
+        return True
+    text = str(hit.get("content") or hit.get("snippet") or "")
+    return text.startswith(_session_marker(session_id) + " ")
+
+
 class FluctlightChatMessageHistory(BaseChatMessageHistory):
     """Persist chat turns in FluctlightDB WM-Ring + hippocampus."""
 
@@ -39,10 +86,12 @@ class FluctlightChatMessageHistory(BaseChatMessageHistory):
 
     @property
     def messages(self) -> list[BaseMessage]:
-        hits = self.brain.recall(f"session:{self.session_id}", mode="episodic", limit=32)
+        hits = self.brain.recall(_session_marker(self.session_id), mode="episodic", limit=32)
         out: list[BaseMessage] = []
         for hit in hits.get("hits", []):
-            text = hit.get("content") or hit.get("snippet") or ""
+            if not _in_session(hit, self.session_id):
+                continue
+            text = _unstamp(self.session_id, hit.get("content") or hit.get("snippet") or "")
             ctx = (hit.get("context") or "").lower()
             if "assistant" in ctx or ctx.startswith("ai"):
                 out.append(AIMessage(content=text))
@@ -60,7 +109,7 @@ class FluctlightChatMessageHistory(BaseChatMessageHistory):
             role = "system"
         elif isinstance(message, ToolMessage):
             role = "tool"
-        text = _msg_to_text(message)
+        text = _stamp(self.session_id, _msg_to_text(message))
         if role == "tool":
             self.brain.observe_tool("langchain", text, context=f"session:{self.session_id}")
         else:

@@ -1,4 +1,5 @@
-# Build FluctlightDB server binary
+# Build FluctlightDB server binary.
+# Rust 1.88 is the MSRV of the locked crates (time 0.3.55, home 0.5.12).
 FROM rust:1.88-bookworm AS builder
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
