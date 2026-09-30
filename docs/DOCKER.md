@@ -47,6 +47,11 @@ Edit `FLUCTLIGHT_API_KEYS` in `docker-compose.yml` before production use.
 
 ## Build locally
 
+The `Dockerfile` pins the Rust image to **1.88** (`rust:1.88-bookworm`). That is the
+minimum toolchain for this repo: locked crates such as `time` 0.3.55 and `home` 0.5.12
+declare Rust 1.88. An older official `rust` image fails to compile. CI builds with
+current stable, which is newer than 1.88 and compatible with the same lockfile.
+
 ```bash
 docker build -t fluctlightdb:local .
 docker run --rm -p 8792:8792 \
