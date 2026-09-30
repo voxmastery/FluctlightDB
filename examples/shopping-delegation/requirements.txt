@@ -1,0 +1,9 @@
+# Runnable from this directory. The Python SDK is the in-repo package;
+# the native extension is built from crates/fluctlight-py (no PyPI download required).
+#
+#   pip install -e ../../sdks/python
+#   maturin build --release -o /tmp/fluctlight-wheels --manifest-path ../../crates/fluctlight-py/Cargo.toml
+#   pip install /tmp/fluctlight-wheels/fluctlightdb_native-*.whl
+#
+# Benchmarks use the Python standard library plus that extension.
+# There is no paid API and no extra scientific stack.

@@ -142,6 +142,8 @@ fluctlight-project init
 
 Claude + Codex share `.fluctlight/project/` brains, handoffs, MCP. See [MULTI_AGENT.md](docs/MULTI_AGENT.md).
 
+Standing shopping delegations (synthetic demo and benchmarks): [examples/shopping-delegation](examples/shopping-delegation/README.md).
+
 ---
 
 ## Choose your path
