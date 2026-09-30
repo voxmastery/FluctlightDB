@@ -10,7 +10,7 @@
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install "fluctlightdb[native]>=0.5.21"   # Linux / macOS / Windows (x64 + arm64); abi3 wheel for Python 3.9–3.13
+pip install "fluctlightdb[native]>=0.5.22"   # Linux / macOS / Windows (x64 + arm64); abi3 wheel for Python 3.9–3.13
 ```
 
 **Stability:** [docs/STABILITY.md](docs/STABILITY.md) · **Production / embedded:** [docs/PRODUCTION.md](docs/PRODUCTION.md) · [docs/EMBEDDED.md](docs/EMBEDDED.md) · **Embeddings / offline:** [docs/EMBEDDINGS.md](docs/EMBEDDINGS.md)
@@ -147,7 +147,7 @@ Claude + Codex share `.fluctlight/project/` brains, handoffs, MCP. See [MULTI_AG
 ## Choose your path
 
 ```
-One agent (start here)     → pip install "fluctlightdb[native]==0.5.21" ; connect_embedded()
+One agent (start here)     → pip install "fluctlightdb[native]==0.5.22" ; connect_embedded()
 Monorepo multi-tool        → fluctlight-project init ; connect_project()
 HTTP server                → Docker ghcr.io/voxmastery/fluctlightdb
 Engine development         → clone + cargo (CONTRIBUTING.md)
