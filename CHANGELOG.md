@@ -11,6 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+### Removed
+
+- Root README no longer mentions the Codex Community Hackathon. The writeup remains in `HACKATHON.md`.
+
 ---
 
 ## [0.5.22] - 2026-09-30
