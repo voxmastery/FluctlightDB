@@ -359,9 +359,14 @@ properties; this section validates \emph{recall quality} on public suites---what
 measured, ablated, honestly caveated, or left incomplete. We do not re-benchmark
 crash recovery here---that is covered by the chaos suite (Table~\ref{tab:durability}).
 
-All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
-number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-09.json}. CHORUS benchmarks (LoCoMo, BEIR,
+All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. LoCoMo,
+BEIR, FAMB, and LongMemEval numbers below are reproduced by a script in
+\texttt{benchmarks/} and frozen in
+\texttt{benchmarks/results/paper-2026-07-09.json}. Graded provenance
+(18\% shared-brain, 100\% isolated) is frozen in
+\texttt{benchmarks/results/provenance-conflict-shared-2026-07-10.json} and
+\texttt{benchmarks/results/provenance-conflict-2026-07-10.json}.
+CHORUS benchmarks (LoCoMo, BEIR,
 FAMB) set \texttt{FLUCTLIGHT\_FABRIC=1} (Recall Fabric on; re-frozen 2026-07-09).
 LongMemEval-S retrieval is the July 2026 Colab v4 freeze (\textbf{97.6\%},
 488/500; hybrid index + mpnet, no Fabric rerank). LongMemEval-S E2E QA is frozen
@@ -509,7 +514,10 @@ lexical overlap (``balance,'' ``quota,'' ``version''), so activation returns
 another case's ledger or chat engram. Under \emph{per-case isolation} (one brain
 per conflict pair), the same suite scores \textbf{100\%} (50/50)---a ceiling under
 isolation, not evidence of multi-tenant readiness
-(Table~\ref{tab:provenance-conditions}). \textbf{Status:} no implementation
+(Table~\ref{tab:provenance-conditions}). Shared-brain and isolated runs are frozen in
+\texttt{benchmarks/results/provenance-conflict-shared-2026-07-10.json} and
+\texttt{benchmarks/results/provenance-conflict-2026-07-10.json}.
+\textbf{Status:} no implementation
 mitigates the shared-brain failure as of this preprint---\texttt{activate\_scoped}
 can post-filter by \texttt{agent\_id}, but ingest and benchmarks do not enforce
 per-tenant namespaces, and we have not re-run the suite under scoped activation
@@ -848,7 +856,12 @@ Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
 \texttt{benchmarks/provenance\_conflict\_bench.py},
 \texttt{benchmarks/longmemeval\_bench.py}, \texttt{benchmarks/longmemeval\_colab.ipynb},
 \texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py}.
-Frozen metrics: \texttt{benchmarks/results/paper-2026-07-09.json}. E2E:
+Frozen metrics: \texttt{benchmarks/results/paper-2026-07-09.json}
+(LoCoMo bundle);
+\texttt{benchmarks/results/provenance-conflict-2026-07-10.json}
+and
+\texttt{benchmarks/results/provenance-conflict-shared-2026-07-10.json}
+(18\% shared-brain / 100\% isolated). E2E:
 \texttt{benchmarks/longmemeval\_e2e.py};
 \texttt{benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}. Preprint DOI:
 \url{https://doi.org/10.5281/zenodo.20949890}. Source:
