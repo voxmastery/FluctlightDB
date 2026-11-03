@@ -43,7 +43,7 @@ HTTP-only (no Rust extension): `pip install fluctlightdb`
 
 Frozen JSON: [benchmarks/results/paper-2026-07-09.json](https://github.com/voxmastery/FluctlightDB/blob/main/benchmarks/results/paper-2026-07-09.json)
 
-> LoCoMo **evidence recall** ≠ Mem0 **LLM-as-judge QA** — different metrics; compare only when labeled. (The old 99.0% headline was ±3 neighbor-expansion inflation, now deprecated.)
+> LoCoMo **evidence recall** ≠ Mem0 **LLM-as-judge QA** — different metrics; compare only when labeled. (The old 99.0% headline was ±3 neighbor-expansion inflation, now retracted.)
 
 ## Docs
 

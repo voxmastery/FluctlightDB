@@ -88,7 +88,7 @@ See also [CITATION.cff](https://github.com/voxmastery/FluctlightDB/blob/main/CIT
 
 ## Metric note
 
-LoCoMo **evidence recall** = fraction of gold dialogue evidence in retrieved context (official RAG metric). Mem0/Zep often report **LLM-as-judge end-to-end QA** — a different, harder number. Do not compare 96.8% recall to ~92% QA without naming the metric; evidence-recall ≠ QA. (The historical **99.0%** headline came from ±3 neighbor-expansion scoring, not the engine — deprecated.)
+LoCoMo **evidence recall** = fraction of gold dialogue evidence in retrieved context (official RAG metric). Mem0/Zep often report **LLM-as-judge end-to-end QA** — a different, harder number. Do not compare 96.8% recall to ~92% QA without naming the metric; evidence-recall ≠ QA. (The historical **99.0%** headline (retracted) came from ±3 neighbor-expansion scoring, not the engine — withdrawn.)
 
 ## License
 

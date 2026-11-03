@@ -10,7 +10,7 @@ pip install chromadb pytrec-eval-terrier "fluctlightdb[native]>=0.5.2"
 make reproduce-locomo
 # Frozen baseline: benchmarks/results/locomo-invented-stack-engine-2026-07-13.json
 # LoCoMo @150: 96.8% MiniLM-384 / 97.0% mpnet-768 (native Rust, no expansion; @5=72.6%/75.1%).
-# The historical 99.0% was ±3 neighbor-expansion inflation, not the engine — deprecated. Evidence-recall ≠ QA.
+# The historical 99.0% (retracted) was ±3 neighbor-expansion inflation, not the engine — withdrawn. Evidence-recall ≠ QA.
 ```
 
 | Script | Purpose | Data |

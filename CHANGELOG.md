@@ -227,7 +227,7 @@ artifacts were cut.
 
 ### Benchmarks
 
-- **LoCoMo headline corrected to honest raw evidence recall (no expansion):** **96.8% @150 (MiniLM) / 97.0% (mpnet)**, tight-k @5=72.6%/75.1%, @10=80.0%/82.6%, @20=85.6%/87.2%, @50=91.8%/92.4% — native Rust CHORUS first-principles invented stack (salience-gated MaxSim + conjunctive surprisal + evidence-integration fusion). Bench `benchmarks/locomo_engine_maxsim.py`; frozen `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet). The prior **99.0%** headline was ±3 neighbor-expansion scoring inflation (`expand_session_neighbors`), not the engine — **deprecated**. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15, retrieval-bound).
+- **LoCoMo headline corrected to honest raw evidence recall (no expansion):** **96.8% @150 (MiniLM) / 97.0% (mpnet)**, tight-k @5=72.6%/75.1%, @10=80.0%/82.6%, @20=85.6%/87.2%, @50=91.8%/92.4% — native Rust CHORUS first-principles invented stack (salience-gated MaxSim + conjunctive surprisal + evidence-integration fusion). Bench `benchmarks/locomo_engine_maxsim.py`; frozen `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet). The prior **99.0%** headline (retracted) was ±3 neighbor-expansion scoring inflation (`expand_session_neighbors`), not the engine — **withdrawn**. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15, retrieval-bound).
 
 ---
 
@@ -390,7 +390,7 @@ Commits before `v0.4.0` cover Rust core, CHORUS/PRISM benchmarks, arxiv preprint
 
 **Benchmark milestones (not tied 1:1 to semver tags):**
 
-- LoCoMo evidence recall (honest raw, no expansion): **96.8% @150 (MiniLM) / 97.0% (mpnet)**, @5=72.6%/75.1% tight-k — native Rust CHORUS invented stack, July 2026. (The earlier **99.0%** was ±3 neighbor-expansion inflation, deprecated. Evidence recall ≠ QA accuracy; E2E ≈85% @k=15.)
+- LoCoMo evidence recall (honest raw, no expansion): **96.8% @150 (MiniLM) / 97.0% (mpnet)**, @5=72.6%/75.1% tight-k — native Rust CHORUS invented stack, July 2026. (The earlier **99.0%** (retracted) was ±3 neighbor-expansion inflation, withdrawn. Evidence recall ≠ QA accuracy; E2E ≈85% @k=15.)
 - LongMemEval session@8 **97.6%**, E2E **97.4%** — July 2026 paper freeze
 - BEIR SciFact nDCG@10 **0.645** — July 2026
 

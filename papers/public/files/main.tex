@@ -361,7 +361,7 @@ crash recovery here---that is covered by the chaos suite (Table~\ref{tab:durabil
 
 All experiments use \texttt{all-MiniLM-L6-v2} (ONNX, CPU) unless noted. Every
 number below is reproduced by a script in \texttt{benchmarks/} and frozen in
-\texttt{benchmarks/results/paper-2026-07-10.json}. CHORUS benchmarks (LoCoMo, BEIR,
+\texttt{benchmarks/results/paper-2026-07-09.json}. CHORUS benchmarks (LoCoMo, BEIR,
 FAMB) set \texttt{FLUCTLIGHT\_FABRIC=1} (Recall Fabric on; re-frozen 2026-07-09).
 LongMemEval-S retrieval is the July 2026 Colab v4 freeze (\textbf{97.6\%},
 488/500; hybrid index + mpnet, no Fabric rerank). LongMemEval-S E2E QA is frozen
@@ -418,7 +418,7 @@ MiniLM-384 (\textbf{97.0\%} with mpnet-768) as \emph{raw} recall with \emph{no}
 neighbor expansion (Table~\ref{tab:locomo-k} for the budget--recall curve).
 
 \paragraph{Deprecated 99\% figure (honest disclosure).} An earlier
-draft headlined \textbf{99.0\%} on this set. That number was an artifact of a
+draft headlined \textbf{99.0\%} on this set (figure retracted). That number was an artifact of a
 harness scoring policy---$\pm3$ session-neighbor expansion
 (\texttt{expand\_session\_neighbors}) that credited spans adjacent to a hit---not
 a property of the engine. It is deprecated. Under the same $\pm3$ policy a trivial
@@ -848,7 +848,7 @@ Repository: FluctlightDB (MIT). Harnesses: \texttt{benchmarks/locomo\_eval.py},
 \texttt{benchmarks/provenance\_conflict\_bench.py},
 \texttt{benchmarks/longmemeval\_bench.py}, \texttt{benchmarks/longmemeval\_colab.ipynb},
 \texttt{benchmarks/beir\_bench.py}, \texttt{benchmarks/agent\_memory\_bench.py}.
-Frozen metrics: \texttt{benchmarks/results/paper-2026-07-10.json}. E2E:
+Frozen metrics: \texttt{benchmarks/results/paper-2026-07-09.json}. E2E:
 \texttt{benchmarks/longmemeval\_e2e.py};
 \texttt{benchmarks/results/e2e-cert-paper-v2-2026-07-07.json}. Preprint DOI:
 \url{https://doi.org/10.5281/zenodo.20949890}. Source:

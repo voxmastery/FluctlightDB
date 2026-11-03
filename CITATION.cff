@@ -32,9 +32,8 @@ preferred-citation:
       description: "arXiv preprint (cs.DB), submitted 2026-07-10"
   notes: >-
     Also on arXiv as arXiv:2608.12365 (cs.DB, submitted 2026-07-10).
-    NOTE: arXiv v1 reports the deprecated 99.0% LoCoMo figure, which was an
-    artifact of post-hoc +/-3 neighbor expansion. The corrected numbers are
-    96.8% @k=150 raw evidence recall and 72.6% @k=5; see README and
-    docs/BENCHMARKS.md. A v2 replacement carrying the corrected abstract is
-    prepared in papers/arxiv-v1/ and pending upload.
-  url: "https://doi.org/10.5281/zenodo.20949890"
+    NOTE: arXiv v1 reports the retracted 99.0% LoCoMo figure, which was an
+    artifact of post-hoc +/-3 neighbor expansion (withdrawn). The corrected
+    numbers are 96.8% mean per-question evidence recall at k=150 and 72.6% at
+    k=5; see README and docs/BENCHMARKS.md. v2: https://arxiv.org/abs/2608.12365v2
+  url: "https://arxiv.org/abs/2608.12365v2"

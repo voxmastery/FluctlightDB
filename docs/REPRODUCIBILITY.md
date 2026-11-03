@@ -17,16 +17,16 @@ We welcome independent reproductions and list **public credit** in this doc (no 
 
 ## Will you get the same %?
 
-> **Honest LoCoMo headline:** **96.8% @150 (MiniLM) / 97.0% (mpnet)** raw evidence recall, **no expansion** — tight-k @5=72.6%/75.1%, @10=80.0%/82.6%, @20=85.6%/87.2%, @50=91.8%/92.4%. Native Rust CHORUS first-principles invented stack; bench `benchmarks/locomo_engine_maxsim.py`, frozen `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM) / `locomo-mpnet-engine-2026-07-15.json` (mpnet). The legacy `make reproduce-locomo` protocol below reproduces the **deprecated ±3-expansion cert** (the old 99.0%), kept for historical parity only. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15).
+> **Honest LoCoMo headline:** **96.8% @150 (MiniLM) / 97.0% (mpnet)** raw evidence recall, **no expansion** — tight-k @5=72.6%/75.1%, @10=80.0%/82.6%, @20=85.6%/87.2%, @50=91.8%/92.4%. Native Rust CHORUS first-principles invented stack; bench `benchmarks/locomo_engine_maxsim.py`, frozen `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json` (MiniLM) / `locomo-mpnet-engine-2026-07-15.json` (mpnet). The legacy `make reproduce-locomo` protocol below reproduces the **retracted ±3-expansion cert** (the old 99.0%, withdrawn), kept for historical parity only. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15).
 
 **Legacy expansion cert (deprecated) — CHORUS @ k=150: yes — when you follow the pinned protocol.**
 
 `make reproduce-locomo` exits **0** only if your output JSON matches the frozen cert **exactly** on:
 
 - `evidence_hits` (string, e.g. `"1970/1982"`)
-- `mean_evidence_recall` (float, e.g. `0.990201277587756`)
+- `mean_evidence_recall` (retracted legacy float, e.g. `0.990201277587756`)
 
-That is the legacy **99.0%** (1970/1982) ±3-expansion cert — **deprecated, not the headline** (the honest number is 96.8% @150 no-expansion, above).
+That is the retracted **99.0%** (1970/1982) ±3-expansion cert — **withdrawn, not the headline** (the honest number is 96.8% @150 no-expansion, above).
 
 | Requirement | Why it matters |
 |-------------|----------------|
@@ -114,7 +114,7 @@ git checkout v0.5.6   # or tag matching the frozen cert you compare against
 make reproduce-locomo
 ```
 
-This downloads LoCoMo data, runs the honest self-contained recipe (`benchmarks/locomo_lateinteraction.py` — token-population MaxSim ⊕ BM25, no neighbor expansion), and compares raw recall@150 against `locomo-lateinteraction-2026-07-13.json`. The native-engine invented-stack headline (**96.8% @150 MiniLM / 97.0% mpnet, no expansion**) reproduces via `benchmarks/locomo_engine_maxsim.py` after a source build, comparing against `locomo-invented-stack-engine-2026-07-13.json` / `locomo-mpnet-engine-2026-07-15.json`. The old ±3-expansion 99.0% is deprecated (a trivial BM25 baseline also scored ~99% under it).
+This downloads LoCoMo data, runs the honest self-contained recipe (`benchmarks/locomo_lateinteraction.py` — token-population MaxSim ⊕ BM25, no neighbor expansion), and compares raw recall@150 against `locomo-lateinteraction-2026-07-13.json`. The native-engine invented-stack headline (**96.8% @150 MiniLM / 97.0% mpnet, no expansion**) reproduces via `benchmarks/locomo_engine_maxsim.py` after a source build, comparing against `locomo-invented-stack-engine-2026-07-13.json` / `locomo-mpnet-engine-2026-07-15.json`. The old ±3-expansion 99.0% is retracted (withdrawn; a trivial BM25 baseline also scored ~99% under it).
 
 Options:
 

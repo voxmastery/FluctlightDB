@@ -84,7 +84,7 @@ Index-mode query latency uses slim vector-fast recalls (large doc bodies omitted
 | **Metrics** | Upstream LoCoMo: gold `dia_id` in retrieved context. **Our harness (historical):** also applies `expand_session_neighbors(±3)` before scoring — see [#2](https://github.com/voxmastery/FluctlightDB/issues/2) |
 | **Paper** | Maharana et al., *Evaluating Very Long-Term Conversational Memory of LLM Agents*, ACL 2024 |
 | **Site** | https://snap-research.github.io/locomo/ |
-| **Status** | **Honest raw: 96.8% @k=150** (2627/2823 spans, no expansion) via the first-principles invented stack in the Rust engine. **Tight-k (what a RAG app actually uses): @5 72.6%, @10 80.0%, @20 85.6%.** Frozen: `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json`. The historical *99.0% expanded* is deprecated as a headline (see below). |
+| **Status** | **Honest raw: 96.8% @k=150** mean per-question evidence recall (pooled span recall 2627/2823 = 93.1%, no expansion) via the first-principles invented stack in the Rust engine. **Tight-k (what a RAG app actually uses): @5 72.6%, @10 80.0%, @20 85.6%.** Frozen: `benchmarks/results/locomo-invented-stack-engine-2026-07-13.json`. The historical *99.0% expanded* is retracted (withdrawn as a headline; see below). |
 | **In-repo** | `benchmarks/locomo_engine_maxsim.py` (native invented stack), `benchmarks/locomo_honest.py` (2-channel prototype), `benchmarks/locomo_eval.py` (`--neighbor-window 0` for raw CHORUS lane) |
 
 **One-command reproduce:**
@@ -143,7 +143,7 @@ invented stack / a stronger embedder), not the reader. Caveat: single-judge esti
 certified 500-question figure.
 
 Two mechanisms tested and **rejected** for honesty/quality:
-- `expand_session_neighbors(±3)` — inflates to 99.0% by crediting neighbours never retrieved. A trivial BM25 baseline also scores ~99% under it, so it distinguishes no engine. **Not reported as a headline.**
+- `expand_session_neighbors(±3)` — inflates to 99.0% (retracted) by crediting neighbours never retrieved. A trivial BM25 baseline also scores ~99% under it, so it distinguishes no engine. **Not reported as a headline.**
 - CA3 pattern-completion via PRF/Rocchio query feedback — drifts on multi-topic dialogue (−1 to −2 pts). Genuine completion needs LLM-based HyDE (model access not assumed here).
 
 Path to 98%+: the opendomain/multihop gap is semantic, not lexical — it needs a stronger retrieval embedder (bge/e5/gte-large or mpnet, per LongMemEval's 97.6%). That is the next lever, not more chunking or fusion tricks.
@@ -269,11 +269,13 @@ FAMB is an **internal regression suite** (not LoCoMo-scale external validation):
 
 ## Development protocol (freeze dates)
 
-Headline numbers in `benchmarks/results/paper-2026-07-10.json` (reviewer remediation freeze):
+Headline numbers in `benchmarks/results/paper-2026-07-09.json` (current v2 freeze). `benchmarks/results/paper-2026-07-10.json` is superseded; its 0.99 LoCoMo evidence recall is withdrawn (arXiv:2608.12365v2, 96.8% at k=150).
+
+`scripts/check_public_locomo_claims.py` (CI job `public-locomo-claims` in `.github/workflows/ci.yml`) fails on a 99.0%, 0.99, or 98.1% LoCoMo evidence-recall headline unless that line contains withdrawn, retract, or superseded, or the results JSON is marked superseded or retraction. It scans README files, `docs/`, `CHANGELOG.md`, `MAINTAINER.md`, `.zenodo.json`, `CITATION.cff`, `benchmarks/results/`, and papers/hub site text.
 
 | Benchmark | Config frozen | Final cert JSON | Notes |
 |---|---|---|---|
-| LoCoMo invented stack (native engine) | 2026-07-15 | `locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet) | **96.8% / 97.0% raw @$k{=}150$, no expansion** (deprecated ±3-expansion 99.0% removed) |
+| LoCoMo invented stack (native engine) | 2026-07-15 | `locomo-invented-stack-engine-2026-07-13.json` (MiniLM), `locomo-mpnet-engine-2026-07-15.json` (mpnet) | **96.8% / 97.0% raw @$k{=}150$, no expansion** (retracted ±3-expansion 99.0% withdrawn) |
 | LoCoMo hybrid vs vector (index) | 2026-07-10 | `locomo-hybrid-index-2026-07-10.json` | @ $k{=}50$; hybrid $\approx$ vector |
 | Provenance conflict (50 cases, isolated) | 2026-07-10 | `provenance-conflict-2026-07-10.json` | Agent lane; 100% top-1 |
 | Provenance conflict (50 cases, shared brain) | 2026-07-10 | `provenance-conflict-shared-2026-07-10.json` | 18% top-1; cross-case contamination |

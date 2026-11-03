@@ -12,7 +12,7 @@ This document tracks the **adoption layer** (integrations, DX, proof) on top of 
 | FAMB | Macro accuracy | **97–98%** | `benchmarks/results/famb-*-2026-07-06.json` |
 | LongMemEval E2E | QA accuracy | Run `benchmarks/e2e_certify.sh` | Requires API key |
 
-> LoCoMo note: the historical **99.0%** headline was ±3 neighbor-expansion inflation (`expand_session_neighbors`), not the engine — deprecated, not the number. The honest figures above are native Rust CHORUS invented-stack, evidence recall with no expansion. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15, retrieval-bound).
+> LoCoMo note: the historical **99.0%** headline (retracted) was ±3 neighbor-expansion inflation (`expand_session_neighbors`), not the engine — withdrawn, not the number. The honest figures above are native Rust CHORUS invented-stack, evidence recall with no expansion. Evidence recall ≠ QA accuracy (E2E ≈85% @k=15, retrieval-bound).
 
 ## Tier 1 — Framework drop-in (shipped)
 
