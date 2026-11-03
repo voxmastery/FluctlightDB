@@ -81,7 +81,7 @@ CHORUS uses `connect_chorus()` + `chorus_imprint_batch` (GRG resonance recall): 
 
 ### 4.2 LoCoMo — 96.8% raw evidence recall @150 on the full set (no expansion)
 
-> The earlier 99.0% used a ±3 neighbor-expansion scoring policy (not the engine); a trivial BM25 baseline also scored ~99% under it. Deprecated. Evidence-recall ≠ LLM-judge QA.
+> The earlier 99.0% (retracted) used a ±3 neighbor-expansion scoring policy (not the engine); a trivial BM25 baseline also scored ~99% under it. Withdrawn. Evidence-recall ≠ LLM-judge QA.
 
 Official evidence-recall metric: fraction of gold `dia_id` spans in retrieved context. Config: `connect_index()`, dialog + observations, k=150, hybrid vector+BM25. July 2026 certified rerun (embed cache warm):
 

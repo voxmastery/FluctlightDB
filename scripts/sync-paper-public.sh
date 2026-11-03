@@ -76,7 +76,7 @@ cat > "$PUBLIC/index.html" << 'HTML'
         <li><span class="tag">RETRIEVAL</span> LoCoMo + LongMemEval complete</li>
         <li><span class="tag">E2E</span> LongMemEval 97.4% certified</li>
         <li><span class="tag">PREPRINT</span> Public draft</li>
-        <li><span class="tag">ARXIV</span> <a href="https://arxiv.org/abs/2608.12365">arXiv:2608.12365</a> — v1 predates the LoCoMo correction; v2 pending</li>
+        <li><span class="tag">ARXIV</span> <a href="https://arxiv.org/abs/2608.12365v2">arXiv:2608.12365v2</a></li>
       </ul>
     </aside>
 

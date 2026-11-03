@@ -1,4 +1,7 @@
 {
+  "status": "superseded",
+  "retraction": "0.981 LoCoMo mean evidence recall withdrawn; superseded by benchmarks/results/paper-2026-07-09.json (96.8% at k=150)",
+  "superseded_by": "benchmarks/results/paper-2026-07-09.json",
   "date": "2025-06-22",
   "harness": "FluctlightDB benchmark suite",
   "mode_index": {

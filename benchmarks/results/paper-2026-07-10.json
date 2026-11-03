@@ -1,4 +1,7 @@
 {
+  "status": "superseded",
+  "retraction": "0.99 LoCoMo evidence recall withdrawn; see arXiv:2608.12365v2 (96.8% at k=150)",
+  "superseded_by": "benchmarks/results/paper-2026-07-09.json",
   "date": "2026-07-10",
   "harness": "FluctlightDB benchmark suite (paper v2 + reviewer remediation)",
   "paper": "FluctlightDB: A Memory Model of Data for AI Agents",
