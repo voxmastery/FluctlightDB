@@ -200,5 +200,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test withdrawn LoCoMo headline checker
+        run: python3 scripts/test_check_public_locomo_claims.py
+
       - name: Reject withdrawn LoCoMo headlines
         run: python3 scripts/check_public_locomo_claims.py

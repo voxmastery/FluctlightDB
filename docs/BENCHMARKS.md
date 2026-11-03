@@ -271,7 +271,7 @@ FAMB is an **internal regression suite** (not LoCoMo-scale external validation):
 
 Headline numbers in `benchmarks/results/paper-2026-07-09.json` (current v2 freeze). `benchmarks/results/paper-2026-07-10.json` is superseded; its 0.99 LoCoMo evidence recall is withdrawn (arXiv:2608.12365v2, 96.8% at k=150).
 
-`scripts/check_public_locomo_claims.py` (CI job `public-locomo-claims` in `.github/workflows/ci.yml`) fails on a 99.0%, 0.99, or 98.1% LoCoMo evidence-recall headline unless that line contains withdrawn, retract, or superseded, or the results JSON is marked superseded or retraction. It scans README files, `docs/`, `CHANGELOG.md`, `MAINTAINER.md`, `.zenodo.json`, `CITATION.cff`, `benchmarks/results/`, and papers/hub site text.
+`scripts/check_public_locomo_claims.py` (CI job `public-locomo-claims` in `.github/workflows/ci.yml`) fails on a 99.0%, 0.99, or 98.1% LoCoMo evidence-recall headline. JSON is parsed structurally: `mean_evidence_recall` and `recall_at_k` fail for fraction values 0.99, 0.9902, and 0.981 and for percent values 99.0 and 98.1, unless the containing object or file is marked superseded or retraction. A prose line is allowed when it contains withdrawn, retract, or superseded. Tests in `scripts/test_check_public_locomo_claims.py` cover both formats. The check scans README files, `docs/`, `CHANGELOG.md`, `MAINTAINER.md`, `.zenodo.json`, `CITATION.cff`, `benchmarks/results/`, and papers/hub site text.
 
 | Benchmark | Config frozen | Final cert JSON | Notes |
 |---|---|---|---|
