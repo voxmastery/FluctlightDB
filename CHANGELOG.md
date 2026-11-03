@@ -11,9 +11,17 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 
 ## [Unreleased]
 
+### Changed
+
+- Public LoCoMo copy reports 96.8% mean per-question evidence recall at k=150 (72.6% at k=5), maintainer-reported. `benchmarks/results/paper-2026-07-10.json` is superseded by `paper-2026-07-09.json`. Citations link to https://arxiv.org/abs/2608.12365v2. Pooled span recall is 2627/2823 = 93.1%, separate from that mean. CI rejects a 99.0%, 0.99, or 98.1% LoCoMo headline unless the line or JSON object is marked withdrawn, retracted, or superseded.
+
 ### Removed
 
 - Root README no longer mentions the Codex Community Hackathon. The writeup remains in `HACKATHON.md`.
+
+### Security
+
+- **`rustls` 0.23.46 and `rustls-webpki` 0.103.16.** Clears RUSTSEC-2026-0346, RUSTSEC-2026-0347, RUSTSEC-2026-0348, RUSTSEC-2026-0349, and RUSTSEC-2026-0382.
 
 ---
 
