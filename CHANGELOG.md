@@ -22,6 +22,7 @@ Versioning follows [Semantic Versioning](https://semver.org/) where practical.
 ### Security
 
 - **`rustls` 0.23.46 and `rustls-webpki` 0.103.16.** Clears RUSTSEC-2026-0346, RUSTSEC-2026-0347, RUSTSEC-2026-0348, RUSTSEC-2026-0349, and RUSTSEC-2026-0382.
+- **`tokio` 1.53.3.** Clears RUSTSEC-2026-0386 (`AsyncFd` I/O safety).
 
 ---
 
